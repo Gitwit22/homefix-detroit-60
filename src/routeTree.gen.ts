@@ -13,9 +13,17 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AssessmentRouteImport } from './routes/assessment'
 import { Route as CoverageRouteImport } from './routes/coverage'
 import { Route as IntakeRouteImport } from './routes/intake'
+import { Route as PartnerRouteImport } from './routes/partner'
 import { Route as PassportRouteImport } from './routes/passport'
 import { Route as StatusRouteImport } from './routes/status'
+import { Route as PartnerAnalyticsRouteImport } from './routes/partner.analytics'
+import { Route as PartnerCasesRouteImport } from './routes/partner.cases'
+import { Route as PartnerOverflowRouteImport } from './routes/partner.overflow'
+import { Route as PartnerProgramsRouteImport } from './routes/partner.programs'
+import { Route as PartnerUnmetNeedsRouteImport } from './routes/partner.unmet-needs'
 import { Route as ProgramsProgramIdRouteImport } from './routes/programs.$programId'
+import { Route as PartnerCasesCaseIdRouteImport } from './routes/partner.cases.$caseId'
+import { Route as PartnerOverflowJobIdRouteImport } from './routes/partner.overflow.$jobId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -37,6 +45,11 @@ const IntakeRoute = IntakeRouteImport.update({
   path: '/intake',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PartnerRoute = PartnerRouteImport.update({
+  id: '/partner',
+  path: '/partner',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PassportRoute = PassportRouteImport.update({
   id: '/passport',
   path: '/passport',
@@ -47,10 +60,45 @@ const StatusRoute = StatusRouteImport.update({
   path: '/status',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PartnerAnalyticsRoute = PartnerAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => PartnerRoute,
+} as any)
+const PartnerCasesRoute = PartnerCasesRouteImport.update({
+  id: '/cases',
+  path: '/cases',
+  getParentRoute: () => PartnerRoute,
+} as any)
+const PartnerOverflowRoute = PartnerOverflowRouteImport.update({
+  id: '/overflow',
+  path: '/overflow',
+  getParentRoute: () => PartnerRoute,
+} as any)
+const PartnerProgramsRoute = PartnerProgramsRouteImport.update({
+  id: '/programs',
+  path: '/programs',
+  getParentRoute: () => PartnerRoute,
+} as any)
+const PartnerUnmetNeedsRoute = PartnerUnmetNeedsRouteImport.update({
+  id: '/unmet-needs',
+  path: '/unmet-needs',
+  getParentRoute: () => PartnerRoute,
+} as any)
 const ProgramsProgramIdRoute = ProgramsProgramIdRouteImport.update({
   id: '/programs/$programId',
   path: '/programs/$programId',
   getParentRoute: () => rootRouteImport,
+} as any)
+const PartnerCasesCaseIdRoute = PartnerCasesCaseIdRouteImport.update({
+  id: '/$caseId',
+  path: '/$caseId',
+  getParentRoute: () => PartnerCasesRoute,
+} as any)
+const PartnerOverflowJobIdRoute = PartnerOverflowJobIdRouteImport.update({
+  id: '/$jobId',
+  path: '/$jobId',
+  getParentRoute: () => PartnerOverflowRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -58,18 +106,34 @@ export interface FileRoutesByFullPath {
   '/assessment': typeof AssessmentRoute
   '/coverage': typeof CoverageRoute
   '/intake': typeof IntakeRoute
+  '/partner': typeof PartnerRouteWithChildren
   '/passport': typeof PassportRoute
   '/status': typeof StatusRoute
+  '/partner/analytics': typeof PartnerAnalyticsRoute
+  '/partner/cases': typeof PartnerCasesRouteWithChildren
+  '/partner/overflow': typeof PartnerOverflowRouteWithChildren
+  '/partner/programs': typeof PartnerProgramsRoute
+  '/partner/unmet-needs': typeof PartnerUnmetNeedsRoute
   '/programs/$programId': typeof ProgramsProgramIdRoute
+  '/partner/cases/$caseId': typeof PartnerCasesCaseIdRoute
+  '/partner/overflow/$jobId': typeof PartnerOverflowJobIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/assessment': typeof AssessmentRoute
   '/coverage': typeof CoverageRoute
   '/intake': typeof IntakeRoute
+  '/partner': typeof PartnerRouteWithChildren
   '/passport': typeof PassportRoute
   '/status': typeof StatusRoute
+  '/partner/analytics': typeof PartnerAnalyticsRoute
+  '/partner/cases': typeof PartnerCasesRouteWithChildren
+  '/partner/overflow': typeof PartnerOverflowRouteWithChildren
+  '/partner/programs': typeof PartnerProgramsRoute
+  '/partner/unmet-needs': typeof PartnerUnmetNeedsRoute
   '/programs/$programId': typeof ProgramsProgramIdRoute
+  '/partner/cases/$caseId': typeof PartnerCasesCaseIdRoute
+  '/partner/overflow/$jobId': typeof PartnerOverflowJobIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -77,9 +141,17 @@ export interface FileRoutesById {
   '/assessment': typeof AssessmentRoute
   '/coverage': typeof CoverageRoute
   '/intake': typeof IntakeRoute
+  '/partner': typeof PartnerRouteWithChildren
   '/passport': typeof PassportRoute
   '/status': typeof StatusRoute
+  '/partner/analytics': typeof PartnerAnalyticsRoute
+  '/partner/cases': typeof PartnerCasesRouteWithChildren
+  '/partner/overflow': typeof PartnerOverflowRouteWithChildren
+  '/partner/programs': typeof PartnerProgramsRoute
+  '/partner/unmet-needs': typeof PartnerUnmetNeedsRoute
   '/programs/$programId': typeof ProgramsProgramIdRoute
+  '/partner/cases/$caseId': typeof PartnerCasesCaseIdRoute
+  '/partner/overflow/$jobId': typeof PartnerOverflowJobIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -88,27 +160,51 @@ export interface FileRouteTypes {
     | '/assessment'
     | '/coverage'
     | '/intake'
+    | '/partner'
     | '/passport'
     | '/status'
+    | '/partner/analytics'
+    | '/partner/cases'
+    | '/partner/overflow'
+    | '/partner/programs'
+    | '/partner/unmet-needs'
     | '/programs/$programId'
+    | '/partner/cases/$caseId'
+    | '/partner/overflow/$jobId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/assessment'
     | '/coverage'
     | '/intake'
+    | '/partner'
     | '/passport'
     | '/status'
+    | '/partner/analytics'
+    | '/partner/cases'
+    | '/partner/overflow'
+    | '/partner/programs'
+    | '/partner/unmet-needs'
     | '/programs/$programId'
+    | '/partner/cases/$caseId'
+    | '/partner/overflow/$jobId'
   id:
     | '__root__'
     | '/'
     | '/assessment'
     | '/coverage'
     | '/intake'
+    | '/partner'
     | '/passport'
     | '/status'
+    | '/partner/analytics'
+    | '/partner/cases'
+    | '/partner/overflow'
+    | '/partner/programs'
+    | '/partner/unmet-needs'
     | '/programs/$programId'
+    | '/partner/cases/$caseId'
+    | '/partner/overflow/$jobId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -116,6 +212,7 @@ export interface RootRouteChildren {
   AssessmentRoute: typeof AssessmentRoute
   CoverageRoute: typeof CoverageRoute
   IntakeRoute: typeof IntakeRoute
+  PartnerRoute: typeof PartnerRouteWithChildren
   PassportRoute: typeof PassportRoute
   StatusRoute: typeof StatusRoute
   ProgramsProgramIdRoute: typeof ProgramsProgramIdRoute
@@ -151,6 +248,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IntakeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/partner': {
+      id: '/partner'
+      path: '/partner'
+      fullPath: '/partner'
+      preLoaderRoute: typeof PartnerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/passport': {
       id: '/passport'
       path: '/passport'
@@ -165,6 +269,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StatusRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/partner/analytics': {
+      id: '/partner/analytics'
+      path: '/analytics'
+      fullPath: '/partner/analytics'
+      preLoaderRoute: typeof PartnerAnalyticsRouteImport
+      parentRoute: typeof PartnerRoute
+    }
+    '/partner/cases': {
+      id: '/partner/cases'
+      path: '/cases'
+      fullPath: '/partner/cases'
+      preLoaderRoute: typeof PartnerCasesRouteImport
+      parentRoute: typeof PartnerRoute
+    }
+    '/partner/overflow': {
+      id: '/partner/overflow'
+      path: '/overflow'
+      fullPath: '/partner/overflow'
+      preLoaderRoute: typeof PartnerOverflowRouteImport
+      parentRoute: typeof PartnerRoute
+    }
+    '/partner/programs': {
+      id: '/partner/programs'
+      path: '/programs'
+      fullPath: '/partner/programs'
+      preLoaderRoute: typeof PartnerProgramsRouteImport
+      parentRoute: typeof PartnerRoute
+    }
+    '/partner/unmet-needs': {
+      id: '/partner/unmet-needs'
+      path: '/unmet-needs'
+      fullPath: '/partner/unmet-needs'
+      preLoaderRoute: typeof PartnerUnmetNeedsRouteImport
+      parentRoute: typeof PartnerRoute
+    }
     '/programs/$programId': {
       id: '/programs/$programId'
       path: '/programs/$programId'
@@ -172,14 +311,72 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProgramsProgramIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/partner/cases/$caseId': {
+      id: '/partner/cases/$caseId'
+      path: '/$caseId'
+      fullPath: '/partner/cases/$caseId'
+      preLoaderRoute: typeof PartnerCasesCaseIdRouteImport
+      parentRoute: typeof PartnerCasesRoute
+    }
+    '/partner/overflow/$jobId': {
+      id: '/partner/overflow/$jobId'
+      path: '/$jobId'
+      fullPath: '/partner/overflow/$jobId'
+      preLoaderRoute: typeof PartnerOverflowJobIdRouteImport
+      parentRoute: typeof PartnerOverflowRoute
+    }
   }
 }
+
+interface PartnerCasesRouteChildren {
+  PartnerCasesCaseIdRoute: typeof PartnerCasesCaseIdRoute
+}
+
+const PartnerCasesRouteChildren: PartnerCasesRouteChildren = {
+  PartnerCasesCaseIdRoute: PartnerCasesCaseIdRoute,
+}
+
+const PartnerCasesRouteWithChildren = PartnerCasesRoute._addFileChildren(
+  PartnerCasesRouteChildren,
+)
+
+interface PartnerOverflowRouteChildren {
+  PartnerOverflowJobIdRoute: typeof PartnerOverflowJobIdRoute
+}
+
+const PartnerOverflowRouteChildren: PartnerOverflowRouteChildren = {
+  PartnerOverflowJobIdRoute: PartnerOverflowJobIdRoute,
+}
+
+const PartnerOverflowRouteWithChildren = PartnerOverflowRoute._addFileChildren(
+  PartnerOverflowRouteChildren,
+)
+
+interface PartnerRouteChildren {
+  PartnerAnalyticsRoute: typeof PartnerAnalyticsRoute
+  PartnerCasesRoute: typeof PartnerCasesRouteWithChildren
+  PartnerOverflowRoute: typeof PartnerOverflowRouteWithChildren
+  PartnerProgramsRoute: typeof PartnerProgramsRoute
+  PartnerUnmetNeedsRoute: typeof PartnerUnmetNeedsRoute
+}
+
+const PartnerRouteChildren: PartnerRouteChildren = {
+  PartnerAnalyticsRoute: PartnerAnalyticsRoute,
+  PartnerCasesRoute: PartnerCasesRouteWithChildren,
+  PartnerOverflowRoute: PartnerOverflowRouteWithChildren,
+  PartnerProgramsRoute: PartnerProgramsRoute,
+  PartnerUnmetNeedsRoute: PartnerUnmetNeedsRoute,
+}
+
+const PartnerRouteWithChildren =
+  PartnerRoute._addFileChildren(PartnerRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AssessmentRoute: AssessmentRoute,
   CoverageRoute: CoverageRoute,
   IntakeRoute: IntakeRoute,
+  PartnerRoute: PartnerRouteWithChildren,
   PassportRoute: PassportRoute,
   StatusRoute: StatusRoute,
   ProgramsProgramIdRoute: ProgramsProgramIdRoute,
