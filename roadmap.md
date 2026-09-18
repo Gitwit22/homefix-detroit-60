@@ -5,4 +5,4 @@
 - [x] Build the repair assessment, Repair Passport, coverage plan, program detail, and case status
 - [x] Build the partner dashboard, unmet-needs view, case detail, programs, analytics, and overflow-job demo
 - [x] Connect every resident and partner journey with synthetic Detroit demo data
-- [ ] Verify accessibility, mobile layouts, desktop admin layouts, metadata, and key click paths
+- [x] Verify accessibility, mobile layouts, desktop admin layouts, metadata, and key click paths
