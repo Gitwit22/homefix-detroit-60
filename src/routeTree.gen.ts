@@ -10,33 +10,242 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AssessmentRouteImport } from './routes/assessment'
+import { Route as CoverageRouteImport } from './routes/coverage'
+import { Route as IntakeRouteImport } from './routes/intake'
+import { Route as PartnerRouteImport } from './routes/partner'
+import { Route as PassportRouteImport } from './routes/passport'
+import { Route as StatusRouteImport } from './routes/status'
+import { Route as PartnerIndexRouteImport } from './routes/partner.index'
+import { Route as PartnerAnalyticsRouteImport } from './routes/partner.analytics'
+import { Route as PartnerCasesRouteImport } from './routes/partner.cases'
+import { Route as PartnerOverflowRouteImport } from './routes/partner.overflow'
+import { Route as PartnerProgramsRouteImport } from './routes/partner.programs'
+import { Route as PartnerUnmetNeedsRouteImport } from './routes/partner.unmet-needs'
+import { Route as ProgramsProgramIdRouteImport } from './routes/programs.$programId'
+import { Route as PartnerCasesIndexRouteImport } from './routes/partner.cases.index'
+import { Route as PartnerCasesCaseIdRouteImport } from './routes/partner.cases.$caseId'
+import { Route as PartnerOverflowIndexRouteImport } from './routes/partner.overflow.index'
+import { Route as PartnerOverflowJobIdRouteImport } from './routes/partner.overflow.$jobId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AssessmentRoute = AssessmentRouteImport.update({
+  id: '/assessment',
+  path: '/assessment',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CoverageRoute = CoverageRouteImport.update({
+  id: '/coverage',
+  path: '/coverage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IntakeRoute = IntakeRouteImport.update({
+  id: '/intake',
+  path: '/intake',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PartnerRoute = PartnerRouteImport.update({
+  id: '/partner',
+  path: '/partner',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PassportRoute = PassportRouteImport.update({
+  id: '/passport',
+  path: '/passport',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StatusRoute = StatusRouteImport.update({
+  id: '/status',
+  path: '/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PartnerIndexRoute = PartnerIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PartnerRoute,
+} as any)
+const PartnerAnalyticsRoute = PartnerAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => PartnerRoute,
+} as any)
+const PartnerCasesRoute = PartnerCasesRouteImport.update({
+  id: '/cases',
+  path: '/cases',
+  getParentRoute: () => PartnerRoute,
+} as any)
+const PartnerOverflowRoute = PartnerOverflowRouteImport.update({
+  id: '/overflow',
+  path: '/overflow',
+  getParentRoute: () => PartnerRoute,
+} as any)
+const PartnerProgramsRoute = PartnerProgramsRouteImport.update({
+  id: '/programs',
+  path: '/programs',
+  getParentRoute: () => PartnerRoute,
+} as any)
+const PartnerUnmetNeedsRoute = PartnerUnmetNeedsRouteImport.update({
+  id: '/unmet-needs',
+  path: '/unmet-needs',
+  getParentRoute: () => PartnerRoute,
+} as any)
+const ProgramsProgramIdRoute = ProgramsProgramIdRouteImport.update({
+  id: '/programs/$programId',
+  path: '/programs/$programId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PartnerCasesIndexRoute = PartnerCasesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PartnerCasesRoute,
+} as any)
+const PartnerCasesCaseIdRoute = PartnerCasesCaseIdRouteImport.update({
+  id: '/$caseId',
+  path: '/$caseId',
+  getParentRoute: () => PartnerCasesRoute,
+} as any)
+const PartnerOverflowIndexRoute = PartnerOverflowIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PartnerOverflowRoute,
+} as any)
+const PartnerOverflowJobIdRoute = PartnerOverflowJobIdRouteImport.update({
+  id: '/$jobId',
+  path: '/$jobId',
+  getParentRoute: () => PartnerOverflowRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/assessment': typeof AssessmentRoute
+  '/coverage': typeof CoverageRoute
+  '/intake': typeof IntakeRoute
+  '/partner': typeof PartnerRouteWithChildren
+  '/passport': typeof PassportRoute
+  '/status': typeof StatusRoute
+  '/partner/analytics': typeof PartnerAnalyticsRoute
+  '/partner/cases': typeof PartnerCasesRouteWithChildren
+  '/partner/overflow': typeof PartnerOverflowRouteWithChildren
+  '/partner/programs': typeof PartnerProgramsRoute
+  '/partner/unmet-needs': typeof PartnerUnmetNeedsRoute
+  '/programs/$programId': typeof ProgramsProgramIdRoute
+  '/partner/': typeof PartnerIndexRoute
+  '/partner/cases/$caseId': typeof PartnerCasesCaseIdRoute
+  '/partner/overflow/$jobId': typeof PartnerOverflowJobIdRoute
+  '/partner/cases/': typeof PartnerCasesIndexRoute
+  '/partner/overflow/': typeof PartnerOverflowIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/assessment': typeof AssessmentRoute
+  '/coverage': typeof CoverageRoute
+  '/intake': typeof IntakeRoute
+  '/passport': typeof PassportRoute
+  '/status': typeof StatusRoute
+  '/partner/analytics': typeof PartnerAnalyticsRoute
+  '/partner/programs': typeof PartnerProgramsRoute
+  '/partner/unmet-needs': typeof PartnerUnmetNeedsRoute
+  '/programs/$programId': typeof ProgramsProgramIdRoute
+  '/partner': typeof PartnerIndexRoute
+  '/partner/cases/$caseId': typeof PartnerCasesCaseIdRoute
+  '/partner/overflow/$jobId': typeof PartnerOverflowJobIdRoute
+  '/partner/cases': typeof PartnerCasesIndexRoute
+  '/partner/overflow': typeof PartnerOverflowIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/assessment': typeof AssessmentRoute
+  '/coverage': typeof CoverageRoute
+  '/intake': typeof IntakeRoute
+  '/partner': typeof PartnerRouteWithChildren
+  '/passport': typeof PassportRoute
+  '/status': typeof StatusRoute
+  '/partner/analytics': typeof PartnerAnalyticsRoute
+  '/partner/cases': typeof PartnerCasesRouteWithChildren
+  '/partner/overflow': typeof PartnerOverflowRouteWithChildren
+  '/partner/programs': typeof PartnerProgramsRoute
+  '/partner/unmet-needs': typeof PartnerUnmetNeedsRoute
+  '/programs/$programId': typeof ProgramsProgramIdRoute
+  '/partner/': typeof PartnerIndexRoute
+  '/partner/cases/$caseId': typeof PartnerCasesCaseIdRoute
+  '/partner/overflow/$jobId': typeof PartnerOverflowJobIdRoute
+  '/partner/cases/': typeof PartnerCasesIndexRoute
+  '/partner/overflow/': typeof PartnerOverflowIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/assessment'
+    | '/coverage'
+    | '/intake'
+    | '/partner'
+    | '/passport'
+    | '/status'
+    | '/partner/analytics'
+    | '/partner/cases'
+    | '/partner/overflow'
+    | '/partner/programs'
+    | '/partner/unmet-needs'
+    | '/programs/$programId'
+    | '/partner/'
+    | '/partner/cases/$caseId'
+    | '/partner/overflow/$jobId'
+    | '/partner/cases/'
+    | '/partner/overflow/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/assessment'
+    | '/coverage'
+    | '/intake'
+    | '/passport'
+    | '/status'
+    | '/partner/analytics'
+    | '/partner/programs'
+    | '/partner/unmet-needs'
+    | '/programs/$programId'
+    | '/partner'
+    | '/partner/cases/$caseId'
+    | '/partner/overflow/$jobId'
+    | '/partner/cases'
+    | '/partner/overflow'
+  id:
+    | '__root__'
+    | '/'
+    | '/assessment'
+    | '/coverage'
+    | '/intake'
+    | '/partner'
+    | '/passport'
+    | '/status'
+    | '/partner/analytics'
+    | '/partner/cases'
+    | '/partner/overflow'
+    | '/partner/programs'
+    | '/partner/unmet-needs'
+    | '/programs/$programId'
+    | '/partner/'
+    | '/partner/cases/$caseId'
+    | '/partner/overflow/$jobId'
+    | '/partner/cases/'
+    | '/partner/overflow/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AssessmentRoute: typeof AssessmentRoute
+  CoverageRoute: typeof CoverageRoute
+  IntakeRoute: typeof IntakeRoute
+  PartnerRoute: typeof PartnerRouteWithChildren
+  PassportRoute: typeof PassportRoute
+  StatusRoute: typeof StatusRoute
+  ProgramsProgramIdRoute: typeof ProgramsProgramIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +257,186 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/assessment': {
+      id: '/assessment'
+      path: '/assessment'
+      fullPath: '/assessment'
+      preLoaderRoute: typeof AssessmentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/coverage': {
+      id: '/coverage'
+      path: '/coverage'
+      fullPath: '/coverage'
+      preLoaderRoute: typeof CoverageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/intake': {
+      id: '/intake'
+      path: '/intake'
+      fullPath: '/intake'
+      preLoaderRoute: typeof IntakeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/partner': {
+      id: '/partner'
+      path: '/partner'
+      fullPath: '/partner'
+      preLoaderRoute: typeof PartnerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/passport': {
+      id: '/passport'
+      path: '/passport'
+      fullPath: '/passport'
+      preLoaderRoute: typeof PassportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/status': {
+      id: '/status'
+      path: '/status'
+      fullPath: '/status'
+      preLoaderRoute: typeof StatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/partner/': {
+      id: '/partner/'
+      path: '/'
+      fullPath: '/partner/'
+      preLoaderRoute: typeof PartnerIndexRouteImport
+      parentRoute: typeof PartnerRoute
+    }
+    '/partner/analytics': {
+      id: '/partner/analytics'
+      path: '/analytics'
+      fullPath: '/partner/analytics'
+      preLoaderRoute: typeof PartnerAnalyticsRouteImport
+      parentRoute: typeof PartnerRoute
+    }
+    '/partner/cases': {
+      id: '/partner/cases'
+      path: '/cases'
+      fullPath: '/partner/cases'
+      preLoaderRoute: typeof PartnerCasesRouteImport
+      parentRoute: typeof PartnerRoute
+    }
+    '/partner/overflow': {
+      id: '/partner/overflow'
+      path: '/overflow'
+      fullPath: '/partner/overflow'
+      preLoaderRoute: typeof PartnerOverflowRouteImport
+      parentRoute: typeof PartnerRoute
+    }
+    '/partner/programs': {
+      id: '/partner/programs'
+      path: '/programs'
+      fullPath: '/partner/programs'
+      preLoaderRoute: typeof PartnerProgramsRouteImport
+      parentRoute: typeof PartnerRoute
+    }
+    '/partner/unmet-needs': {
+      id: '/partner/unmet-needs'
+      path: '/unmet-needs'
+      fullPath: '/partner/unmet-needs'
+      preLoaderRoute: typeof PartnerUnmetNeedsRouteImport
+      parentRoute: typeof PartnerRoute
+    }
+    '/programs/$programId': {
+      id: '/programs/$programId'
+      path: '/programs/$programId'
+      fullPath: '/programs/$programId'
+      preLoaderRoute: typeof ProgramsProgramIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/partner/cases/': {
+      id: '/partner/cases/'
+      path: '/'
+      fullPath: '/partner/cases/'
+      preLoaderRoute: typeof PartnerCasesIndexRouteImport
+      parentRoute: typeof PartnerCasesRoute
+    }
+    '/partner/cases/$caseId': {
+      id: '/partner/cases/$caseId'
+      path: '/$caseId'
+      fullPath: '/partner/cases/$caseId'
+      preLoaderRoute: typeof PartnerCasesCaseIdRouteImport
+      parentRoute: typeof PartnerCasesRoute
+    }
+    '/partner/overflow/': {
+      id: '/partner/overflow/'
+      path: '/'
+      fullPath: '/partner/overflow/'
+      preLoaderRoute: typeof PartnerOverflowIndexRouteImport
+      parentRoute: typeof PartnerOverflowRoute
+    }
+    '/partner/overflow/$jobId': {
+      id: '/partner/overflow/$jobId'
+      path: '/$jobId'
+      fullPath: '/partner/overflow/$jobId'
+      preLoaderRoute: typeof PartnerOverflowJobIdRouteImport
+      parentRoute: typeof PartnerOverflowRoute
+    }
   }
 }
 
+interface PartnerCasesRouteChildren {
+  PartnerCasesCaseIdRoute: typeof PartnerCasesCaseIdRoute
+  PartnerCasesIndexRoute: typeof PartnerCasesIndexRoute
+}
+
+const PartnerCasesRouteChildren: PartnerCasesRouteChildren = {
+  PartnerCasesCaseIdRoute: PartnerCasesCaseIdRoute,
+  PartnerCasesIndexRoute: PartnerCasesIndexRoute,
+}
+
+const PartnerCasesRouteWithChildren = PartnerCasesRoute._addFileChildren(
+  PartnerCasesRouteChildren,
+)
+
+interface PartnerOverflowRouteChildren {
+  PartnerOverflowJobIdRoute: typeof PartnerOverflowJobIdRoute
+  PartnerOverflowIndexRoute: typeof PartnerOverflowIndexRoute
+}
+
+const PartnerOverflowRouteChildren: PartnerOverflowRouteChildren = {
+  PartnerOverflowJobIdRoute: PartnerOverflowJobIdRoute,
+  PartnerOverflowIndexRoute: PartnerOverflowIndexRoute,
+}
+
+const PartnerOverflowRouteWithChildren = PartnerOverflowRoute._addFileChildren(
+  PartnerOverflowRouteChildren,
+)
+
+interface PartnerRouteChildren {
+  PartnerAnalyticsRoute: typeof PartnerAnalyticsRoute
+  PartnerCasesRoute: typeof PartnerCasesRouteWithChildren
+  PartnerOverflowRoute: typeof PartnerOverflowRouteWithChildren
+  PartnerProgramsRoute: typeof PartnerProgramsRoute
+  PartnerUnmetNeedsRoute: typeof PartnerUnmetNeedsRoute
+  PartnerIndexRoute: typeof PartnerIndexRoute
+}
+
+const PartnerRouteChildren: PartnerRouteChildren = {
+  PartnerAnalyticsRoute: PartnerAnalyticsRoute,
+  PartnerCasesRoute: PartnerCasesRouteWithChildren,
+  PartnerOverflowRoute: PartnerOverflowRouteWithChildren,
+  PartnerProgramsRoute: PartnerProgramsRoute,
+  PartnerUnmetNeedsRoute: PartnerUnmetNeedsRoute,
+  PartnerIndexRoute: PartnerIndexRoute,
+}
+
+const PartnerRouteWithChildren =
+  PartnerRoute._addFileChildren(PartnerRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AssessmentRoute: AssessmentRoute,
+  CoverageRoute: CoverageRoute,
+  IntakeRoute: IntakeRoute,
+  PartnerRoute: PartnerRouteWithChildren,
+  PassportRoute: PassportRoute,
+  StatusRoute: StatusRoute,
+  ProgramsProgramIdRoute: ProgramsProgramIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
