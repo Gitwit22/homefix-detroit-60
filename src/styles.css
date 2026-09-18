@@ -19,6 +19,8 @@
  */
 
 @theme inline {
+  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Source Serif 4", Georgia, serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -62,26 +64,31 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
+  --radius: 0.375rem;
+  --background: oklch(0.965 0.012 84);
+  --foreground: oklch(0.225 0.025 245);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.129 0.042 264.695);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
+  --primary: oklch(0.43 0.07 185);
+  --primary-foreground: oklch(0.985 0.006 84);
+  --secondary: oklch(0.91 0.025 153);
+  --secondary-foreground: oklch(0.27 0.035 180);
+  --muted: oklch(0.925 0.012 84);
+  --muted-foreground: oklch(0.46 0.025 245);
+  --accent: oklch(0.52 0.12 39);
+  --accent-foreground: oklch(0.985 0.006 84);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --border: oklch(0.79 0.018 80);
+  --input: oklch(0.82 0.018 80);
+  --ring: oklch(0.43 0.07 185);
+  --rust: oklch(0.52 0.12 39);
+  --warning: oklch(0.7 0.13 75);
+  --positive: oklch(0.78 0.06 150);
+  --navy: oklch(0.225 0.025 245);
+  --paper: oklch(0.985 0.006 84);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -140,5 +147,58 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: var(--font-sans);
+    letter-spacing: 0;
+  }
+  button, a, input, select, textarea { outline-offset: 3px; }
+  :focus-visible { outline: 3px solid var(--ring); }
+  h1, h2, h3 { font-family: var(--font-display); }
+}
+
+@theme inline {
+  --color-rust: var(--rust);
+  --color-warning: var(--warning);
+  --color-positive: var(--positive);
+  --color-navy: var(--navy);
+  --color-paper: var(--paper);
+}
+
+@utility blueprint-grid {
+  background-image: linear-gradient(to right, color-mix(in oklab, var(--foreground) 7%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in oklab, var(--foreground) 7%, transparent) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+@layer components {
+  .app-header { @apply sticky top-0 z-50 grid min-h-18 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur md:px-8 lg:grid-cols-[auto_1fr_auto]; }
+  .brand-mark { @apply flex min-w-0 items-center gap-2.5; } .brand-number { @apply grid size-10 shrink-0 place-items-center bg-primary font-bold text-primary-foreground; }
+  .brand-mark strong { @apply block text-lg leading-none; } .brand-mark small { @apply mt-1 block truncate text-[10px] uppercase text-muted-foreground; }
+  .resident-nav { @apply hidden items-center justify-center gap-1 lg:flex; } .resident-nav a { @apply border-b-2 border-transparent px-3 py-6 text-sm font-semibold text-muted-foreground; } .resident-nav a.is-active { @apply border-primary text-foreground; }
+  .view-switcher { @apply flex shrink-0 border border-foreground/20 bg-paper p-1 text-xs font-bold; } .view-switcher a { @apply px-2.5 py-2 text-muted-foreground sm:px-3; } .view-switcher a.is-active { @apply bg-navy text-primary-foreground; }
+  .mobile-nav { @apply fixed inset-x-2 bottom-2 z-50 grid grid-cols-5 border border-border bg-paper shadow-xl lg:hidden; } .mobile-nav a { @apply flex min-w-0 flex-col items-center gap-1 px-1 py-2 text-[10px] font-semibold text-muted-foreground; } .mobile-nav svg { @apply size-5; } .mobile-nav a.is-active { @apply bg-secondary text-primary; }
+  .partner-layout { @apply mx-auto grid max-w-[1600px] lg:grid-cols-[250px_minmax(0,1fr)]; } .partner-sidebar { @apply hidden min-h-[calc(100vh-4.5rem)] border-r border-border bg-navy p-5 text-primary-foreground lg:flex lg:flex-col; }
+  .sidebar-title span { @apply text-[10px] uppercase text-primary-foreground/60; } .sidebar-title strong { @apply mt-2 block font-display text-2xl leading-tight; } .partner-sidebar nav { @apply mt-8 flex flex-col gap-1; } .partner-sidebar nav a { @apply flex items-center gap-3 border-l-2 border-transparent px-3 py-3 text-sm font-semibold text-primary-foreground/65; } .partner-sidebar nav svg { @apply size-4; } .partner-sidebar nav a.is-active { @apply border-warning bg-primary-foreground/10 text-primary-foreground; } .sidebar-foot { @apply mt-auto border-t border-primary-foreground/20 pt-5 text-xs text-primary-foreground/60; }
+  .partner-main { @apply min-w-0 px-4 py-8 pb-24 sm:px-6 lg:px-10 lg:pb-12; }
+  .demo-flag { @apply inline-flex items-center gap-1.5 text-[10px] font-bold uppercase text-rust; } .demo-flag svg { @apply size-3; }
+  .page-intro { @apply grid grid-cols-[minmax(0,1fr)_auto] items-end gap-5 border-b border-foreground pb-6; } .page-intro h1 { @apply mt-2 max-w-4xl text-4xl leading-[1.02] sm:text-5xl lg:text-6xl; } .page-intro p { @apply mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground; }
+  .eyebrow { @apply text-[11px] font-bold uppercase text-primary; }
+  .status-badge { @apply inline-flex w-fit items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold; } .status-badge svg { @apply size-3; } .status-positive { @apply bg-positive/45 text-foreground; } .status-warning { @apply bg-warning/30 text-foreground; } .status-danger { @apply bg-rust/15 text-rust; } .status-info { @apply bg-secondary text-primary; } .status-neutral { @apply bg-muted text-muted-foreground; }
+  .section-label { @apply flex items-baseline gap-3 border-b border-border pb-3 text-xs font-bold uppercase; } .section-label b { @apply font-display text-3xl font-normal text-rust; }
+  .blueprint-button { @apply min-h-12 rounded-none px-5 font-bold; } .blueprint-button svg { @apply size-4; } .button-primary { @apply bg-primary text-primary-foreground hover:bg-primary/90; } .button-secondary { @apply border border-foreground bg-transparent text-foreground hover:bg-secondary; } .button-rust { @apply bg-rust text-accent-foreground hover:bg-rust/90; }
+  .disclaimer { @apply flex gap-3 border-l-4 border-warning bg-warning/15 p-4 text-xs leading-relaxed text-muted-foreground; } .disclaimer svg { @apply mt-0.5 size-4 shrink-0 text-foreground; }
+  .progress-rail { @apply grid grid-cols-5 gap-1 border-b border-border pb-4 lg:flex lg:flex-col lg:border-b-0 lg:border-l lg:pb-0 lg:pl-5; } .progress-rail li { @apply flex min-w-0 flex-col gap-1 text-muted-foreground lg:flex-row lg:items-center lg:gap-3 lg:py-2; } .progress-rail li>span { @apply grid size-8 shrink-0 place-items-center border border-border text-xs font-bold; } .progress-rail li>span svg { @apply size-4; } .progress-rail li b { @apply truncate text-[10px] lg:text-sm; } .progress-rail li.current { @apply text-primary; } .progress-rail li.current>span { @apply bg-primary text-primary-foreground; } .progress-rail li.complete>span { @apply bg-positive/60 text-foreground; }
+  .form-field { @apply flex flex-col gap-2 font-semibold; } .form-field small { @apply font-normal text-muted-foreground; } .form-field input,.form-field select,.form-field textarea { @apply min-h-13 border border-input bg-paper px-4 py-3 font-normal; }
+  .choice-group legend,.field-legend { @apply mb-3 font-semibold; } .choice-group>div { @apply grid grid-cols-2 gap-2; } .choice-group button { @apply flex min-h-13 items-center justify-center gap-2 border border-input bg-paper px-4 font-semibold; } .choice-group button.selected { @apply border-primary bg-secondary text-primary; } .choice-group button svg { @apply size-4; }
+  .repair-grid { @apply grid grid-cols-2 gap-2 sm:grid-cols-4; } .repair-grid button { @apply relative flex min-h-28 flex-col items-start justify-between border border-border bg-paper p-3 text-left; } .repair-grid button>span { @apply text-[10px] text-muted-foreground; } .repair-grid button>svg { @apply size-5 text-primary; } .repair-grid button .check { @apply absolute right-3 top-3 size-4; } .repair-grid button.selected { @apply border-2 border-primary bg-secondary; }
+  .photo-drop { @apply flex min-h-64 w-full flex-col items-center justify-center gap-3 border-2 border-dashed border-primary bg-secondary/40 p-6 text-center; } .photo-drop>svg { @apply size-8 text-primary; } .photo-drop span,.photo-drop small { @apply text-sm text-muted-foreground; }
+  .photo-previews { @apply relative grid grid-cols-2 gap-3; } .mock-damage-photo { @apply relative min-h-56 overflow-hidden bg-muted blueprint-grid; } .mock-damage-photo::before { content:""; @apply absolute inset-x-0 top-0 h-8 bg-navy/80; } .mock-damage-photo span { @apply absolute bottom-3 left-3 bg-navy px-2 py-1 text-xs text-primary-foreground; } .water-mark { @apply absolute left-[28%] top-[25%] h-20 w-32 rounded-[50%] bg-rust/25 blur-sm; } .second .water-mark { @apply left-[48%] top-[38%] h-28 w-20; } .photo-previews>button { @apply absolute right-2 top-2 grid size-9 place-items-center bg-navy text-primary-foreground; }
+  .coverage-meter { @apply border-y border-foreground py-6; } .meter-number { @apply flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-5; } .meter-number strong { @apply font-display text-7xl font-normal text-primary; } .meter-number span { @apply max-w-xs pb-2 text-sm font-bold uppercase; } .meter-track { @apply mt-5 h-3 bg-muted; } .meter-track span { @apply block h-full origin-left bg-primary motion-safe:animate-[meter_900ms_ease-out]; }
+  .metric { @apply border-l border-border px-4 py-2; } .metric strong { @apply block font-display text-5xl font-normal; } .metric span { @apply mt-1 block max-w-32 text-xs font-bold uppercase text-muted-foreground; } .metric.accent strong { @apply text-rust; }
+  .data-table-wrap { @apply w-full overflow-x-auto border-y border-border; } .data-table { @apply w-full min-w-[720px] text-left text-sm; } .data-table th { @apply border-b border-foreground px-3 py-3 text-[10px] uppercase text-muted-foreground; } .data-table td { @apply border-b border-border px-3 py-4; } .data-table tbody tr:hover { @apply bg-secondary/40; }
+  .next-action { @apply grid gap-6 border-l-8 border-rust bg-navy p-6 text-primary-foreground sm:grid-cols-[1fr_auto] sm:items-center; } .next-action h2 { @apply mt-2 max-w-3xl text-2xl leading-tight sm:text-3xl; } .next-action .eyebrow { @apply text-warning; }
+}
+
+@keyframes meter { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; animation-duration: 0.01ms !important; } }
+@media (max-width: 1023px) { .partner-layout { display:block; } .app-header { grid-template-columns:minmax(0,1fr) auto; } }
   }
 }
