@@ -37,7 +37,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <ViewSwitcher />
     </header>
     {partner ? <div className="partner-layout"><aside className="partner-sidebar"><div className="sidebar-title"><span>Partner workspace</span><strong>Detroit Repair<br/>Intelligence</strong></div><nav aria-label="Partner navigation">{partnerLinks.map(({to,label,icon:Icon}) => <Link key={to} to={to} activeOptions={{ exact: to === "/partner" }} activeProps={{ className: "is-active" }}><Icon aria-hidden="true" />{label}</Link>)}</nav><div className="sidebar-foot"><DemoFlag /><p>Planning view for community partners.</p></div></aside><main className="partner-main">{children}</main></div> : <main>{children}</main>}
-    {!partner && <nav className="mobile-nav" aria-label="Resident mobile navigation">{residentLinks.map(({to,label,icon:Icon}) => <Link key={to} to={to} activeOptions={{ exact: to === "/" }} activeProps={{ className: "is-active" }}><Icon aria-hidden="true" /><span>{label.replace("Repair ", "")}</span></Link>)}</nav>}
+    {!partner ? <nav className="mobile-nav" aria-label="Resident mobile navigation">{residentLinks.map(({to,label,icon:Icon}) => <Link key={to} to={to} activeOptions={{ exact: to === "/" }} activeProps={{ className: "is-active" }}><Icon aria-hidden="true" /><span>{label.replace("Repair ", "")}</span></Link>)}</nav> : <nav className="partner-mobile-nav" aria-label="Partner mobile navigation">{partnerLinks.map(({to,label,icon:Icon}) => <Link key={to} to={to} activeOptions={{ exact: to === "/partner" }} activeProps={{ className: "is-active" }}><Icon aria-hidden="true" /><span>{label}</span></Link>)}</nav>}
   </div>;
 }
 

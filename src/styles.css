@@ -175,6 +175,7 @@
   .resident-nav { @apply hidden items-center justify-center gap-1 lg:flex; } .resident-nav a { @apply border-b-2 border-transparent px-3 py-6 text-sm font-semibold text-muted-foreground; } .resident-nav a.is-active { @apply border-primary text-foreground; }
   .view-switcher { @apply flex shrink-0 border border-foreground/20 bg-paper p-1 text-xs font-bold; } .view-switcher a { @apply px-2.5 py-2 text-muted-foreground sm:px-3; } .view-switcher a.is-active { @apply bg-navy text-primary-foreground; }
   .mobile-nav { @apply fixed inset-x-2 bottom-2 z-50 grid grid-cols-5 border border-border bg-paper shadow-xl lg:hidden; } .mobile-nav a { @apply flex min-w-0 flex-col items-center gap-1 px-1 py-2 text-[10px] font-semibold text-muted-foreground; } .mobile-nav svg { @apply size-5; } .mobile-nav a.is-active { @apply bg-secondary text-primary; }
+  .partner-mobile-nav { @apply fixed inset-x-2 bottom-2 z-50 flex gap-1 overflow-x-auto border border-border bg-navy p-2 shadow-xl lg:hidden; } .partner-mobile-nav a { @apply flex min-w-20 shrink-0 flex-col items-center gap-1 px-2 py-2 text-[10px] font-semibold text-primary-foreground/60; } .partner-mobile-nav svg { @apply size-5; } .partner-mobile-nav a.is-active { @apply bg-primary text-primary-foreground; }
   .partner-layout { @apply mx-auto grid max-w-[1600px] lg:grid-cols-[250px_minmax(0,1fr)]; } .partner-sidebar { @apply hidden min-h-[calc(100vh-4.5rem)] border-r border-border bg-navy p-5 text-primary-foreground lg:flex lg:flex-col; }
   .sidebar-title span { @apply text-[10px] uppercase text-primary-foreground/60; } .sidebar-title strong { @apply mt-2 block font-display text-2xl leading-tight; } .partner-sidebar nav { @apply mt-8 flex flex-col gap-1; } .partner-sidebar nav a { @apply flex items-center gap-3 border-l-2 border-transparent px-3 py-3 text-sm font-semibold text-primary-foreground/65; } .partner-sidebar nav svg { @apply size-4; } .partner-sidebar nav a.is-active { @apply border-warning bg-primary-foreground/10 text-primary-foreground; } .sidebar-foot { @apply mt-auto border-t border-primary-foreground/20 pt-5 text-xs text-primary-foreground/60; }
   .partner-main { @apply min-w-0 px-4 py-8 pb-24 sm:px-6 lg:px-10 lg:pb-12; }
@@ -200,5 +201,3 @@
 @keyframes meter { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; animation-duration: 0.01ms !important; } }
 @media (max-width: 1023px) { .partner-layout { display:block; } .app-header { grid-template-columns:minmax(0,1fr) auto; } }
-  }
-}
