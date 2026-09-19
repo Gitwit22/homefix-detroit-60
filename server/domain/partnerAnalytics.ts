@@ -159,6 +159,21 @@ export type PartnerCaseDetail = PartnerCaseSummary & {
     coverageStatus: CoverageStatus;
     programId?: string;
   }>;
+  overflow?: {
+    eligible: boolean;
+    programId?: string;
+    fundingStatus?: string;
+    fundingStatusLabel?: string;
+    capacityStatus?: string;
+    capacityStatusLabel?: string;
+    explanation?: string;
+    existingWorkOrder?: {
+      id: string;
+      workOrderNumber: string;
+      status: string;
+      statusLabel: string;
+    } | null;
+  };
 };
 
 export type ProgramCapacityMetric = SyntheticProgramCapacity & {

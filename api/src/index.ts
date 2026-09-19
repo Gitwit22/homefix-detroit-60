@@ -19,6 +19,23 @@ import {
   calculatePartnerAnalytics,
   getPartnerCaseDetail,
 } from "../../server/services/partnerAnalytics.js";
+import {
+  findExistingOverflowWorkOrderByCaseNumber,
+  ensureOverflowDemoData,
+} from "../../server/demo/overflowDemo.js";
+import {
+  createOverflowJob,
+  getOverflowJob,
+  getWorkOrderBids,
+  listOverflowJobs,
+  submitBid,
+} from "../../server/services/workOrders.js";
+import {
+  getOverflowDemoCaseConfig,
+  overflowCapacityStatusLabels,
+  overflowFundingStatusLabels,
+  workOrderStatusLabels,
+} from "../../server/domain/overflow.js";
 
 const port = parsePort(process.env.PORT);
 const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGINS);
@@ -36,6 +53,45 @@ const partnerAnalytics = calculatePartnerAnalytics(
   Number.isFinite(partnerDemoSeed) ? partnerDemoSeed : DEFAULT_PARTNER_DEMO_SEED,
   PARTNER_DEMO_GENERATED_AT,
 );
+
+async function withOverflowCaseState(caseId: string) {
+  const partnerCase = getPartnerCaseDetail(partnerFacts, caseId);
+  if (!partnerCase) return null;
+
+  const selectedNeed = partnerCase.needs.find(
+    (need) => need.programId && need.coverageStatus === "potentially_covered",
+  );
+  const config = getOverflowDemoCaseConfig(partnerCase.caseId);
+  const existingWorkOrder = await findExistingOverflowWorkOrderByCaseNumber(partnerCase.caseId);
+
+  return {
+    ...partnerCase,
+    overflow: config
+      ? {
+          eligible:
+            config.selectedRepairCategory === selectedNeed?.repairType &&
+            config.selectedProgramSlug === selectedNeed?.programId,
+          programId: config.selectedProgramSlug,
+          fundingStatus: config.fundingStatus,
+          fundingStatusLabel: overflowFundingStatusLabels[config.fundingStatus],
+          capacityStatus: config.capacityStatus,
+          capacityStatusLabel: overflowCapacityStatusLabels[config.capacityStatus],
+          explanation: config.explanation,
+          existingWorkOrder: existingWorkOrder
+            ? {
+                id: existingWorkOrder.id,
+                workOrderNumber: existingWorkOrder.workOrderNumber,
+                status: existingWorkOrder.status,
+                statusLabel:
+                  workOrderStatusLabels[
+                    existingWorkOrder.status as keyof typeof workOrderStatusLabels
+                  ] ?? existingWorkOrder.status,
+              }
+            : null,
+        }
+      : { eligible: false, existingWorkOrder: null },
+  };
+}
 
 function parsePort(value: string | undefined): number {
   const parsed = Number(value ?? 4000);
@@ -141,13 +197,19 @@ const server = createServer(async (request, response) => {
 
   const partnerCaseMatch = requestUrl.pathname.match(/^\/api\/v1\/partner-cases\/([^/]+)$/);
   if (method === "GET" && partnerCaseMatch) {
-    const caseId = decodeURIComponent(partnerCaseMatch[1]!);
-    const partnerCase = getPartnerCaseDetail(partnerFacts, caseId);
-    if (!partnerCase) {
-      sendJson(response, 404, { error: "Synthetic partner case not found" });
-      return;
+    try {
+      await ensureOverflowDemoData();
+      const caseId = decodeURIComponent(partnerCaseMatch[1]!);
+      const partnerCase = await withOverflowCaseState(caseId);
+      if (!partnerCase) {
+        sendJson(response, 404, { error: "Synthetic partner case not found" });
+        return;
+      }
+      sendJson(response, 200, partnerCase);
+    } catch (error) {
+      console.error(error);
+      sendJson(response, 500, { error: "Unable to load partner case" });
     }
-    sendJson(response, 200, partnerCase);
     return;
   }
 
@@ -163,6 +225,103 @@ const server = createServer(async (request, response) => {
     } catch (error) {
       console.error(error);
       sendJson(response, 500, { error: "Unable to load program" });
+    }
+    return;
+  }
+
+  const createOverflowMatch = requestUrl.pathname.match(
+    /^\/api\/v1\/partner-cases\/([^/]+)\/overflow-jobs$/,
+  );
+  if (method === "POST" && createOverflowMatch) {
+    try {
+      await ensureOverflowDemoData();
+      const caseReference = decodeURIComponent(createOverflowMatch[1]!);
+      const body = (await readJson(request)) as { repairNeedId?: string } | null;
+      const payload = await createOverflowJob({
+        caseReference,
+        repairNeedId: body?.repairNeedId,
+      });
+      sendJson(response, 201, payload);
+    } catch (error) {
+      console.error(error);
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Unable to create overflow job",
+      });
+    }
+    return;
+  }
+
+  if (method === "GET" && requestUrl.pathname === "/api/v1/overflow-jobs") {
+    try {
+      await ensureOverflowDemoData();
+      const payload = await listOverflowJobs();
+      sendJson(response, 200, payload);
+    } catch (error) {
+      console.error(error);
+      sendJson(response, 500, { error: "Unable to load overflow jobs" });
+    }
+    return;
+  }
+
+  const overflowJobMatch = requestUrl.pathname.match(/^\/api\/v1\/overflow-jobs\/([^/]+)$/);
+  if (method === "GET" && overflowJobMatch) {
+    try {
+      await ensureOverflowDemoData();
+      const workOrderReference = decodeURIComponent(overflowJobMatch[1]!);
+      const payload = await getOverflowJob(workOrderReference);
+      if (!payload) {
+        sendJson(response, 404, { error: "Overflow job not found" });
+        return;
+      }
+      sendJson(response, 200, payload);
+    } catch (error) {
+      console.error(error);
+      sendJson(response, 500, { error: "Unable to load overflow job" });
+    }
+    return;
+  }
+
+  const overflowJobBidsMatch = requestUrl.pathname.match(/^\/api\/v1\/overflow-jobs\/([^/]+)\/bids$/);
+  if (method === "GET" && overflowJobBidsMatch) {
+    try {
+      await ensureOverflowDemoData();
+      const workOrderReference = decodeURIComponent(overflowJobBidsMatch[1]!);
+      const payload = await getWorkOrderBids(workOrderReference);
+      sendJson(response, 200, payload);
+    } catch (error) {
+      console.error(error);
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Unable to load work order bids",
+      });
+    }
+    return;
+  }
+
+  if (method === "POST" && overflowJobBidsMatch) {
+    try {
+      await ensureOverflowDemoData();
+      const workOrderReference = decodeURIComponent(overflowJobBidsMatch[1]!);
+      const body = (await readJson(request)) as {
+        contractorName?: string;
+        companyName?: string;
+        estimatedPriceCents?: number;
+        estimatedDurationDays?: number;
+        notes?: string;
+      };
+      const payload = await submitBid({
+        workOrderReference,
+        contractorName: body.contractorName ?? "",
+        companyName: body.companyName ?? "",
+        estimatedPriceCents: Number(body.estimatedPriceCents),
+        estimatedDurationDays: Number(body.estimatedDurationDays),
+        notes: body.notes,
+      });
+      sendJson(response, 201, payload);
+    } catch (error) {
+      console.error(error);
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Unable to submit contractor response",
+      });
     }
     return;
   }

@@ -132,6 +132,22 @@ export function generateSyntheticPartnerDataset(
     }
   }
 
+  facts.unshift({
+    homeId: "HOME-DEMO-HF3130842",
+    caseId: "HF-313-0842",
+    repairNeedId: "NEED-DEMO-HF3130842-001",
+    propertyLabel: "123 Main Street",
+    zipCode: "48205",
+    repairType: "roof_water_intrusion",
+    priority: "high",
+    matchStatus: "strong_match",
+    coverageStatus: "potentially_covered",
+    caseStatus: "program_review",
+    programId: "critical-home-repair",
+    createdAt: PARTNER_DEMO_GENERATED_AT,
+    synthetic: true,
+  });
+
   return facts;
 }
 

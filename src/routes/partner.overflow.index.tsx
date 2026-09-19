@@ -1,6 +1,74 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import { DataTable, DemoFlag, PageIntro, PriorityBadge, StatusBadge } from "@/components/homefix";
-import { overflowJobs } from "@/lib/demo-data";
-export const Route=createFileRoute("/partner/overflow/")({head:()=>({meta:[{title:"Overflow Network — HomeFix 313"},{name:"description",content:"Future demo feature for program-funded repair capacity coordination."},{property:"og:title",content:"Overflow Network — HomeFix 313"},{property:"og:description",content:"A future capacity-management concept for eligible repair jobs."},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary_large_image"}]}),component:Overflow});
-function Overflow(){return <><DemoFlag/><PageIntro eyebrow="HomeFix Overflow Network · Future / Demo Feature" title="Program-funded work, prepared for capacity support." description="When approved programs have more work than available contractor capacity, eligible jobs may be prepared for qualified organizations to assess or bid on."/><div className="mt-8 border-l-4 border-warning bg-warning/15 p-4 text-sm"><strong>Concept only.</strong> Procurement, contractor verification, and bidding rules are not included in this prototype.</div><div className="mt-8"><DataTable headers={["Job","Property","Repair Type","Priority","Program","Job Status","Responses"]} rows={overflowJobs.map(j=>[<Link to="/partner/overflow/$jobId" params={{jobId:j.id}} className="flex items-center gap-2 font-bold text-primary">HF {j.id}<ArrowRight className="size-4"/></Link>,j.property,j.repair,<PriorityBadge priority={j.priority}/>,j.program,<StatusBadge tone={j.status==="Open"?"positive":"warning"}>{j.status}</StatusBadge>,`${j.responses} Responses`])}/></div></>}
+import { getOverflowJobs } from "@/lib/homefix-api";
+
+export const Route = createFileRoute("/partner/overflow/")({
+  head: () => ({
+    meta: [
+      { title: "Overflow Network — HomeFix 313" },
+      {
+        name: "description",
+        content: "Future demo feature for program-funded repair capacity coordination.",
+      },
+      { property: "og:title", content: "Overflow Network — HomeFix 313" },
+      {
+        property: "og:description",
+        content: "A future capacity-management concept for eligible repair jobs.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
+  loader: () => getOverflowJobs(),
+  component: Overflow,
+});
+
+function Overflow() {
+  const jobs = Route.useLoaderData();
+
+  return (
+    <>
+      <DemoFlag />
+      <PageIntro
+        eyebrow="HomeFix Overflow Network · Demo Feature"
+        title="Program-funded work, prepared for delivery-capacity support."
+        description="When an approved repair cannot be fulfilled immediately, HomeFix can create a structured job package for qualified contractor review. All data shown here is synthetic demonstration data."
+      />
+      <div className="mt-8 border-l-4 border-warning bg-warning/15 p-4 text-sm">
+        <strong>Demo feature.</strong> This workflow is a concept for capacity support and is not official government procurement.
+      </div>
+      <div className="mt-8">
+        <DataTable
+          headers={[
+            "Job",
+            "Repair Type",
+            "Location",
+            "Priority",
+            "Program Funding",
+            "Job Status",
+            "Responses",
+          ]}
+          rows={jobs.map((job) => [
+            <Link
+              to="/partner/overflow/$jobId"
+              params={{ jobId: job.workOrderNumber }}
+              className="flex items-center gap-2 font-bold text-primary"
+            >
+              {job.workOrderNumber}
+              <ArrowRight className="size-4" />
+            </Link>,
+            job.repairLabel,
+            `${job.city}, ${job.state} ${job.zipCode}`,
+            <PriorityBadge priority={job.priorityLabel} />,
+            <StatusBadge tone="positive">{job.fundingStatusLabel}</StatusBadge>,
+            <StatusBadge tone={job.status === "open" ? "warning" : "positive"}>
+              {job.statusLabel}
+            </StatusBadge>,
+            `${job.responseCount} Responses`,
+          ])}
+        />
+      </div>
+    </>
+  );
+}

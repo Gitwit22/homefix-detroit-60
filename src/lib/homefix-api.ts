@@ -142,6 +142,54 @@ export type ProgramDetailResponse = {
   rules: Array<{ ruleType: string; operator: string; value: unknown; required: boolean }>;
 };
 
+export type OverflowBidResponse = {
+  id: string;
+  contractorName: string;
+  companyName: string;
+  estimatedPriceCents: number;
+  estimatedDurationDays: number;
+  notes: string | null;
+  status: string;
+  statusLabel: string;
+  createdAt: string;
+};
+
+export type OverflowJobSummaryResponse = {
+  id: string;
+  workOrderNumber: string;
+  repairType: string;
+  repairLabel: string;
+  priority: string;
+  priorityLabel: string;
+  fundingStatus: string;
+  fundingStatusLabel: string;
+  capacityStatus: string;
+  capacityStatusLabel: string;
+  status: string;
+  statusLabel: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  programName: string;
+  programSlug: string | null;
+  responseCount: number;
+  isSynthetic: boolean;
+  createdAt: string;
+};
+
+export type OverflowJobDetailResponse = OverflowJobSummaryResponse & {
+  repairCaseId: string;
+  caseNumber: string;
+  repairNeedId: string;
+  description: string;
+  assessmentSummary: string | null;
+  scope: string;
+  photoCount: number;
+  photos: Array<{ id: string; imageUrl: string }>;
+  requestedAction: string;
+  bids: OverflowBidResponse[];
+};
+
 const apiUrl = import.meta.env.VITE_HOMEFIX_API_URL?.replace(/\/$/, "");
 
 export async function submitIntake(payload: IntakePayload): Promise<IntakeResponse> {
@@ -227,4 +275,59 @@ export async function getProgram(programId: string): Promise<ProgramDetailRespon
   const response = await fetch(`${apiUrl}/api/v1/programs/${encodeURIComponent(programId)}`);
   if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
   return response.json() as Promise<ProgramDetailResponse>;
+}
+
+export async function createOverflowJob(caseId: string, repairNeedId?: string) {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetch(
+    `${apiUrl}/api/v1/partner-cases/${encodeURIComponent(caseId)}/overflow-jobs`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(repairNeedId ? { repairNeedId } : {}),
+    },
+  );
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<OverflowJobDetailResponse>;
+}
+
+export async function getOverflowJobs(): Promise<OverflowJobSummaryResponse[]> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetch(`${apiUrl}/api/v1/overflow-jobs`);
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<OverflowJobSummaryResponse[]>;
+}
+
+export async function getOverflowJob(jobId: string): Promise<OverflowJobDetailResponse> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetch(`${apiUrl}/api/v1/overflow-jobs/${encodeURIComponent(jobId)}`);
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<OverflowJobDetailResponse>;
+}
+
+export async function submitBid(
+  jobId: string,
+  payload: {
+    contractorName: string;
+    companyName: string;
+    estimatedPriceCents: number;
+    estimatedDurationDays: number;
+    notes?: string;
+  },
+) {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetch(`${apiUrl}/api/v1/overflow-jobs/${encodeURIComponent(jobId)}/bids`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<OverflowJobDetailResponse>;
+}
+
+export async function getWorkOrderBids(jobId: string): Promise<OverflowBidResponse[]> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetch(`${apiUrl}/api/v1/overflow-jobs/${encodeURIComponent(jobId)}/bids`);
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<OverflowBidResponse[]>;
 }
