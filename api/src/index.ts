@@ -3,6 +3,9 @@ import "dotenv/config";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
 import { intakeSchema, createIntakeCase } from "../../server/services/intake.js";
+import { getCaseAggregate } from "../../server/services/case.js";
+import { processRepair } from "../../server/services/processRepair.js";
+import { calculateCoveragePlan, getCoveragePlan } from "../../server/services/coverage.js";
 
 const port = parsePort(process.env.PORT);
 const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGINS);
@@ -34,7 +37,7 @@ function applyCors(request: IncomingMessage, response: ServerResponse): boolean 
   if (!allowedOrigins.has(origin)) return false;
 
   response.setHeader("access-control-allow-origin", origin);
-  response.setHeader("access-control-allow-methods", "POST, OPTIONS");
+  response.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
   response.setHeader("access-control-allow-headers", "content-type");
   response.setHeader("vary", "Origin");
   return true;
@@ -66,31 +69,35 @@ async function readJson(request: IncomingMessage): Promise<unknown> {
 }
 
 class RequestError extends Error {
-  constructor(readonly status: number, message: string) {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
     super(message);
   }
 }
 
 const server = createServer(async (request, response) => {
   const requestUrl = new URL(request.url ?? "/", "http://localhost");
+  const method = (request.method ?? "").toUpperCase();
 
   if (!applyCors(request, response)) {
     sendJson(response, 403, { error: "Origin is not allowed" });
     return;
   }
 
-  if (request.method === "OPTIONS") {
+  if (method === "OPTIONS") {
     response.writeHead(204);
     response.end();
     return;
   }
 
-  if (request.method === "GET" && requestUrl.pathname === "/health") {
+  if (method === "GET" && requestUrl.pathname === "/health") {
     sendJson(response, 200, { status: "ok", service: "homefix-api" });
     return;
   }
 
-  if (request.method === "POST" && requestUrl.pathname === "/api/v1/intakes") {
+  if (method === "POST" && requestUrl.pathname === "/api/v1/intakes") {
     try {
       const payload = intakeSchema.parse(await readJson(request));
       const result = await createIntakeCase(payload);
@@ -106,6 +113,54 @@ const server = createServer(async (request, response) => {
       }
       console.error(error);
       sendJson(response, 500, { error: "Unable to save intake submission" });
+    }
+    return;
+  }
+
+  const caseMatch = requestUrl.pathname.match(/^\/api\/v1\/cases\/([0-9a-f-]+)$/i);
+  if (method === "GET" && caseMatch) {
+    try {
+      const caseId = caseMatch[1]!;
+      const payload = await getCaseAggregate(caseId);
+      if (!payload) {
+        sendJson(response, 404, { error: "Case not found" });
+        return;
+      }
+      sendJson(response, 200, payload);
+    } catch (error) {
+      console.error(error);
+      sendJson(response, 500, { error: "Unable to load case" });
+    }
+    return;
+  }
+
+  const coverageMatch = requestUrl.pathname.match(/^\/api\/v1\/cases\/([0-9a-f-]+)\/coverage$/i);
+  if (method === "GET" && coverageMatch) {
+    try {
+      const caseId = coverageMatch[1]!;
+      const existingCase = await getCaseAggregate(caseId);
+      if (!existingCase) {
+        sendJson(response, 404, { error: "Case not found" });
+        return;
+      }
+      const payload = await getCoveragePlan(caseId);
+      sendJson(response, 200, payload);
+    } catch (error) {
+      console.error(error);
+      sendJson(response, 500, { error: "Unable to load coverage plan" });
+    }
+    return;
+  }
+
+  const processMatch = requestUrl.pathname.match(/^\/api\/v1\/repairs\/([0-9a-f-]+)\/process$/i);
+  if (method === "POST" && processMatch) {
+    try {
+      const repairNeedId = processMatch[1]!;
+      const payload = await processRepair(repairNeedId);
+      sendJson(response, 200, payload);
+    } catch (error) {
+      console.error(error);
+      sendJson(response, 500, { error: "Unable to process repair" });
     }
     return;
   }
