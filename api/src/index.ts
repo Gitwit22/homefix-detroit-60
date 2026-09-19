@@ -58,19 +58,22 @@ async function withOverflowCaseState(caseId: string) {
   const partnerCase = getPartnerCaseDetail(partnerFacts, caseId);
   if (!partnerCase) return null;
 
-  const selectedNeed = partnerCase.needs.find(
-    (need) => need.programId && need.coverageStatus === "potentially_covered",
-  );
   const config = getOverflowDemoCaseConfig(partnerCase.caseId);
   const existingWorkOrder = await findExistingOverflowWorkOrderByCaseNumber(partnerCase.caseId);
+  const eligibleNeed = config
+    ? partnerCase.needs.find(
+        (need) =>
+          need.programId === config.selectedProgramSlug &&
+          need.repairType === config.selectedRepairCategory &&
+          need.coverageStatus === "potentially_covered",
+      )
+    : null;
 
   return {
     ...partnerCase,
     overflow: config
       ? {
-          eligible:
-            config.selectedRepairCategory === selectedNeed?.repairType &&
-            config.selectedProgramSlug === selectedNeed?.programId,
+          eligible: Boolean(eligibleNeed),
           programId: config.selectedProgramSlug,
           fundingStatus: config.fundingStatus,
           fundingStatusLabel: overflowFundingStatusLabels[config.fundingStatus],

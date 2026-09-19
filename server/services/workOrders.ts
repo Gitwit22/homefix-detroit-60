@@ -144,18 +144,20 @@ function buildPreliminaryScope(input: {
   ].join("\n");
 }
 
-async function generateUniqueWorkOrderNumber() {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const candidate = `HF-WO-${randomInt(0, 100000).toString().padStart(5, "0")}`;
-    const existing = await db
-      .select({ id: workOrders.id })
-      .from(workOrders)
-      .where(eq(workOrders.workOrderNumber, candidate))
-      .limit(1);
-    if (!existing[0]) return candidate;
-  }
+function generateWorkOrderNumber() {
+  return `HF-WO-${randomInt(0, 100000).toString().padStart(5, "0")}`;
+}
 
-  throw new Error("Unable to generate a unique work order number");
+function isUniqueConstraintError(error: unknown, constraintName: string) {
+  if (!(error instanceof Error)) return false;
+
+  const candidate = error as Error & { code?: string; constraint?: string; detail?: string };
+  return (
+    candidate.code === "23505" &&
+    (candidate.constraint === constraintName ||
+      candidate.message.includes(constraintName) ||
+      candidate.detail?.includes(constraintName))
+  );
 }
 
 async function resolveCase(caseReference: string) {
@@ -415,56 +417,77 @@ export async function createOverflowJob(input: CreateOverflowJobInput) {
     .from(repairPhotos)
     .where(eq(repairPhotos.repairNeedId, repairNeed.id));
   const priority = toPriority(repairNeed.urgency);
-  const workOrderNumber = await generateUniqueWorkOrderNumber();
 
-  const inserted = await db
-    .insert(workOrders)
-    .values({
-      repairCaseId: repairCase.id,
-      repairNeedId: repairNeed.id,
-      programId: match.program.id,
-      workOrderNumber,
-      repairType,
-      scope: buildPreliminaryScope({
-        description: repairNeed.description,
-        repairType,
-        priority,
-        photoCount: photos.length,
-      }),
-      priority,
-      fundingStatus: eligibility.config.fundingStatus,
-      capacityStatus: "overflow",
-      status: "open",
-      isSynthetic: true,
-    })
-    .onConflictDoNothing({ target: workOrders.repairNeedId })
-    .returning({ id: workOrders.id });
+  let createdWorkOrderId: string | null = null;
+  let createdWorkOrderNumber: string | null = null;
 
-  if (!inserted[0]) {
-    const existing = await db
-      .select({ id: workOrders.id })
-      .from(workOrders)
-      .where(eq(workOrders.repairNeedId, repairNeed.id))
-      .limit(1);
-    if (!existing[0]) {
-      throw new Error("Overflow job already exists but could not be loaded");
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const workOrderNumber = generateWorkOrderNumber();
+
+    try {
+      const inserted = await db
+        .insert(workOrders)
+        .values({
+          repairCaseId: repairCase.id,
+          repairNeedId: repairNeed.id,
+          programId: match.program.id,
+          workOrderNumber,
+          repairType,
+          scope: buildPreliminaryScope({
+            description: repairNeed.description,
+            repairType,
+            priority,
+            photoCount: photos.length,
+          }),
+          priority,
+          fundingStatus: eligibility.config.fundingStatus,
+          capacityStatus: "overflow",
+          status: "open",
+          isSynthetic: true,
+        })
+        .onConflictDoNothing({ target: workOrders.repairNeedId })
+        .returning({ id: workOrders.id });
+
+      if (!inserted[0]) {
+        const existing = await db
+          .select({ id: workOrders.id })
+          .from(workOrders)
+          .where(eq(workOrders.repairNeedId, repairNeed.id))
+          .limit(1);
+        if (!existing[0]) {
+          throw new Error("Overflow job already exists but could not be loaded");
+        }
+        const existingWorkOrder = await getOverflowJob(existing[0].id);
+        if (!existingWorkOrder) {
+          throw new Error("Existing work order could not be loaded");
+        }
+        return existingWorkOrder;
+      }
+
+      createdWorkOrderId = inserted[0].id;
+      createdWorkOrderNumber = workOrderNumber;
+      break;
+    } catch (error) {
+      if (isUniqueConstraintError(error, "work_orders_work_order_number_unique")) {
+        continue;
+      }
+      throw error;
     }
-    const existingWorkOrder = await getOverflowJob(existing[0].id);
-    if (!existingWorkOrder) {
-      throw new Error("Existing work order could not be loaded");
-    }
-    return existingWorkOrder;
+  }
+
+  if (!createdWorkOrderId || !createdWorkOrderNumber) {
+    throw new Error("Unable to create overflow job with a unique work order number");
   }
 
   await db.insert(caseEvents).values({
     repairCaseId: repairCase.id,
     eventType: "overflow_job_created",
     title: "Overflow job created",
-    description: `${workOrderNumber} was opened for contractor response.`,
-    metadata: { workOrderNumber, repairNeedId: repairNeed.id },
+    description: `${createdWorkOrderNumber} was opened for contractor response.`,
+    metadata: { workOrderNumber: createdWorkOrderNumber, repairNeedId: repairNeed.id },
   });
 
-  const workOrder = await getOverflowJob(inserted[0]!.id);
+  const workOrder = await getOverflowJob(createdWorkOrderId);
   if (!workOrder) {
     throw new Error("Overflow job was created but could not be loaded");
   }

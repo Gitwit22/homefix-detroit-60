@@ -522,22 +522,34 @@ export async function ensureOverflowDemoData() {
     (entry) => entry.workOrderId && entry.workOrderNumber,
   );
   if (workOrderEntries.length > 0) {
-    await db
-      .insert(workOrders)
-      .values(
-        workOrderEntries.map((entry) => {
-          const programId = programIdBySlug.get(entry.programSlug);
-          if (
-            !programId ||
-            !entry.workOrderId ||
-            !entry.workOrderNumber ||
-            !entry.workOrderCreatedAt
-          ) {
-            throw new Error(`Missing work order configuration for ${entry.caseNumber}`);
-          }
-          const seededBids = entry.bids ?? [];
-          return {
-            id: entry.workOrderId,
+    for (const entry of workOrderEntries) {
+      const programId = programIdBySlug.get(entry.programSlug);
+      if (!programId || !entry.workOrderId || !entry.workOrderNumber || !entry.workOrderCreatedAt) {
+        throw new Error(`Missing work order configuration for ${entry.caseNumber}`);
+      }
+
+      const seededBids = entry.bids ?? [];
+      await db
+        .insert(workOrders)
+        .values({
+          id: entry.workOrderId,
+          repairCaseId: entry.caseId,
+          repairNeedId: entry.repairNeedId,
+          programId,
+          workOrderNumber: entry.workOrderNumber,
+          repairType: entry.repairCategory,
+          scope: buildScope(entry),
+          priority: toPriority(entry.urgency),
+          fundingStatus: "program_approved",
+          capacityStatus: "overflow",
+          status: seededBids.length > 0 ? "bids_received" : "open",
+          isSynthetic: true,
+          createdAt: new Date(entry.workOrderCreatedAt),
+          updatedAt: new Date(entry.workOrderCreatedAt),
+        })
+        .onConflictDoUpdate({
+          target: workOrders.id,
+          set: {
             repairCaseId: entry.caseId,
             repairNeedId: entry.repairNeedId,
             programId,
@@ -549,15 +561,10 @@ export async function ensureOverflowDemoData() {
             capacityStatus: "overflow",
             status: seededBids.length > 0 ? "bids_received" : "open",
             isSynthetic: true,
-            createdAt: new Date(entry.workOrderCreatedAt),
-            updatedAt: new Date(entry.workOrderCreatedAt),
-          };
-        }),
-      )
-      .onConflictDoUpdate({
-        target: workOrders.id,
-        set: { updatedAt: new Date(createdAt) },
-      });
+            updatedAt: new Date(createdAt),
+          },
+        });
+    }
 
     await db
       .insert(bids)
