@@ -136,6 +136,7 @@ export type HighPriorityCase = {
 
 export type PartnerCaseSummary = {
   caseId: string;
+  caseNumber: string;
   homeId: string;
   propertyLabel: string;
   zipCode: string;

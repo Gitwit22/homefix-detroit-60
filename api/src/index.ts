@@ -58,8 +58,8 @@ async function withOverflowCaseState(caseId: string) {
   const partnerCase = getPartnerCaseDetail(partnerFacts, caseId);
   if (!partnerCase) return null;
 
-  const config = getOverflowDemoCaseConfig(partnerCase.caseId);
-  const existingWorkOrder = await findExistingOverflowWorkOrderByCaseNumber(partnerCase.caseId);
+  const config = getOverflowDemoCaseConfig(partnerCase.caseNumber);
+  const existingWorkOrder = await findExistingOverflowWorkOrderByCaseNumber(partnerCase.caseNumber);
   const eligibleNeed = config
     ? partnerCase.needs.find(
         (need) =>

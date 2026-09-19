@@ -193,7 +193,13 @@ async function resolveRepairNeedForOverflow(
     if (!explicit) {
       throw new Error("Repair need not found for case");
     }
-    return explicit;
+    const explicitMatch = await getProgramMatchForNeed(explicit.id);
+    const eligibility = getOverflowEligibility({
+      caseNumber,
+      repairCategory: normalizeRepairCategory(explicit.category),
+      programSlug: explicitMatch?.program.slug ?? null,
+    });
+    return eligibility.eligible ? explicit : null;
   }
 
   const matches = await db

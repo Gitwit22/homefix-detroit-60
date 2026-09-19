@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ArrowLeft, Camera, ClipboardList, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +52,11 @@ function Job() {
     estimatedDurationDays: number;
     statusLabel: string;
   } | null>(null);
+
+  useEffect(() => {
+    setJob(initialJob);
+    setConfirmation(null);
+  }, [initialJob]);
 
   const submitContractorBid = async () => {
     const estimatedPriceValue = Math.round(Number(estimatedPrice) * 100);
@@ -245,18 +250,23 @@ function Job() {
                 >
                   <FormField label="Company Name">
                     <input
+                      type="text"
                       value={companyName}
                       onChange={(event) => setCompanyName(event.target.value)}
                     />
                   </FormField>
                   <FormField label="Contractor Name">
                     <input
+                      type="text"
                       value={contractorName}
                       onChange={(event) => setContractorName(event.target.value)}
                     />
                   </FormField>
                   <FormField label="Estimated Price">
                     <input
+                      type="number"
+                      min="1"
+                      step="1"
                       inputMode="decimal"
                       value={estimatedPrice}
                       onChange={(event) => setEstimatedPrice(event.target.value)}
@@ -264,6 +274,9 @@ function Job() {
                   </FormField>
                   <FormField label="Estimated Duration (days)">
                     <input
+                      type="number"
+                      min="1"
+                      step="1"
                       inputMode="numeric"
                       value={estimatedDuration}
                       onChange={(event) => setEstimatedDuration(event.target.value)}
