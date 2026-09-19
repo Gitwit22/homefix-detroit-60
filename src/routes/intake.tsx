@@ -1,15 +1,86 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { ChoiceGroup, DemoFlag, FormField, PhotoUploader, ProgressRail, RepairCategoryGrid } from "@/components/homefix";
+import { submitIntake } from "@/lib/intake.server";
 
 export const Route = createFileRoute("/intake")({ head: () => ({ meta: [{title:"Repair Assessment — HomeFix 313"},{name:"description",content:"Complete a guided property and repair assessment."},{property:"og:title",content:"Repair Assessment — HomeFix 313"},{property:"og:description",content:"Tell HomeFix about your property, household, and repair needs."},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary_large_image"}] }), component: IntakePage });
 
 function IntakePage(){
- const navigate=useNavigate({from:"/intake"}); const [step,setStep]=useState(1); const [owner,setOwner]=useState("Owner"); const [primary,setPrimary]=useState("Yes"); const [senior,setSenior]=useState("Yes"); const [children,setChildren]=useState("No"); const [access,setAccess]=useState("No"); const [category,setCategory]=useState("Roof / Water"); const [safe,setSafe]=useState("Yes"); const [worse,setWorse]=useState("Yes"); const [photos,setPhotos]=useState(false);
+ const navigate=useNavigate({from:"/intake"});
+ const submit = useServerFn(submitIntake);
+ const [step,setStep]=useState(1);
+ const [owner,setOwner]=useState("Owner");
+ const [primary,setPrimary]=useState("Yes");
+ const [senior,setSenior]=useState("Yes");
+ const [children,setChildren]=useState("No");
+ const [access,setAccess]=useState("No");
+ const [category,setCategory]=useState("Roof / Water");
+ const [safe,setSafe]=useState("Yes");
+ const [worse,setWorse]=useState("Yes");
+ const [photos,setPhotos]=useState(false);
+ const [isSubmitting,setIsSubmitting]=useState(false);
  const titles=["Tell us about the property","Tell us about your household","What needs attention?","Show us what you see","Review your repair report"];
- const next=()=> step<5?setStep(step+1):navigate({to:"/assessment"});
+ const next = async () => {
+   if (step < 5) {
+     setStep(step + 1);
+     return;
+   }
+
+   setIsSubmitting(true);
+   try {
+     const response = await submit({
+       data: {
+         resident: {
+           firstName: "Denise",
+           lastName: "Carter",
+           email: "denise@example.com",
+           phone: "3135550100",
+         },
+         property: {
+           streetAddress: "123 Main Street",
+           city: "Detroit",
+           state: "MI",
+           zipCode: "48224",
+           occupancyType: owner === "Owner" ? "owner" : "renter",
+           primaryResidence: primary === "Yes",
+           yearsAtProperty: 12,
+         },
+         household: {
+           householdSize: 3,
+           incomeRange: "41000-60000",
+           applicantAge: 68,
+           seniorHousehold: senior === "Yes",
+           childrenInHousehold: children === "Yes",
+           accessibilityNeeds: access === "Yes",
+         },
+         repair: {
+           category: category,
+           description: "Water stains have spread across the upstairs bedroom ceiling after heavy rain. The paint is bubbling and the ceiling feels damp.",
+           startedWhen: "A few months ago",
+           gettingWorse: worse === "Yes",
+           safeToOccupy: safe === "Yes" || safe === "Not sure",
+           urgency: "medium",
+         },
+       },
+     });
+
+     if (response.success) {
+       navigate({ to: "/assessment" });
+       return;
+     }
+
+     throw new Error("Submission failed");
+   } catch (error) {
+     console.error(error);
+     window.alert("We couldn’t save this intake yet. Please try again.");
+   } finally {
+     setIsSubmitting(false);
+   }
+ };
+
  return <div className="mx-auto max-w-6xl px-4 py-8 pb-28 sm:px-6 lg:px-10 lg:py-12"><div className="grid gap-8 lg:grid-cols-[190px_minmax(0,1fr)]"><aside><DemoFlag/><div className="mt-6 sticky top-28"><ProgressRail current={step}/></div></aside><section><p className="eyebrow">Guided property assessment · Step {step} of 5</p><h1 className="mt-3 max-w-3xl text-4xl leading-tight sm:text-6xl">{titles[step-1]}</h1><p className="mt-4 max-w-2xl text-muted-foreground">Your answers help organize your Repair Passport and identify possible next steps. Financial questions are broad and preliminary.</p>
  <div className="mt-10 border-y border-foreground py-8">
  {step===1&&<div className="grid gap-6 sm:grid-cols-2"><FormField label="Detroit street address"><input defaultValue="123 Main Street"/></FormField><FormField label="ZIP code"><input defaultValue="48224" inputMode="numeric"/></FormField><ChoiceGroup label="Do you own or rent?" options={["Owner","Renter"]} value={owner} onChange={setOwner}/><ChoiceGroup label="Is this your primary residence?" options={["Yes","No"]} value={primary} onChange={setPrimary}/><FormField label="How many years have you lived here?"><input type="number" defaultValue="12" min="0"/></FormField></div>}
@@ -17,6 +88,6 @@ function IntakePage(){
  {step===3&&<div className="space-y-7"><RepairCategoryGrid selected={category} onChange={setCategory}/><FormField label="Describe the problem"><textarea rows={5} defaultValue="Water stains have spread across the upstairs bedroom ceiling after heavy rain. The paint is bubbling and the ceiling feels damp."/></FormField><div className="grid gap-6 sm:grid-cols-2"><FormField label="When did it start?"><select defaultValue="months"><option>Within the last week</option><option value="months">A few months ago</option><option>More than a year ago</option></select></FormField><ChoiceGroup label="Is the home safe to occupy?" options={["Yes","Not sure","No"]} value={safe} onChange={setSafe}/><ChoiceGroup label="Has it gotten worse recently?" options={["Yes","No"]} value={worse} onChange={setWorse}/></div></div>}
  {step===4&&<PhotoUploader hasPhotos={photos} onUpload={()=>setPhotos(!photos)}/>} 
  {step===5&&<div className="space-y-6"><div className="grid gap-px bg-border sm:grid-cols-2"><Review label="Property" value="123 Main Street · Detroit 48224"/><Review label="Household" value="3 residents · Senior household"/><Review label="Repair" value={`${category} · Getting worse`}/><Review label="Photos" value={photos?"2 mock photos attached":"No photos attached"}/></div><div className="flex gap-3 border-l-4 border-positive bg-positive/20 p-4"><Check className="size-5 shrink-0"/><p className="text-sm"><strong>Ready for preliminary review.</strong><br/><span className="text-muted-foreground">This demo creates a sample assessment; no information is saved.</span></p></div></div>}
- </div><div className="mt-6 flex justify-between gap-3"><Button variant="outline" className="min-h-12 rounded-none" disabled={step===1} onClick={()=>setStep(step-1)}><ArrowLeft/>Back</Button><Button className="min-h-12 rounded-none bg-primary px-6 text-primary-foreground" onClick={next}>{step===4?"Analyze My Repair":step===5?"View Assessment":"Continue"}<ArrowRight/></Button></div></section></div></div>
+ </div><div className="mt-6 flex justify-between gap-3"><Button variant="outline" className="min-h-12 rounded-none" disabled={step===1} onClick={()=>setStep(step-1)}><ArrowLeft/>Back</Button><Button className="min-h-12 rounded-none bg-primary px-6 text-primary-foreground" onClick={next} disabled={isSubmitting}>{step===4?"Analyze My Repair":step===5?isSubmitting?"Saving...":"View Assessment":"Continue"}<ArrowRight/></Button></div></section></div></div>
 }
 function Review({label,value}:{label:string;value:string}){return <div className="bg-background p-5"><span className="eyebrow">{label}</span><strong className="mt-2 block">{value}</strong></div>}

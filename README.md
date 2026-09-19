@@ -332,6 +332,37 @@ Screenshots/video backup
 ↓
 Pitch prep
 
+Cloudflare deployment
+----------------------
+
+This project deploys as a Cloudflare Worker using TanStack Start's Nitro
+Cloudflare output. The Vite configuration already targets Cloudflare; Wrangler
+publishes the generated Worker and static assets from `wrangler.toml`.
+
+```sh
+bun install
+bun run build
+bun run deploy:cloudflare
+```
+
+For local Worker testing after a build:
+
+```sh
+bun run preview:cloudflare
+```
+
+In Cloudflare's dashboard, set the same `VITE_*` variables used locally as
+build-time variables. Keep private credentials out of `VITE_*` variables; use
+Worker secrets instead:
+
+```sh
+bunx wrangler secret put SECRET_NAME
+```
+
+The deployment entry point is `.output/server/index.mjs`, and static assets are
+served from `.output/public`. Do not configure this as a Pages-only static site,
+because the app uses TanStack Start server rendering and server functions.
+
 Priority hierarchy
 Priority
 Capability
