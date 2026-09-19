@@ -133,14 +133,41 @@ export type ProgramDetailResponse = {
   slug: string | null;
   name: string;
   organization: string;
+  recordType: "resident_program" | "funding_layer";
+  governmentLevel: string | null;
+  fundingSource: string | null;
   description: string | null;
   sourceUrl: string | null;
+  applicationUrl: string | null;
+  phone: string | null;
   applicationStatus: string;
+  applicationOpenDate: string | null;
+  applicationCloseDate: string | null;
+  active: boolean;
+  matchable: boolean;
+  ownerOccupiedRequired: boolean;
+  rentersEligible: boolean;
+  landlordsEligible: boolean;
+  minimumAge: number | null;
+  childRequired: boolean;
+  disabilityRequired: boolean;
+  pregnancyQualifier: boolean;
+  incomeLimitType: string | null;
+  maxAmi: number | null;
+  taxesCurrentRequired: boolean;
+  paymentPlanAccepted: boolean;
+  geographicRestriction: string | null;
+  disasterTieBackRequired: boolean;
+  benefitType: string | null;
+  residentEntryPoint: string | null;
+  notes: string | null;
   lastVerifiedAt: string | null;
   requiredDocuments: string[];
   repairTypes: string[];
   rules: Array<{ ruleType: string; operator: string; value: unknown; required: boolean }>;
 };
+
+export type ProgramCatalogResponse = Omit<ProgramDetailResponse, "rules">[];
 
 const apiUrl = import.meta.env.VITE_HOMEFIX_API_URL?.replace(/\/$/, "");
 
@@ -227,4 +254,11 @@ export async function getProgram(programId: string): Promise<ProgramDetailRespon
   const response = await fetch(`${apiUrl}/api/v1/programs/${encodeURIComponent(programId)}`);
   if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
   return response.json() as Promise<ProgramDetailResponse>;
+}
+
+export async function getPrograms(): Promise<ProgramCatalogResponse> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetch(`${apiUrl}/api/v1/programs`);
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<ProgramCatalogResponse>;
 }

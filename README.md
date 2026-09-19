@@ -49,7 +49,7 @@ Friday build sequence
    photos
 3. Make the Passport real
    The HomeFix Passport should now load actual database information instead of demo constants.
-4. Seed 5–8 verified Detroit repair programs
+4. Seed the verified Detroit repair-program inventory
    Store structured fields:
    name
    organization
@@ -62,8 +62,7 @@ Friday build sequence
    documents_required
    source_url
    last_verified_at
-   Don't build 30 programs.
-   Five accurate programs are enough for the demo.
+   Keep current programs, closed or transitioning programs, and funding layers distinct.
    Friday Definition of Done
    You can:
    Start intake → submit → refresh browser → reopen the case → see the same information in the Passport.
@@ -395,7 +394,7 @@ npm run dev:api
 npm run dev
 ```
 
-`db:deploy` applies additive Drizzle migrations and idempotently seeds five managed Detroit-area program records. Program application windows change frequently: verify every official `sourceUrl`, `applicationStatus`, rule threshold, and `lastVerifiedAt` value before a public demonstration. Programs that are closed or require verification remain in the catalog but do not produce a viable match.
+`db:deploy` applies additive Drizzle migrations and idempotently seeds 18 managed Detroit-area records: nine current resident-facing programs, seven closed or transitioning programs, and two non-application funding layers. Program application windows change frequently: verify every official `sourceUrl`, `applicationStatus`, rule threshold, and `lastVerifiedAt` value before a public demonstration. Only records explicitly marked `matchable` enter eligibility and coverage; closed programs, inquiry-only programs, and funding layers remain visible without producing matches.
 
 Repair photos are uploaded through the Render API to authenticated Cloudinary assets. Accepted formats are JPEG, PNG, and WebP, with a maximum of five files per repair and 10 MB per file. Cloudinary credentials belong only on Render or in the local API environment; never expose them through `VITE_*` variables.
 

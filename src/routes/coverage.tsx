@@ -6,7 +6,7 @@ import { toRepairCategoryLabel } from "@/lib/repair-categories";
 
 export const Route = createFileRoute("/coverage")({
   validateSearch: (search: Record<string, unknown>) => ({
-    caseId: typeof search.caseId === "string" ? search.caseId : "",
+    caseId: typeof search["caseId"] === "string" ? search["caseId"] : "",
   }),
   head: () => ({
     meta: [
@@ -106,7 +106,7 @@ function CoveragePage() {
               key={repair.repairNeedId}
               className="relative grid gap-5 border-b border-border py-7 sm:grid-cols-[180px_1fr_auto] sm:items-center"
             >
-              <span className="absolute -left-[29px] top-9 size-4 bg-background ring-2 ring-foreground sm:-left-[41px]" />
+              <span className="absolute -left-7 top-9 size-4 bg-background ring-2 ring-foreground sm:-left-10" />
               <div>
                 <span className="text-[10px] font-bold uppercase text-muted-foreground">
                   Repair 0{index + 1}

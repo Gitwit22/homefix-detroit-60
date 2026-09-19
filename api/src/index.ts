@@ -7,7 +7,7 @@ import { intakeSchema, createIntakeCase } from "../../server/services/intake.js"
 import { getCaseAggregate } from "../../server/services/case.js";
 import { processCase, processRepair } from "../../server/services/processRepair.js";
 import { uploadRepairPhoto } from "../../server/services/photos.js";
-import { getProgramDetail } from "../../server/services/program.js";
+import { getProgramDetail, listProgramCatalog } from "../../server/services/program.js";
 import { calculateCoveragePlan, getCoveragePlan } from "../../server/services/coverage.js";
 import {
   DEFAULT_PARTNER_DEMO_SEED,
@@ -136,6 +136,16 @@ const server = createServer(async (request, response) => {
 
   if (method === "GET" && requestUrl.pathname === "/api/v1/partner-analytics") {
     sendJson(response, 200, partnerAnalytics);
+    return;
+  }
+
+  if (method === "GET" && requestUrl.pathname === "/api/v1/programs") {
+    try {
+      sendJson(response, 200, await listProgramCatalog());
+    } catch (error) {
+      console.error(error);
+      sendJson(response, 500, { error: "Unable to load programs" });
+    }
     return;
   }
 

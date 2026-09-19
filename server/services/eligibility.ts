@@ -102,6 +102,19 @@ export function evaluateProgramRules(input: {
       case "accessibility_need":
         candidate = home.accessibilityNeeds;
         break;
+      case "household_qualifier":
+        candidate =
+          home.seniorHousehold || (home.applicantAge != null && home.applicantAge >= 62)
+            ? true
+            : home.childrenInHousehold || home.accessibilityNeeds
+              ? null
+              : false;
+        break;
+      case "lead_household_qualifier":
+      case "disaster_tie_back":
+      case "geographic_eligibility":
+        candidate = null;
+        break;
       case "repair_type":
         candidate = normalizeRepairCategory(repairNeed.category);
         break;

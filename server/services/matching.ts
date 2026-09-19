@@ -52,7 +52,10 @@ export async function runMatchingForCase(caseId: string) {
     return [];
   }
 
-  const activePrograms = await db.select().from(programs).where(eq(programs.active, true));
+  const activePrograms = await db
+    .select()
+    .from(programs)
+    .where(and(eq(programs.active, true), eq(programs.matchable, true)));
   const programIds = activePrograms.map((program) => program.id);
   const allRules =
     programIds.length > 0
