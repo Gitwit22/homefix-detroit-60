@@ -1,5 +1,5 @@
 import { randomInt } from "node:crypto";
-import { desc, eq, inArray } from "drizzle-orm";
+import { desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   bids,
@@ -280,10 +280,20 @@ export async function listOverflowJobs(): Promise<OverflowWorkOrderSummary[]> {
     .innerJoin(programs, eq(programs.id, workOrders.programId))
     .orderBy(desc(workOrders.createdAt));
 
-  const bidRows = await db.select().from(bids);
-  const responseCountByWorkOrderId = bidRows.reduce(
-    (accumulator, bid) =>
-      accumulator.set(bid.workOrderId, (accumulator.get(bid.workOrderId) ?? 0) + 1),
+  const workOrderIds = rows.map((row) => row.workOrder.id);
+  const bidCounts =
+    workOrderIds.length > 0
+      ? await db
+          .select({
+            workOrderId: bids.workOrderId,
+            responseCount: sql<number>`count(*)`,
+          })
+          .from(bids)
+          .where(inArray(bids.workOrderId, workOrderIds))
+          .groupBy(bids.workOrderId)
+      : [];
+  const responseCountByWorkOrderId = bidCounts.reduce(
+    (accumulator, bid) => accumulator.set(bid.workOrderId, Number(bid.responseCount)),
     new Map<string, number>(),
   );
 

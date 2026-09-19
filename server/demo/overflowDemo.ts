@@ -566,24 +566,26 @@ export async function ensureOverflowDemoData() {
         });
     }
 
-    await db
-      .insert(bids)
-      .values(
-        workOrderEntries.flatMap((entry) =>
-          (entry.bids ?? []).map((bidEntry) => ({
-            id: bidEntry.id,
-            workOrderId: entry.workOrderId!,
-            contractorName: bidEntry.contractorName,
-            companyName: bidEntry.companyName,
-            estimatedPriceCents: bidEntry.estimatedPriceCents,
-            estimatedDurationDays: bidEntry.estimatedDurationDays,
-            notes: bidEntry.notes,
-            status: "submitted",
-            createdAt: new Date(bidEntry.createdAt),
-          })),
-        ),
-      )
-      .onConflictDoNothing();
+    const seededWorkOrderIds = workOrderEntries.map((entry) => entry.workOrderId!);
+    await db.delete(bids).where(inArray(bids.workOrderId, seededWorkOrderIds));
+
+    const seededBids = workOrderEntries.flatMap((entry) =>
+      (entry.bids ?? []).map((bidEntry) => ({
+        id: bidEntry.id,
+        workOrderId: entry.workOrderId!,
+        contractorName: bidEntry.contractorName,
+        companyName: bidEntry.companyName,
+        estimatedPriceCents: bidEntry.estimatedPriceCents,
+        estimatedDurationDays: bidEntry.estimatedDurationDays,
+        notes: bidEntry.notes,
+        status: "submitted" as const,
+        createdAt: new Date(bidEntry.createdAt),
+      })),
+    );
+
+    if (seededBids.length > 0) {
+      await db.insert(bids).values(seededBids);
+    }
   }
 }
 

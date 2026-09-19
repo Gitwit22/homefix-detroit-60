@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   integer,
   jsonb,
   numeric,
@@ -197,16 +198,20 @@ export const workOrders = pgTable("work_orders", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const bids = pgTable("bids", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  workOrderId: uuid("work_order_id")
-    .references(() => workOrders.id, { onDelete: "cascade" })
-    .notNull(),
-  contractorName: text("contractor_name").notNull(),
-  companyName: text("company_name").notNull(),
-  estimatedPriceCents: integer("estimated_price_cents").notNull(),
-  estimatedDurationDays: integer("estimated_duration_days").notNull(),
-  notes: text("notes"),
-  status: text("status").default("submitted").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const bids = pgTable(
+  "bids",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workOrderId: uuid("work_order_id")
+      .references(() => workOrders.id, { onDelete: "cascade" })
+      .notNull(),
+    contractorName: text("contractor_name").notNull(),
+    companyName: text("company_name").notNull(),
+    estimatedPriceCents: integer("estimated_price_cents").notNull(),
+    estimatedDurationDays: integer("estimated_duration_days").notNull(),
+    notes: text("notes"),
+    status: text("status").default("submitted").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("bids_work_order_id_created_at_idx").on(table.workOrderId, table.createdAt)],
+);

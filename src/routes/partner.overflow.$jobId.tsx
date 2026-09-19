@@ -236,7 +236,13 @@ function Job() {
                   </div>
                 </div>
               ) : (
-                <div className="mt-5 grid gap-4 border border-border p-6">
+                <form
+                  className="mt-5 grid gap-4 border border-border p-6"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void submitContractorBid();
+                  }}
+                >
                   <FormField label="Company Name">
                     <input
                       value={companyName}
@@ -271,14 +277,14 @@ function Job() {
                     />
                   </FormField>
                   <Button
+                    type="submit"
                     className="min-h-12 rounded-none bg-primary"
-                    onClick={submitContractorBid}
                     disabled={isSubmitting}
                   >
                     <Send />
                     {isSubmitting ? "Submitting Bid…" : "Submit Bid"}
                   </Button>
-                </div>
+                </form>
               )}
             </section>
           )}
