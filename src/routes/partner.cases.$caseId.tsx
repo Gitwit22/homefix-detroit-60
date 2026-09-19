@@ -50,7 +50,7 @@ function CaseDetail() {
         (need) =>
           need.programId === item.overflow?.programId &&
           need.coverageStatus === "potentially_covered",
-      ) ?? item.needs[0],
+      ) ?? null,
     [item.needs, item.overflow?.programId],
   );
   const reportedDate = new Intl.DateTimeFormat("en-US", {
@@ -185,7 +185,7 @@ function CaseDetail() {
                       </Link>
                     </Button>
                   </>
-                ) : item.overflow?.eligible ? (
+                ) : item.overflow?.eligible && overflowNeed ? (
                   <Button
                     className="min-h-12 rounded-none bg-primary"
                     onClick={createJob}

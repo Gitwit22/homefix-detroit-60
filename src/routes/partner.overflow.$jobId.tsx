@@ -130,7 +130,7 @@ function Job() {
       <div className="mt-8 grid gap-10 xl:grid-cols-[1fr_360px]">
         <div>
           <section className="grid gap-3 sm:grid-cols-3">
-            <StatusBadge tone="danger">{job.priorityLabel} Priority</StatusBadge>
+            <PriorityBadge priority={job.priorityLabel} />
             <StatusBadge tone="positive">{job.fundingStatusLabel}</StatusBadge>
             <StatusBadge tone={job.status === "open" ? "warning" : "positive"}>
               {job.statusLabel}

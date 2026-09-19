@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { desc, eq, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
@@ -143,10 +144,18 @@ function buildPreliminaryScope(input: {
   ].join("\n");
 }
 
-function generateWorkOrderNumber() {
-  return `HF-WO-${Math.floor(Math.random() * 100000)
-    .toString()
-    .padStart(5, "0")}`;
+async function generateUniqueWorkOrderNumber() {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const candidate = `HF-WO-${randomInt(0, 100000).toString().padStart(5, "0")}`;
+    const existing = await db
+      .select({ id: workOrders.id })
+      .from(workOrders)
+      .where(eq(workOrders.workOrderNumber, candidate))
+      .limit(1);
+    if (!existing[0]) return candidate;
+  }
+
+  throw new Error("Unable to generate a unique work order number");
 }
 
 async function resolveCase(caseReference: string) {
@@ -386,19 +395,6 @@ export async function createOverflowJob(input: CreateOverflowJobInput) {
     throw new Error("Repair need not found");
   }
 
-  const existing = await db
-    .select()
-    .from(workOrders)
-    .where(eq(workOrders.repairNeedId, repairNeed.id))
-    .limit(1);
-  if (existing[0]) {
-    const workOrder = await getOverflowJob(existing[0].id);
-    if (!workOrder) {
-      throw new Error("Existing work order could not be loaded");
-    }
-    return workOrder;
-  }
-
   const match = await getProgramMatchForNeed(repairNeed.id);
   if (!match) {
     throw new Error("No program match is available for this repair need");
@@ -419,7 +415,7 @@ export async function createOverflowJob(input: CreateOverflowJobInput) {
     .from(repairPhotos)
     .where(eq(repairPhotos.repairNeedId, repairNeed.id));
   const priority = toPriority(repairNeed.urgency);
-  const workOrderNumber = generateWorkOrderNumber();
+  const workOrderNumber = await generateUniqueWorkOrderNumber();
 
   const inserted = await db
     .insert(workOrders)
@@ -441,7 +437,24 @@ export async function createOverflowJob(input: CreateOverflowJobInput) {
       status: "open",
       isSynthetic: true,
     })
+    .onConflictDoNothing({ target: workOrders.repairNeedId })
     .returning({ id: workOrders.id });
+
+  if (!inserted[0]) {
+    const existing = await db
+      .select({ id: workOrders.id })
+      .from(workOrders)
+      .where(eq(workOrders.repairNeedId, repairNeed.id))
+      .limit(1);
+    if (!existing[0]) {
+      throw new Error("Overflow job already exists but could not be loaded");
+    }
+    const existingWorkOrder = await getOverflowJob(existing[0].id);
+    if (!existingWorkOrder) {
+      throw new Error("Existing work order could not be loaded");
+    }
+    return existingWorkOrder;
+  }
 
   await db.insert(caseEvents).values({
     repairCaseId: repairCase.id,

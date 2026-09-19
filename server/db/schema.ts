@@ -180,7 +180,8 @@ export const workOrders = pgTable("work_orders", {
     .notNull(),
   repairNeedId: uuid("repair_need_id")
     .references(() => repairNeeds.id, { onDelete: "cascade" })
-    .notNull(),
+    .notNull()
+    .unique(),
   programId: uuid("program_id")
     .references(() => programs.id)
     .notNull(),
