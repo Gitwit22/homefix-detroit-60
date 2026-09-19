@@ -1,16 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
-import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { ChoiceGroup, DemoFlag, FormField, PhotoUploader, ProgressRail, RepairCategoryGrid } from "@/components/homefix";
-import { submitIntake } from "@/lib/intake.server";
+import { submitIntake } from "@/lib/homefix-api";
 
 export const Route = createFileRoute("/intake")({ head: () => ({ meta: [{title:"Repair Assessment — HomeFix 313"},{name:"description",content:"Complete a guided property and repair assessment."},{property:"og:title",content:"Repair Assessment — HomeFix 313"},{property:"og:description",content:"Tell HomeFix about your property, household, and repair needs."},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary_large_image"}] }), component: IntakePage });
 
 function IntakePage(){
  const navigate=useNavigate({from:"/intake"});
- const submit = useServerFn(submitIntake);
  const [step,setStep]=useState(1);
  const [owner,setOwner]=useState("Owner");
  const [primary,setPrimary]=useState("Yes");
@@ -31,8 +29,7 @@ function IntakePage(){
 
    setIsSubmitting(true);
    try {
-     const response = await submit({
-       data: {
+     const response = await submitIntake({
          resident: {
            firstName: "Denise",
            lastName: "Carter",
@@ -64,7 +61,6 @@ function IntakePage(){
            safeToOccupy: safe === "Yes" || safe === "Not sure",
            urgency: "medium",
          },
-       },
      });
 
      if (response.success) {

@@ -332,36 +332,47 @@ Screenshots/video backup
 ↓
 Pitch prep
 
-Cloudflare deployment
-----------------------
+Deployment
+----------
 
-This project deploys as a Cloudflare Worker using TanStack Start's Nitro
-Cloudflare output. The Vite configuration already targets Cloudflare; Wrangler
-publishes the generated Worker and static assets from `wrangler.toml`.
+The frontend deploys as a static Cloudflare Pages site. The standalone API
+deploys to Render and is the only service with database credentials.
+
+### Render API
+
+Create a Render Blueprint from `render.yaml`, then set:
+
+- `DATABASE_URL` to the HomeFix Postgres connection string.
+- `CORS_ORIGINS` to the comma-separated frontend origins allowed to submit
+      intake data, such as `https://homefix-detroit-60.pages.dev`.
+
+Render supplies `PORT`; do not set it manually. The service health check is
+`/health` and intake submissions use `POST /api/v1/intakes`.
+
+### Cloudflare Pages
+
+Create a Pages project from this repository with:
+
+- Build command: `npm run build`
+- Build output directory: `dist`
+- Root directory: repository root
+- Node version: `22.12.0`
+
+Set `VITE_HOMEFIX_API_URL` as a Pages build variable using the Render service
+origin, for example `https://homefix-api.onrender.com`. This value is public by
+design; do not add `DATABASE_URL` to Cloudflare.
 
 ```sh
-bun install
-bun run build
-bun run deploy:cloudflare
+npm ci
+npm run build
 ```
 
-For local Worker testing after a build:
+For local development, use separate terminals:
 
 ```sh
-bun run preview:cloudflare
+npm run dev:api
+npm run dev
 ```
-
-In Cloudflare's dashboard, set the same `VITE_*` variables used locally as
-build-time variables. Keep private credentials out of `VITE_*` variables; use
-Worker secrets instead:
-
-```sh
-bunx wrangler secret put SECRET_NAME
-```
-
-The deployment entry point is `.output/server/index.mjs`, and static assets are
-served from `.output/public`. Do not configure this as a Pages-only static site,
-because the app uses TanStack Start server rendering and server functions.
 
 Priority hierarchy
 Priority

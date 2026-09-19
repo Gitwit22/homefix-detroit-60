@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { db } from "../db";
-import { homes, repairCases, repairNeeds, residents } from "../db/schema";
+import { db } from "../db/index.js";
+import { homes, repairCases, repairNeeds, residents } from "../db/schema.js";
 
 export const intakeSchema = z.object({
   resident: z.object({
