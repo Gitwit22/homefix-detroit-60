@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { db } from "../db/index.js";
 import { homes, repairCases, repairNeeds, residents } from "../db/schema.js";
+import { normalizeRepairCategory } from "../domain/repair.js";
 
 export const intakeSchema = z.object({
   resident: z.object({
@@ -42,34 +43,40 @@ export function createCaseNumber(zipCode: string) {
 }
 
 export async function createIntakeCase(payload: z.infer<typeof intakeSchema>) {
-  const residentResult = await db.insert(residents).values({
-    firstName: payload.resident.firstName,
-    lastName: payload.resident.lastName,
-    email: payload.resident.email || null,
-    phone: payload.resident.phone || null,
-  }).returning({ id: residents.id });
+  const residentResult = await db
+    .insert(residents)
+    .values({
+      firstName: payload.resident.firstName,
+      lastName: payload.resident.lastName,
+      email: payload.resident.email || null,
+      phone: payload.resident.phone || null,
+    })
+    .returning({ id: residents.id });
 
   const residentId = residentResult[0]?.id;
   if (!residentId) {
     throw new Error("Resident could not be created");
   }
 
-  const homeResult = await db.insert(homes).values({
-    residentId,
-    streetAddress: payload.property.streetAddress,
-    city: payload.property.city,
-    state: payload.property.state,
-    zipCode: payload.property.zipCode,
-    occupancyType: payload.property.occupancyType,
-    primaryResidence: payload.property.primaryResidence,
-    yearsAtProperty: payload.property.yearsAtProperty ?? null,
-    householdSize: payload.household.householdSize ?? null,
-    incomeRange: payload.household.incomeRange ?? null,
-    applicantAge: payload.household.applicantAge ?? null,
-    seniorHousehold: payload.household.seniorHousehold,
-    childrenInHousehold: payload.household.childrenInHousehold,
-    accessibilityNeeds: payload.household.accessibilityNeeds,
-  }).returning({ id: homes.id });
+  const homeResult = await db
+    .insert(homes)
+    .values({
+      residentId,
+      streetAddress: payload.property.streetAddress,
+      city: payload.property.city,
+      state: payload.property.state,
+      zipCode: payload.property.zipCode,
+      occupancyType: payload.property.occupancyType,
+      primaryResidence: payload.property.primaryResidence,
+      yearsAtProperty: payload.property.yearsAtProperty ?? null,
+      householdSize: payload.household.householdSize ?? null,
+      incomeRange: payload.household.incomeRange ?? null,
+      applicantAge: payload.household.applicantAge ?? null,
+      seniorHousehold: payload.household.seniorHousehold,
+      childrenInHousehold: payload.household.childrenInHousehold,
+      accessibilityNeeds: payload.household.accessibilityNeeds,
+    })
+    .returning({ id: homes.id });
 
   const homeId = homeResult[0]?.id;
   if (!homeId) {
@@ -78,38 +85,46 @@ export async function createIntakeCase(payload: z.infer<typeof intakeSchema>) {
 
   const caseNumber = createCaseNumber(payload.property.zipCode);
 
-  const repairCaseResult = await db.insert(repairCases).values({
-    homeId,
-    caseNumber,
-    status: "assessment_started",
-    currentStep: "intake",
-    nextAction: "Preliminary review pending",
-    coveragePercentage: 0,
-  }).returning({ id: repairCases.id });
+  const repairCaseResult = await db
+    .insert(repairCases)
+    .values({
+      homeId,
+      caseNumber,
+      status: "assessment_started",
+      currentStep: "intake",
+      nextAction: "Preliminary review pending",
+      coveragePercentage: 0,
+    })
+    .returning({ id: repairCases.id });
 
   const repairCaseId = repairCaseResult[0]?.id;
   if (!repairCaseId) {
     throw new Error("Repair case could not be created");
   }
 
-  const repairNeedResult = await db.insert(repairNeeds).values({
-    repairCaseId,
-    category: payload.repair.category,
-    description: payload.repair.description,
-    startedWhen: payload.repair.startedWhen ?? null,
-    gettingWorse: payload.repair.gettingWorse,
-    safeToOccupy: payload.repair.safeToOccupy,
-    urgency: payload.repair.urgency,
-    status: "reported",
-  }).returning({ id: repairNeeds.id });
+  const repairNeedResult = await db
+    .insert(repairNeeds)
+    .values({
+      repairCaseId,
+      category: normalizeRepairCategory(payload.repair.category),
+      description: payload.repair.description,
+      startedWhen: payload.repair.startedWhen ?? null,
+      gettingWorse: payload.repair.gettingWorse,
+      safeToOccupy: payload.repair.safeToOccupy,
+      urgency: payload.repair.urgency,
+      status: "reported",
+    })
+    .returning({ id: repairNeeds.id });
 
-  if (!repairNeedResult[0]?.id) {
+  const repairNeedId = repairNeedResult[0]?.id;
+  if (!repairNeedId) {
     throw new Error("Repair need could not be created");
   }
 
   return {
     success: true,
     caseId: repairCaseId,
+    repairNeedId,
     caseNumber,
   };
 }
