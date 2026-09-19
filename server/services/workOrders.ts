@@ -218,7 +218,7 @@ async function resolveRepairNeedForOverflow(
     if (eligibility.eligible) return need;
   }
 
-  return needs[0] ?? null;
+  return null;
 }
 
 async function getProgramMatchForNeed(repairNeedId: string) {
@@ -461,7 +461,7 @@ export async function createOverflowJob(input: CreateOverflowJobInput) {
         if (!existingWorkOrder) {
           throw new Error("Existing work order could not be loaded");
         }
-        return existingWorkOrder;
+        return { workOrder: existingWorkOrder, created: false as const };
       }
 
       createdWorkOrderId = inserted[0].id;
@@ -491,7 +491,7 @@ export async function createOverflowJob(input: CreateOverflowJobInput) {
   if (!workOrder) {
     throw new Error("Overflow job was created but could not be loaded");
   }
-  return workOrder;
+  return { workOrder, created: true as const };
 }
 
 export async function submitBid(input: SubmitBidInput) {

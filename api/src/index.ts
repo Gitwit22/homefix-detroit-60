@@ -250,7 +250,10 @@ const server = createServer(async (request, response) => {
             }
           : { caseReference },
       );
-      sendJson(response, 201, payload);
+      sendJson(response, payload.created ? 201 : 200, {
+        ...payload.workOrder,
+        created: payload.created,
+      });
     } catch (error) {
       console.error(error);
       sendJson(response, 400, {
@@ -337,7 +340,7 @@ const server = createServer(async (request, response) => {
               estimatedDurationDays: Number(body.estimatedDurationDays),
             },
       );
-      sendJson(response, 201, payload);
+      sendJson(response, 200, payload);
     } catch (error) {
       console.error(error);
       sendJson(response, 400, {
