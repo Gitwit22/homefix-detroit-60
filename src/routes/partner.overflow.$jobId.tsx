@@ -2,7 +2,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import { ArrowLeft, Camera, ClipboardList, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DemoFlag, PageIntro, PriorityBadge, SectionLabel, StatusBadge } from "@/components/homefix";
+import {
+  DemoFlag,
+  PageIntro,
+  PriorityBadge,
+  SectionLabel,
+  StatusBadge,
+} from "@/components/homefix";
 import { getOverflowJob, submitBid } from "@/lib/homefix-api";
 
 export const Route = createFileRoute("/partner/overflow/$jobId")({
@@ -106,7 +112,11 @@ function Job() {
             Admin Review
           </Link>
         </Button>
-        <Button asChild variant={mode === "contractor" ? "default" : "outline"} className="rounded-none">
+        <Button
+          asChild
+          variant={mode === "contractor" ? "default" : "outline"}
+          className="rounded-none"
+        >
           <Link
             to="/partner/overflow/$jobId"
             params={{ jobId: job.workOrderNumber }}
@@ -165,8 +175,14 @@ function Job() {
                         <StatusBadge tone="positive">{bid.statusLabel}</StatusBadge>
                       </div>
                       <dl className="mt-5 grid gap-4 sm:grid-cols-3">
-                        <CardStat label="Estimated Cost" value={formatMoney(bid.estimatedPriceCents)} />
-                        <CardStat label="Estimated Duration" value={`${bid.estimatedDurationDays} Days`} />
+                        <CardStat
+                          label="Estimated Cost"
+                          value={formatMoney(bid.estimatedPriceCents)}
+                        />
+                        <CardStat
+                          label="Estimated Duration"
+                          value={`${bid.estimatedDurationDays} Days`}
+                        />
                         <CardStat
                           label="Submitted"
                           value={new Intl.DateTimeFormat("en-US", {
@@ -197,7 +213,10 @@ function Job() {
                   <p className="eyebrow">Bid Submitted</p>
                   <h3 className="mt-2 text-3xl font-semibold">{job.workOrderNumber}</h3>
                   <dl className="mt-5 grid gap-4 sm:grid-cols-3">
-                    <CardStat label="Estimated Cost" value={formatMoney(confirmation.estimatedPriceCents)} />
+                    <CardStat
+                      label="Estimated Cost"
+                      value={formatMoney(confirmation.estimatedPriceCents)}
+                    />
                     <CardStat
                       label="Estimated Duration"
                       value={`${confirmation.estimatedDurationDays} days`}
@@ -219,7 +238,10 @@ function Job() {
               ) : (
                 <div className="mt-5 grid gap-4 border border-border p-6">
                   <FormField label="Company Name">
-                    <input value={companyName} onChange={(event) => setCompanyName(event.target.value)} />
+                    <input
+                      value={companyName}
+                      onChange={(event) => setCompanyName(event.target.value)}
+                    />
                   </FormField>
                   <FormField label="Contractor Name">
                     <input
@@ -242,7 +264,11 @@ function Job() {
                     />
                   </FormField>
                   <FormField label="Notes">
-                    <textarea rows={4} value={notes} onChange={(event) => setNotes(event.target.value)} />
+                    <textarea
+                      rows={4}
+                      value={notes}
+                      onChange={(event) => setNotes(event.target.value)}
+                    />
                   </FormField>
                   <Button
                     className="min-h-12 rounded-none bg-primary"
@@ -274,8 +300,9 @@ function Job() {
               <span>{job.photoCount} photos available</span>
             </div>
             <div className="mt-4 text-sm text-muted-foreground">
-              HomeFix organizes this work opportunity from verified resident-submitted information and
-              preliminary assessment data. Final construction scope must be confirmed by the contractor.
+              HomeFix organizes this work opportunity from verified resident-submitted information
+              and preliminary assessment data. Final construction scope must be confirmed by the
+              contractor.
             </div>
           </div>
           <Button asChild variant="outline" className="min-h-12 rounded-none">

@@ -132,21 +132,23 @@ export function generateSyntheticPartnerDataset(
     }
   }
 
-  facts.unshift({
-    homeId: "HOME-DEMO-HF3130842",
-    caseId: "HF-313-0842",
-    repairNeedId: "NEED-DEMO-HF3130842-001",
-    propertyLabel: "123 Main Street",
-    zipCode: "48205",
-    repairType: "roof_water_intrusion",
-    priority: "high",
-    matchStatus: "strong_match",
-    coverageStatus: "potentially_covered",
-    caseStatus: "program_review",
-    programId: "critical-home-repair",
-    createdAt: PARTNER_DEMO_GENERATED_AT,
-    synthetic: true,
-  });
+  const specialCaseFacts = facts.filter((fact) => fact.homeId === "HOME-DEMO-0001");
+  for (const fact of specialCaseFacts) {
+    fact.caseId = "HF-313-0842";
+    fact.propertyLabel = "123 Main Street";
+    fact.zipCode = "48205";
+    fact.createdAt = PARTNER_DEMO_GENERATED_AT;
+  }
+
+  const primaryFact = specialCaseFacts[0];
+  if (primaryFact) {
+    primaryFact.repairType = "roof_water_intrusion";
+    primaryFact.priority = "high";
+    primaryFact.matchStatus = "strong_match";
+    primaryFact.coverageStatus = "potentially_covered";
+    primaryFact.caseStatus = "program_review";
+    primaryFact.programId = "critical-home-repair";
+  }
 
   return facts;
 }

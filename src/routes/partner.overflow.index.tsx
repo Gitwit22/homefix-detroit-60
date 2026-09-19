@@ -36,7 +36,8 @@ function Overflow() {
         description="When an approved repair cannot be fulfilled immediately, HomeFix can create a structured job package for qualified contractor review. All data shown here is synthetic demonstration data."
       />
       <div className="mt-8 border-l-4 border-warning bg-warning/15 p-4 text-sm">
-        <strong>Demo feature.</strong> This workflow is a concept for capacity support and is not official government procurement.
+        <strong>Demo feature.</strong> This workflow is a concept for capacity support and is not
+        official government procurement.
       </div>
       <div className="mt-8">
         <DataTable

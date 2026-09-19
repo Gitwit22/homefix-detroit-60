@@ -48,7 +48,8 @@ function CaseDetail() {
     () =>
       item.needs.find(
         (need) =>
-          need.programId === item.overflow?.programId && need.coverageStatus === "potentially_covered",
+          need.programId === item.overflow?.programId &&
+          need.coverageStatus === "potentially_covered",
       ) ?? item.needs[0],
     [item.needs, item.overflow?.programId],
   );
@@ -144,7 +145,9 @@ function CaseDetail() {
             <div className="mt-5 border border-border p-6">
               <span className="eyebrow">Delivery capacity</span>
               <h2 className="mt-2 text-3xl">
-                {item.overflow?.programId ? programNames[item.overflow.programId] : "Not configured"}
+                {item.overflow?.programId
+                  ? programNames[item.overflow.programId]
+                  : "Not configured"}
               </h2>
               <dl className="mt-5 grid gap-4 sm:grid-cols-3">
                 <CapacityItem

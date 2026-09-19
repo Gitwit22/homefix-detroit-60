@@ -101,6 +101,16 @@ function toPriorityLabel(priority: string) {
   return "Moderate";
 }
 
+function toCapacityStatusLabel(capacityStatus: string) {
+  if (capacityStatus === "overflow") {
+    return overflowCapacityStatusLabels.full;
+  }
+  if (capacityStatus === "full" || capacityStatus === "available") {
+    return overflowCapacityStatusLabels[capacityStatus];
+  }
+  return capacityStatus;
+}
+
 function buildPreliminaryScope(input: {
   description: string;
   repairType: RepairCategory;
@@ -141,26 +151,14 @@ function generateWorkOrderNumber() {
 
 async function resolveCase(caseReference: string) {
   const rows = uuidPattern.test(caseReference)
-    ? await db
-        .select()
-        .from(repairCases)
-        .where(eq(repairCases.id, caseReference))
-        .limit(1)
-    : await db
-        .select()
-        .from(repairCases)
-        .where(eq(repairCases.caseNumber, caseReference))
-        .limit(1);
+    ? await db.select().from(repairCases).where(eq(repairCases.id, caseReference)).limit(1)
+    : await db.select().from(repairCases).where(eq(repairCases.caseNumber, caseReference)).limit(1);
   return rows[0] ?? null;
 }
 
 async function resolveWorkOrder(workOrderReference: string) {
   const rows = uuidPattern.test(workOrderReference)
-    ? await db
-        .select()
-        .from(workOrders)
-        .where(eq(workOrders.id, workOrderReference))
-        .limit(1)
+    ? await db.select().from(workOrders).where(eq(workOrders.id, workOrderReference)).limit(1)
     : await db
         .select()
         .from(workOrders)
@@ -169,7 +167,11 @@ async function resolveWorkOrder(workOrderReference: string) {
   return rows[0] ?? null;
 }
 
-async function resolveRepairNeedForOverflow(caseId: string, caseNumber: string, repairNeedId?: string) {
+async function resolveRepairNeedForOverflow(
+  caseId: string,
+  caseNumber: string,
+  repairNeedId?: string,
+) {
   const needs = await db.select().from(repairNeeds).where(eq(repairNeeds.repairCaseId, caseId));
   if (needs.length === 0) {
     throw new Error("Case has no repair needs");
@@ -217,7 +219,8 @@ async function getProgramMatchForNeed(repairNeedId: string) {
 
   const priority = ["strong_match", "potential_match", "verification_needed"];
   matches.sort(
-    (left, right) => priority.indexOf(left.match.matchStatus) - priority.indexOf(right.match.matchStatus),
+    (left, right) =>
+      priority.indexOf(left.match.matchStatus) - priority.indexOf(right.match.matchStatus),
   );
   return matches[0] ?? null;
 }
@@ -241,10 +244,7 @@ function mapSummary(row: {
         row.workOrder.fundingStatus as keyof typeof overflowFundingStatusLabels
       ] ?? row.workOrder.fundingStatus,
     capacityStatus: row.workOrder.capacityStatus,
-    capacityStatusLabel:
-      overflowCapacityStatusLabels[
-        row.workOrder.capacityStatus === "overflow" ? "full" : row.workOrder.capacityStatus
-      ] ?? row.workOrder.capacityStatus,
+    capacityStatusLabel: toCapacityStatusLabel(row.workOrder.capacityStatus),
     status: row.workOrder.status,
     statusLabel:
       workOrderStatusLabels[row.workOrder.status as keyof typeof workOrderStatusLabels] ??
@@ -271,7 +271,8 @@ export async function listOverflowJobs(): Promise<OverflowWorkOrderSummary[]> {
 
   const bidRows = await db.select().from(bids);
   const responseCountByWorkOrderId = bidRows.reduce(
-    (accumulator, bid) => accumulator.set(bid.workOrderId, (accumulator.get(bid.workOrderId) ?? 0) + 1),
+    (accumulator, bid) =>
+      accumulator.set(bid.workOrderId, (accumulator.get(bid.workOrderId) ?? 0) + 1),
     new Map<string, number>(),
   );
 
@@ -317,7 +318,13 @@ export async function getOverflowJob(
   if (!workOrder) return null;
 
   const rows = await db
-    .select({ workOrder: workOrders, repairCase: repairCases, repairNeed: repairNeeds, home: homes, program: programs })
+    .select({
+      workOrder: workOrders,
+      repairCase: repairCases,
+      repairNeed: repairNeeds,
+      home: homes,
+      program: programs,
+    })
     .from(workOrders)
     .innerJoin(repairCases, eq(repairCases.id, workOrders.repairCaseId))
     .innerJoin(repairNeeds, eq(repairNeeds.id, workOrders.repairNeedId))

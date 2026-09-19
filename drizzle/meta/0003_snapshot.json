@@ -72,12 +72,8 @@
           "name": "bids_work_order_id_work_orders_id_fk",
           "tableFrom": "bids",
           "tableTo": "work_orders",
-          "columnsFrom": [
-            "work_order_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["work_order_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -143,12 +139,8 @@
           "name": "case_events_repair_case_id_repair_cases_id_fk",
           "tableFrom": "case_events",
           "tableTo": "repair_cases",
-          "columnsFrom": [
-            "repair_case_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["repair_case_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -209,12 +201,8 @@
           "name": "documents_repair_case_id_repair_cases_id_fk",
           "tableFrom": "documents",
           "tableTo": "repair_cases",
-          "columnsFrom": [
-            "repair_case_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["repair_case_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -347,12 +335,8 @@
           "name": "homes_resident_id_residents_id_fk",
           "tableFrom": "homes",
           "tableTo": "residents",
-          "columnsFrom": [
-            "resident_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["resident_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -418,12 +402,8 @@
           "name": "program_matches_repair_need_id_repair_needs_id_fk",
           "tableFrom": "program_matches",
           "tableTo": "repair_needs",
-          "columnsFrom": [
-            "repair_need_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["repair_need_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -431,12 +411,8 @@
           "name": "program_matches_program_id_programs_id_fk",
           "tableFrom": "program_matches",
           "tableTo": "programs",
-          "columnsFrom": [
-            "program_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["program_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -477,12 +453,8 @@
           "name": "program_repair_types_program_id_programs_id_fk",
           "tableFrom": "program_repair_types",
           "tableTo": "programs",
-          "columnsFrom": [
-            "program_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["program_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -542,12 +514,8 @@
           "name": "program_rules_program_id_programs_id_fk",
           "tableFrom": "program_rules",
           "tableTo": "programs",
-          "columnsFrom": [
-            "program_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["program_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -653,9 +621,7 @@
         "programs_slug_unique": {
           "name": "programs_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -741,12 +707,8 @@
           "name": "repair_assessments_repair_need_id_repair_needs_id_fk",
           "tableFrom": "repair_assessments",
           "tableTo": "repair_needs",
-          "columnsFrom": [
-            "repair_need_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["repair_need_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -828,12 +790,8 @@
           "name": "repair_cases_home_id_homes_id_fk",
           "tableFrom": "repair_cases",
           "tableTo": "homes",
-          "columnsFrom": [
-            "home_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["home_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -843,9 +801,7 @@
         "repair_cases_case_number_unique": {
           "name": "repair_cases_case_number_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "case_number"
-          ]
+          "columns": ["case_number"]
         }
       },
       "policies": {},
@@ -929,12 +885,8 @@
           "name": "repair_needs_repair_case_id_repair_cases_id_fk",
           "tableFrom": "repair_needs",
           "tableTo": "repair_cases",
-          "columnsFrom": [
-            "repair_case_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["repair_case_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1018,12 +970,8 @@
           "name": "repair_photos_repair_need_id_repair_needs_id_fk",
           "tableFrom": "repair_photos",
           "tableTo": "repair_needs",
-          "columnsFrom": [
-            "repair_need_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["repair_need_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1033,9 +981,7 @@
         "repair_photos_public_id_unique": {
           "name": "repair_photos_public_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "public_id"
-          ]
+          "columns": ["public_id"]
         }
       },
       "policies": {},
@@ -1202,12 +1148,8 @@
           "name": "work_orders_repair_case_id_repair_cases_id_fk",
           "tableFrom": "work_orders",
           "tableTo": "repair_cases",
-          "columnsFrom": [
-            "repair_case_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["repair_case_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1215,12 +1157,8 @@
           "name": "work_orders_repair_need_id_repair_needs_id_fk",
           "tableFrom": "work_orders",
           "tableTo": "repair_needs",
-          "columnsFrom": [
-            "repair_need_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["repair_need_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1228,12 +1166,8 @@
           "name": "work_orders_program_id_programs_id_fk",
           "tableFrom": "work_orders",
           "tableTo": "programs",
-          "columnsFrom": [
-            "program_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["program_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1243,9 +1177,7 @@
         "work_orders_work_order_number_unique": {
           "name": "work_orders_work_order_number_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "work_order_number"
-          ]
+          "columns": ["work_order_number"]
         }
       },
       "policies": {},

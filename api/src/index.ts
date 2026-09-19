@@ -138,7 +138,9 @@ async function readPhotoFiles(request: IncomingMessage) {
     filter: ({ mimetype }) => ["image/jpeg", "image/png", "image/webp"].includes(mimetype ?? ""),
   });
   const [, files] = await form.parse(request);
-  return Object.values(files).flat().filter((file) => file != null);
+  return Object.values(files)
+    .flat()
+    .filter((file) => file != null);
 }
 
 async function readJson(request: IncomingMessage): Promise<unknown> {
@@ -237,10 +239,14 @@ const server = createServer(async (request, response) => {
       await ensureOverflowDemoData();
       const caseReference = decodeURIComponent(createOverflowMatch[1]!);
       const body = (await readJson(request)) as { repairNeedId?: string } | null;
-      const payload = await createOverflowJob({
-        caseReference,
-        repairNeedId: body?.repairNeedId,
-      });
+      const payload = await createOverflowJob(
+        body?.repairNeedId
+          ? {
+              caseReference,
+              repairNeedId: body.repairNeedId,
+            }
+          : { caseReference },
+      );
       sendJson(response, 201, payload);
     } catch (error) {
       console.error(error);
@@ -281,7 +287,9 @@ const server = createServer(async (request, response) => {
     return;
   }
 
-  const overflowJobBidsMatch = requestUrl.pathname.match(/^\/api\/v1\/overflow-jobs\/([^/]+)\/bids$/);
+  const overflowJobBidsMatch = requestUrl.pathname.match(
+    /^\/api\/v1\/overflow-jobs\/([^/]+)\/bids$/,
+  );
   if (method === "GET" && overflowJobBidsMatch) {
     try {
       await ensureOverflowDemoData();
@@ -308,14 +316,24 @@ const server = createServer(async (request, response) => {
         estimatedDurationDays?: number;
         notes?: string;
       };
-      const payload = await submitBid({
-        workOrderReference,
-        contractorName: body.contractorName ?? "",
-        companyName: body.companyName ?? "",
-        estimatedPriceCents: Number(body.estimatedPriceCents),
-        estimatedDurationDays: Number(body.estimatedDurationDays),
-        notes: body.notes,
-      });
+      const payload = await submitBid(
+        body.notes !== undefined
+          ? {
+              workOrderReference,
+              contractorName: body.contractorName ?? "",
+              companyName: body.companyName ?? "",
+              estimatedPriceCents: Number(body.estimatedPriceCents),
+              estimatedDurationDays: Number(body.estimatedDurationDays),
+              notes: body.notes,
+            }
+          : {
+              workOrderReference,
+              contractorName: body.contractorName ?? "",
+              companyName: body.companyName ?? "",
+              estimatedPriceCents: Number(body.estimatedPriceCents),
+              estimatedDurationDays: Number(body.estimatedDurationDays),
+            },
+      );
       sendJson(response, 201, payload);
     } catch (error) {
       console.error(error);
@@ -346,9 +364,7 @@ const server = createServer(async (request, response) => {
     return;
   }
 
-  const repairPhotoMatch = requestUrl.pathname.match(
-    /^\/api\/v1\/repairs\/([0-9a-f-]+)\/photos$/i,
-  );
+  const repairPhotoMatch = requestUrl.pathname.match(/^\/api\/v1\/repairs\/([0-9a-f-]+)\/photos$/i);
   if (method === "POST" && repairPhotoMatch) {
     try {
       const repairNeedId = repairPhotoMatch[1]!;

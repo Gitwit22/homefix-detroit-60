@@ -68,10 +68,7 @@ export const overflowDemoCases: OverflowDemoCaseSeed[] = [
     repairNeedId: "84040000-0000-4000-8000-000000000001",
     assessmentId: "84050000-0000-4000-8000-000000000001",
     matchId: "84060000-0000-4000-8000-000000000001",
-    photoIds: [
-      "84070000-0000-4000-8000-000000000001",
-      "84070000-0000-4000-8000-000000000002",
-    ],
+    photoIds: ["84070000-0000-4000-8000-000000000001", "84070000-0000-4000-8000-000000000002"],
     caseNumber: "HF-313-0842",
     residentFirstName: "Denise",
     residentLastName: "Carter",
@@ -85,8 +82,10 @@ export const overflowDemoCases: OverflowDemoCaseSeed[] = [
     childrenInHousehold: false,
     accessibilityNeeds: false,
     repairCategory: "roof_water_intrusion",
-    repairDescription: "Water intrusion affecting the upstairs bedroom ceiling during rainfall. Paint is bubbling and the drywall feels damp after storms.",
-    assessmentSummary: "Possible roof or exterior envelope water intrusion affecting the upstairs bedroom ceiling.",
+    repairDescription:
+      "Water intrusion affecting the upstairs bedroom ceiling during rainfall. Paint is bubbling and the drywall feels damp after storms.",
+    assessmentSummary:
+      "Possible roof or exterior envelope water intrusion affecting the upstairs bedroom ceiling.",
     urgency: "high",
     startedWhen: "Two months ago",
     programSlug: "critical-home-repair",
@@ -173,8 +172,10 @@ export const overflowDemoCases: OverflowDemoCaseSeed[] = [
     childrenInHousehold: false,
     accessibilityNeeds: false,
     repairCategory: "hvac",
-    repairDescription: "The furnace cycles off overnight and the home drops below safe temperature.",
-    assessmentSummary: "Reported intermittent furnace failure requiring HVAC assessment and repair estimate.",
+    repairDescription:
+      "The furnace cycles off overnight and the home drops below safe temperature.",
+    assessmentSummary:
+      "Reported intermittent furnace failure requiring HVAC assessment and repair estimate.",
     urgency: "critical",
     startedWhen: "One week ago",
     programSlug: "wayne-metro-weatherization",
@@ -215,8 +216,10 @@ export const overflowDemoCases: OverflowDemoCaseSeed[] = [
     childrenInHousehold: true,
     accessibilityNeeds: false,
     repairCategory: "electrical",
-    repairDescription: "Two bedroom outlets spark and part of the second floor loses power intermittently.",
-    assessmentSummary: "Reported electrical fault requiring licensed evaluation and repair estimate.",
+    repairDescription:
+      "Two bedroom outlets spark and part of the second floor loses power intermittently.",
+    assessmentSummary:
+      "Reported electrical fault requiring licensed evaluation and repair estimate.",
     urgency: "high",
     startedWhen: "Two weeks ago",
     programSlug: "zero-percent-home-repair-loan",
@@ -247,7 +250,8 @@ export const overflowDemoCases: OverflowDemoCaseSeed[] = [
     accessibilityNeeds: true,
     repairCategory: "accessibility",
     repairDescription: "Front entry stairs and railing are unsafe and limit home access.",
-    assessmentSummary: "Reported accessibility hazard at primary entry requiring assessment and repair estimate.",
+    assessmentSummary:
+      "Reported accessibility hazard at primary entry requiring assessment and repair estimate.",
     urgency: "high",
     startedWhen: "One month ago",
     programSlug: "zero-percent-home-repair-loan",
@@ -297,7 +301,8 @@ export const overflowDemoCases: OverflowDemoCaseSeed[] = [
     childrenInHousehold: false,
     accessibilityNeeds: false,
     repairCategory: "plumbing",
-    repairDescription: "Basement waste line backs up during laundry cycles and standing water collects near the drain.",
+    repairDescription:
+      "Basement waste line backs up during laundry cycles and standing water collects near the drain.",
     assessmentSummary: "Reported plumbing backup requiring assessment and repair estimate.",
     urgency: "moderate",
     startedWhen: "Six weeks ago",
@@ -357,12 +362,15 @@ function buildScope(entry: OverflowDemoCaseSeed) {
 export async function ensureOverflowDemoData() {
   await seedPrograms();
 
-  const programRows = await db.select().from(programs).where(
-    inArray(
-      programs.slug,
-      overflowDemoCases.map((item) => item.programSlug),
-    ),
-  );
+  const programRows = await db
+    .select()
+    .from(programs)
+    .where(
+      inArray(
+        programs.slug,
+        overflowDemoCases.map((item) => item.programSlug),
+      ),
+    );
   const programIdBySlug = new Map(programRows.map((program) => [program.slug, program.id]));
 
   await db
@@ -498,7 +506,8 @@ export async function ensureOverflowDemoData() {
           repairNeedId: entry.repairNeedId,
           programId,
           matchStatus: "strong_match",
-          explanation: "Strong Match\n✓ Program criteria satisfied for synthetic demonstration data.",
+          explanation:
+            "Strong Match\n✓ Program criteria satisfied for synthetic demonstration data.",
           missingRequirements: [],
           createdAt: new Date(entry.createdAt),
         };
@@ -509,14 +518,21 @@ export async function ensureOverflowDemoData() {
       set: { matchStatus: "strong_match" },
     });
 
-  const workOrderEntries = overflowDemoCases.filter((entry) => entry.workOrderId && entry.workOrderNumber);
+  const workOrderEntries = overflowDemoCases.filter(
+    (entry) => entry.workOrderId && entry.workOrderNumber,
+  );
   if (workOrderEntries.length > 0) {
     await db
       .insert(workOrders)
       .values(
         workOrderEntries.map((entry) => {
           const programId = programIdBySlug.get(entry.programSlug);
-          if (!programId || !entry.workOrderId || !entry.workOrderNumber || !entry.workOrderCreatedAt) {
+          if (
+            !programId ||
+            !entry.workOrderId ||
+            !entry.workOrderNumber ||
+            !entry.workOrderCreatedAt
+          ) {
             throw new Error(`Missing work order configuration for ${entry.caseNumber}`);
           }
           const seededBids = entry.bids ?? [];
@@ -580,7 +596,9 @@ export async function findExistingOverflowWorkOrderByCaseNumber(caseNumber: stri
     })
     .from(workOrders)
     .innerJoin(repairCases, eq(repairCases.id, workOrders.repairCaseId))
-    .where(and(eq(repairCases.caseNumber, caseNumber), eq(workOrders.repairNeedId, entry.repairNeedId)))
+    .where(
+      and(eq(repairCases.caseNumber, caseNumber), eq(workOrders.repairNeedId, entry.repairNeedId)),
+    )
     .limit(1);
 
   return row[0] ?? null;
