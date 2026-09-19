@@ -1,0 +1,88 @@
+{
+  "name": "HomeFix Structured Repair Triage",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "homefix-triage",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "homefix-webhook",
+      "name": "HomeFix Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "homefix-triage"
+    },
+    {
+      "parameters": {
+        "jsCode": "const auth = $json.headers?.authorization; if (auth !== `Bearer ${$env.N8N_HOMEFIX_SECRET}`) throw new Error('Unauthorized'); const body = $json.body ?? {}; if (!body.repairNeedId || !body.description) throw new Error('Invalid HomeFix payload'); return [{ json: body }];"
+      },
+      "id": "validate-request",
+      "name": "Validate Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{$env.OPENAI_API_KEY}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { model: $env.HOMEFIX_AI_MODEL || 'gpt-4.1-mini', messages: [{ role: 'system', content: 'You provide conservative preliminary home-repair triage, never a diagnosis. Return only JSON with repairCategory, urgency, summary, observations, safetyFlags, followUpQuestions, confidence.' }, { role: 'user', content: [{ type: 'text', text: JSON.stringify({ description: $json.description, reportedCategory: $json.reportedCategory, gettingWorse: $json.gettingWorse, safeToOccupy: $json.safeToOccupy }) }, ...($json.imageUrls || []).map(url => ({ type: 'image_url', image_url: { url } }))] }], response_format: { type: 'json_object' }, temperature: 0.1 } }}",
+        "options": { "timeout": 12000 }
+      },
+      "id": "structured-triage",
+      "name": "Structured Triage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const content = $json.choices?.[0]?.message?.content; if (!content) throw new Error('AI response missing content'); const value = JSON.parse(content); const allowedCategories = ['roof_water_intrusion','hvac','plumbing','electrical','windows_doors','accessibility','lead_environmental','structural','other']; const allowedUrgencies = ['low','moderate','high','critical']; if (!allowedCategories.includes(value.repairCategory) || !allowedUrgencies.includes(value.urgency) || typeof value.summary !== 'string' || !Array.isArray(value.observations) || !Array.isArray(value.safetyFlags) || !Array.isArray(value.followUpQuestions) || typeof value.confidence !== 'number') throw new Error('AI response failed HomeFix contract'); return [{ json: value }];"
+      },
+      "id": "validate-response",
+      "name": "Validate Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond to HomeFix",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [1000, 0]
+    }
+  ],
+  "connections": {
+    "HomeFix Webhook": { "main": [[{ "node": "Validate Request", "type": "main", "index": 0 }]] },
+    "Validate Request": { "main": [[{ "node": "Structured Triage", "type": "main", "index": 0 }]] },
+    "Structured Triage": {
+      "main": [[{ "node": "Validate Response", "type": "main", "index": 0 }]]
+    },
+    "Validate Response": {
+      "main": [[{ "node": "Respond to HomeFix", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "31300000-0000-4000-8000-000000000313",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, Check, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ChoiceGroup,
@@ -11,6 +11,7 @@ import {
   RepairCategoryGrid,
 } from "@/components/homefix";
 import { submitIntakeServer } from "@/lib/intake.server";
+import { processCase, uploadRepairPhotos } from "@/lib/homefix-api";
 
 export const Route = createFileRoute("/intake")({
   head: () => ({
@@ -40,6 +41,33 @@ const categoryMap: Record<string, string> = {
   Other: "other",
 };
 
+type RepairDraft = {
+  clientId: string;
+  category: string;
+  description: string;
+  startedWhen: string;
+  safe: string;
+  worse: string;
+  files: File[];
+};
+
+function createRepairDraft(index: number): RepairDraft {
+  return {
+    clientId: crypto.randomUUID(),
+    category: index === 1 ? "Heating" : index === 2 ? "Electrical" : "Roof / Water",
+    description:
+      index === 1
+        ? "The furnace is unreliable and sometimes stops producing heat."
+        : index === 2
+          ? "Several outlets spark or stop working and need professional evaluation."
+          : "Water stains have spread across the upstairs bedroom ceiling after heavy rain. The paint is bubbling and the ceiling feels damp.",
+    startedWhen: "A few months ago",
+    safe: "Yes",
+    worse: index === 2 ? "No" : "Yes",
+    files: [],
+  };
+}
+
 function IntakePage() {
   const navigate = useNavigate({ from: "/intake" });
   const [step, setStep] = useState(1);
@@ -48,11 +76,18 @@ function IntakePage() {
   const [senior, setSenior] = useState("Yes");
   const [children, setChildren] = useState("No");
   const [access, setAccess] = useState("No");
-  const [category, setCategory] = useState("Roof / Water");
-  const [safe, setSafe] = useState("Yes");
-  const [worse, setWorse] = useState("Yes");
-  const [photos, setPhotos] = useState(false);
+  const [repairs, setRepairs] = useState<RepairDraft[]>(() => [
+    createRepairDraft(0),
+    createRepairDraft(1),
+    createRepairDraft(2),
+  ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdCase, setCreatedCase] = useState<{
+    caseId: string;
+    repairNeedId: string;
+    repairs: Array<{ clientId: string; repairNeedId: string }>;
+  } | null>(null);
+  const uploadedRepairIds = useRef(new Set<string>());
 
   const [firstName, setFirstName] = useState("Denise");
   const [lastName, setLastName] = useState("Carter");
@@ -66,11 +101,6 @@ function IntakePage() {
   const [incomeRange, setIncomeRange] = useState("$41,000-$60,000");
   const [applicantAge, setApplicantAge] = useState("68");
 
-  const [description, setDescription] = useState(
-    "Water stains have spread across the upstairs bedroom ceiling after heavy rain. The paint is bubbling and the ceiling feels damp.",
-  );
-  const [startedWhen, setStartedWhen] = useState("A few months ago");
-
   const titles = [
     "Tell us about the property",
     "Tell us about your household",
@@ -78,6 +108,12 @@ function IntakePage() {
     "Show us what you see",
     "Review your repair report",
   ];
+
+  const updateRepair = (clientId: string, changes: Partial<RepairDraft>) => {
+    setRepairs((current) =>
+      current.map((repair) => (repair.clientId === clientId ? { ...repair, ...changes } : repair)),
+    );
+  };
 
   const next = async () => {
     if (step < 5) {
@@ -87,47 +123,62 @@ function IntakePage() {
 
     setIsSubmitting(true);
     try {
-      const response = await submitIntakeServer({
-        resident: {
-          firstName,
-          lastName,
-          email,
-          phone,
-        },
-        property: {
-          streetAddress,
-          city: "Detroit",
-          state: "MI",
-          zipCode,
-          occupancyType: owner === "Owner" ? "owner" : "renter",
-          primaryResidence: primary === "Yes",
-          yearsAtProperty: Number(yearsAtProperty),
-        },
-        household: {
-          householdSize: Number(householdSize),
-          incomeRange,
-          applicantAge: Number(applicantAge),
-          seniorHousehold: senior === "Yes",
-          childrenInHousehold: children === "Yes",
-          accessibilityNeeds: access === "Yes",
-        },
-        repair: {
-          category: categoryMap[category] ?? "other",
-          description,
-          startedWhen,
-          gettingWorse: worse === "Yes",
-          safeToOccupy: safe !== "No",
-          urgency: safe === "No" ? "high" : worse === "Yes" ? "high" : "moderate",
-        },
-      });
+      const response =
+        createdCase ??
+        (await submitIntakeServer({
+          resident: { firstName, lastName, email, phone },
+          property: {
+            streetAddress,
+            city: "Detroit",
+            state: "MI",
+            zipCode,
+            occupancyType: owner === "Owner" ? "owner" : "renter",
+            primaryResidence: primary === "Yes",
+            yearsAtProperty: Number(yearsAtProperty),
+          },
+          household: {
+            householdSize: Number(householdSize),
+            incomeRange,
+            applicantAge: Number(applicantAge),
+            seniorHousehold: senior === "Yes",
+            childrenInHousehold: children === "Yes",
+            accessibilityNeeds: access === "Yes",
+          },
+          repairs: repairs.map((repair) => ({
+            clientId: repair.clientId,
+            category: categoryMap[repair.category] ?? "other",
+            description: repair.description,
+            startedWhen: repair.startedWhen,
+            gettingWorse: repair.worse === "Yes",
+            safeToOccupy: repair.safe !== "No",
+            urgency:
+              repair.safe === "No" ? "high" : repair.worse === "Yes" ? "high" : "moderate",
+          })),
+        }));
 
-      if (!response.success) {
-        throw new Error("Submission failed");
+      if (!createdCase) {
+        const savedCase = {
+          caseId: response.caseId,
+          repairNeedId: response.repairNeedId,
+          repairs: response.repairs,
+        };
+        setCreatedCase(savedCase);
+        localStorage.setItem("homefix:lastCaseId", response.caseId);
       }
+
+      for (const repair of response.repairs) {
+        const draft = repairs.find((item) => item.clientId === repair.clientId);
+        if (draft && draft.files.length > 0 && !uploadedRepairIds.current.has(repair.repairNeedId)) {
+          await uploadRepairPhotos(repair.repairNeedId, draft.files);
+          uploadedRepairIds.current.add(repair.repairNeedId);
+        }
+      }
+
+      await processCase(response.caseId);
 
       navigate({
         to: "/assessment",
-        search: { caseId: response.caseId, repairNeedId: response.repairNeedId, process: "1" },
+        search: { caseId: response.caseId, repairNeedId: response.repairNeedId },
       });
     } catch (error) {
       console.error(error);
@@ -258,41 +309,95 @@ function IntakePage() {
             )}
             {step === 3 && (
               <div className="space-y-7">
-                <RepairCategoryGrid selected={category} onChange={setCategory} />
-                <FormField label="Describe the problem">
-                  <textarea
-                    rows={5}
-                    value={description}
-                    onChange={(event) => setDescription(event.target.value)}
-                  />
-                </FormField>
-                <div className="grid gap-6 sm:grid-cols-2">
-                  <FormField label="When did it start?">
-                    <select
-                      value={startedWhen}
-                      onChange={(event) => setStartedWhen(event.target.value)}
-                    >
-                      <option>Within the last week</option>
-                      <option>A few months ago</option>
-                      <option>More than a year ago</option>
-                    </select>
-                  </FormField>
-                  <ChoiceGroup
-                    label="Is the home safe to occupy?"
-                    options={["Yes", "Not sure", "No"]}
-                    value={safe}
-                    onChange={setSafe}
-                  />
-                  <ChoiceGroup
-                    label="Has it gotten worse recently?"
-                    options={["Yes", "No"]}
-                    value={worse}
-                    onChange={setWorse}
-                  />
-                </div>
+                {repairs.map((repair, index) => (
+                  <section key={repair.clientId} className="border-b border-border pb-8">
+                    <div className="mb-5 flex items-center justify-between gap-3">
+                      <h2 className="text-2xl">Repair {index + 1}</h2>
+                      {repairs.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() =>
+                            setRepairs((current) =>
+                              current.filter((item) => item.clientId !== repair.clientId),
+                            )
+                          }
+                          aria-label={`Remove repair ${index + 1}`}
+                        >
+                          <Trash2 />
+                        </Button>
+                      )}
+                    </div>
+                    <RepairCategoryGrid
+                      selected={repair.category}
+                      onChange={(category) => updateRepair(repair.clientId, { category })}
+                    />
+                    <div className="mt-6">
+                      <FormField label="Describe the problem">
+                        <textarea
+                          rows={4}
+                          value={repair.description}
+                          onChange={(event) =>
+                            updateRepair(repair.clientId, { description: event.target.value })
+                          }
+                        />
+                      </FormField>
+                    </div>
+                    <div className="mt-6 grid gap-6 sm:grid-cols-2">
+                      <FormField label="When did it start?">
+                        <select
+                          value={repair.startedWhen}
+                          onChange={(event) =>
+                            updateRepair(repair.clientId, { startedWhen: event.target.value })
+                          }
+                        >
+                          <option>Within the last week</option>
+                          <option>A few months ago</option>
+                          <option>More than a year ago</option>
+                        </select>
+                      </FormField>
+                      <ChoiceGroup
+                        label="Is the home safe to occupy?"
+                        options={["Yes", "Not sure", "No"]}
+                        value={repair.safe}
+                        onChange={(safe) => updateRepair(repair.clientId, { safe })}
+                      />
+                      <ChoiceGroup
+                        label="Has it gotten worse recently?"
+                        options={["Yes", "No"]}
+                        value={repair.worse}
+                        onChange={(worse) => updateRepair(repair.clientId, { worse })}
+                      />
+                    </div>
+                  </section>
+                ))}
+                {repairs.length < 8 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-12 rounded-none"
+                    onClick={() => setRepairs((current) => [...current, createRepairDraft(current.length)])}
+                  >
+                    <Plus /> Add another repair
+                  </Button>
+                )}
               </div>
             )}
-            {step === 4 && <PhotoUploader hasPhotos={photos} onUpload={() => setPhotos(!photos)} />}
+            {step === 4 && (
+              <div className="space-y-10">
+                {repairs.map((repair, index) => (
+                  <section key={repair.clientId}>
+                    <h2 className="mb-4 text-2xl">
+                      Repair {index + 1}: {repair.category}
+                    </h2>
+                    <PhotoUploader
+                      files={repair.files}
+                      onChange={(files) => updateRepair(repair.clientId, { files })}
+                    />
+                  </section>
+                ))}
+              </div>
+            )}
             {step === 5 && (
               <div className="space-y-6">
                 <div className="grid gap-px bg-border sm:grid-cols-2">
@@ -302,14 +407,13 @@ function IntakePage() {
                     label="Household"
                     value={`${householdSize} residents · ${senior === "Yes" ? "Senior household" : "No senior"}`}
                   />
-                  <Review
-                    label="Repair"
-                    value={`${category} · ${worse === "Yes" ? "Getting worse" : "Stable"}`}
-                  />
-                  <Review
-                    label="Photos"
-                    value={photos ? "Mock photos attached" : "No photos attached"}
-                  />
+                  {repairs.map((repair, index) => (
+                    <Review
+                      key={repair.clientId}
+                      label={`Repair ${index + 1}`}
+                      value={`${repair.category} · ${repair.files.length} photo${repair.files.length === 1 ? "" : "s"}`}
+                    />
+                  ))}
                   <Review label="Income range" value={incomeRange} />
                 </div>
                 <div className="flex gap-3 border-l-4 border-positive bg-positive/20 p-4">

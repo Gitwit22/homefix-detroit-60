@@ -2,6 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   caseEvents,
+  documents,
   homes,
   programMatches,
   programRepairTypes,
@@ -121,6 +122,24 @@ export async function runMatchingForCase(caseId: string) {
         programId: program.id,
       });
     }
+  }
+
+  const matchedProgramIds = new Set(createdMatches.map((match) => match.programId));
+  const requiredDocumentTypes = new Set(
+    activePrograms
+      .filter((program) => matchedProgramIds.has(program.id))
+      .flatMap((program) => program.requiredDocuments),
+  );
+  const existingDocuments = await db
+    .select({ documentType: documents.documentType })
+    .from(documents)
+    .where(eq(documents.repairCaseId, caseId));
+  const existingTypes = new Set(existingDocuments.map((document) => document.documentType));
+  const missingDocuments = [...requiredDocumentTypes]
+    .filter((documentType) => !existingTypes.has(documentType))
+    .map((documentType) => ({ repairCaseId: caseId, documentType, status: "missing" }));
+  if (missingDocuments.length > 0) {
+    await db.insert(documents).values(missingDocuments);
   }
 
   await db.insert(caseEvents).values({

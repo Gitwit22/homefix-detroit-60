@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -361,39 +361,62 @@ export function RepairCategoryGrid({
 }
 
 export function PhotoUploader({
-  hasPhotos,
-  onUpload,
+  files,
+  onChange,
 }: {
-  hasPhotos: boolean;
-  onUpload: () => void;
+  files: File[];
+  onChange: (files: File[]) => void;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const previews = useMemo(
+    () => files.map((file) => ({ file, url: URL.createObjectURL(file) })),
+    [files],
+  );
+
+  useEffect(
+    () => () => previews.forEach((preview) => URL.revokeObjectURL(preview.url)),
+    [previews],
+  );
+
+  const chooseFiles = () => inputRef.current?.click();
+
   return (
     <div>
-      {!hasPhotos ? (
-        <button type="button" className="photo-drop" onClick={onUpload}>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        capture="environment"
+        multiple
+        className="sr-only"
+        onChange={(event) => onChange(Array.from(event.target.files ?? []).slice(0, 5))}
+      />
+      {files.length === 0 ? (
+        <button type="button" className="photo-drop" onClick={chooseFiles}>
           <Upload aria-hidden="true" />
           <strong>Add photos of the repair</strong>
           <span>Take a photo or choose images from your device</span>
-          <small>JPG, PNG · Multiple photos welcome</small>
+          <small>JPG, PNG, WebP · Up to 5 photos, 10 MB each</small>
         </button>
       ) : (
         <div className="photo-previews">
-          <div className="mock-damage-photo">
-            <div className="water-mark" />
-            <span>Ceiling water damage</span>
-          </div>
-          <div className="mock-damage-photo second">
-            <div className="water-mark" />
-            <span>Wall near roofline</span>
-          </div>
-          <button type="button" onClick={onUpload} aria-label="Remove uploaded photos">
-            <X aria-hidden="true" />
-          </button>
+          {previews.map(({ file, url }, index) => (
+            <div className="relative" key={`${file.name}-${file.lastModified}`}>
+              <img src={url} alt={`Repair preview ${index + 1}`} className="h-48 w-full object-cover" />
+              <button
+                type="button"
+                onClick={() => onChange(files.filter((_, fileIndex) => fileIndex !== index))}
+                aria-label={`Remove ${file.name}`}
+              >
+                <X aria-hidden="true" />
+              </button>
+            </div>
+          ))}
         </div>
       )}
-      <Button type="button" variant="outline" className="mt-4 min-h-12" onClick={onUpload}>
+      <Button type="button" variant="outline" className="mt-4 min-h-12" onClick={chooseFiles}>
         <Camera aria-hidden="true" />
-        {hasPhotos ? "Replace mock photos" : "Use camera"}
+        {files.length > 0 ? "Replace photos" : "Use camera"}
       </Button>
     </div>
   );

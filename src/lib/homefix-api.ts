@@ -1,4 +1,8 @@
-type IntakePayload = {
+import type { PartnerAnalytics, PartnerCaseDetail } from "../../server/domain/partnerAnalytics";
+
+export type { PartnerAnalytics, PartnerCaseDetail };
+
+export type IntakePayload = {
   resident: {
     firstName: string;
     lastName: string;
@@ -22,20 +26,22 @@ type IntakePayload = {
     childrenInHousehold: boolean;
     accessibilityNeeds: boolean;
   };
-  repair: {
+  repairs: Array<{
+    clientId: string;
     category: string;
     description: string;
     startedWhen?: string;
     gettingWorse: boolean;
     safeToOccupy: boolean;
     urgency: string;
-  };
+  }>;
 };
 
 type IntakeResponse = {
   success: true;
   caseId: string;
   repairNeedId: string;
+  repairs: Array<{ clientId: string; repairNeedId: string }>;
   caseNumber: string;
 };
 
@@ -75,6 +81,14 @@ export type CaseAggregateResponse = {
     urgency: string;
     status: string;
   }>;
+  photos: Array<{
+    id: string;
+    repairNeedId: string;
+    imageUrl: string;
+    originalFilename: string | null;
+    width: number | null;
+    height: number | null;
+  }>;
   assessments: Array<{
     id: string;
     repairNeedId: string;
@@ -112,6 +126,20 @@ export type CoveragePlanResponse = {
     program: { id: string; name: string } | null;
   }>;
   nextBestAction: { type: string; message: string };
+};
+
+export type ProgramDetailResponse = {
+  id: string;
+  slug: string | null;
+  name: string;
+  organization: string;
+  description: string | null;
+  sourceUrl: string | null;
+  applicationStatus: string;
+  lastVerifiedAt: string | null;
+  requiredDocuments: string[];
+  repairTypes: string[];
+  rules: Array<{ ruleType: string; operator: string; value: unknown; required: boolean }>;
 };
 
 const apiUrl = import.meta.env.VITE_HOMEFIX_API_URL?.replace(/\/$/, "");
@@ -154,9 +182,49 @@ export async function processRepair(repairNeedId: string) {
   }>;
 }
 
+export async function uploadRepairPhotos(repairNeedId: string, files: File[]) {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const body = new FormData();
+  files.forEach((file) => body.append("photos", file));
+  const response = await fetch(`${apiUrl}/api/v1/repairs/${repairNeedId}/photos`, {
+    method: "POST",
+    body,
+  });
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<{ photos: Array<{ id: string; imageUrl: string }> }>;
+}
+
+export async function processCase(caseId: string) {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetch(`${apiUrl}/api/v1/cases/${caseId}/process`, { method: "POST" });
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<{ caseId: string; coverage: CoveragePlanResponse }>;
+}
+
 export async function getCoverage(caseId: string): Promise<CoveragePlanResponse> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
   const response = await fetch(`${apiUrl}/api/v1/cases/${caseId}/coverage`);
   if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
   return response.json() as Promise<CoveragePlanResponse>;
+}
+
+export async function getPartnerAnalytics(): Promise<PartnerAnalytics> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetch(`${apiUrl}/api/v1/partner-analytics`);
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<PartnerAnalytics>;
+}
+
+export async function getPartnerCase(caseId: string): Promise<PartnerCaseDetail> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetch(`${apiUrl}/api/v1/partner-cases/${encodeURIComponent(caseId)}`);
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<PartnerCaseDetail>;
+}
+
+export async function getProgram(programId: string): Promise<ProgramDetailResponse> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetch(`${apiUrl}/api/v1/programs/${encodeURIComponent(programId)}`);
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<ProgramDetailResponse>;
 }

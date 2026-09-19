@@ -85,6 +85,10 @@ function AssessmentPage() {
       payload?.assessments[0],
     [payload, repairNeed],
   );
+  const photos = useMemo(
+    () => payload?.photos.filter((photo) => photo.repairNeedId === repairNeed?.id) ?? [],
+    [payload, repairNeed],
+  );
 
   const observations = Array.isArray(assessment?.observations) ? assessment.observations : [];
   const safetyFlags = Array.isArray(assessment?.safetyFlags) ? assessment.safetyFlags : [];
@@ -110,10 +114,33 @@ function AssessmentPage() {
           {assessment?.summary ?? repairNeed.description}
         </p>
       </header>
+      {payload.repairNeeds.length > 1 && (
+        <nav className="flex flex-wrap gap-2 border-b border-foreground py-5" aria-label="Repair assessments">
+          {payload.repairNeeds.map((need) => (
+            <Link
+              key={need.id}
+              to="/assessment"
+              search={{ caseId, repairNeedId: need.id }}
+              className={`border px-4 py-2 text-sm font-bold ${need.id === repairNeed.id ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}
+            >
+              {toRepairCategoryLabel(need.category)}
+            </Link>
+          ))}
+        </nav>
+      )}
       <section className="grid border-b border-foreground lg:grid-cols-[1.1fr_.9fr]">
-        <div className="mock-damage-photo min-h-[420px] lg:border-r lg:border-foreground">
-          <div className="water-mark" />
-          <span>Uploaded repair photo</span>
+        <div className="min-h-105 bg-muted lg:border-r lg:border-foreground">
+          {photos[0] ? (
+            <img
+              src={photos[0].imageUrl}
+              alt={`Uploaded photo for ${toRepairCategoryLabel(repairNeed.category)}`}
+              className="h-full min-h-105 w-full object-cover"
+            />
+          ) : (
+            <div className="mock-damage-photo min-h-105">
+              <span>No repair photo submitted</span>
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-2 content-start">
           <Result label="Possible issue" value={toRepairCategoryLabel(repairNeed.category)} />

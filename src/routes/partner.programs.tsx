@@ -2,5 +2,83 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import { DemoFlag, PageIntro, StatusBadge } from "@/components/homefix";
 import { programs } from "@/lib/demo-data";
-export const Route=createFileRoute("/partner/programs")({head:()=>({meta:[{title:"Programs — HomeFix 313 Partner"},{name:"description",content:"Synthetic program pipeline and capacity overview."},{property:"og:title",content:"Programs — HomeFix 313 Partner"},{property:"og:description",content:"Program status and repair coverage planning."},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary_large_image"}]}),component:Programs});
-function Programs(){const extra=[{name:"Private Sewer Repair Program",organization:"City of Detroit",status:"Accepting applications",types:"Eligible private sewer repairs related to the June 2021 flood",id:"critical-home-repair",match:"Open"},{name:"Habitat Critical Home Repair",organization:"Habitat for Humanity Detroit",status:"Limited neighborhood openings",types:"Roofs, siding, gutters, HVAC, windows, doors, and accessibility",id:"weatherization",match:"Limited"},{name:"Detroit 0% Interest Home Repair Loan",organization:"City of Detroit partners",status:"Program in transition — verify",types:"Traditionally $5,000–$25,000 at 0% interest",id:"critical-home-repair",match:"Verify"}];return <><DemoFlag/><PageIntro eyebrow="Program capacity" title="Home Repair Programs" description="A demo view of relevant assistance resources, their current status, and the repair needs they may support."/><div className="mt-8 divide-y divide-border border-y border-border">{[...programs,...extra].map((p,i)=><article key={p.name} className="grid gap-4 py-6 md:grid-cols-[60px_1.2fr_.8fr_auto] md:items-center"><b className="font-display text-3xl font-normal text-rust">0{i+1}</b><div><h2 className="text-2xl">{p.name}</h2><p className="text-sm text-muted-foreground">{p.organization}</p></div><div><StatusBadge tone={p.status.toLowerCase().includes("open")||p.status.includes("Accepting")?"positive":p.status.includes("Limited")?"warning":"neutral"}>{p.status}</StatusBadge><p className="mt-2 text-sm text-muted-foreground">{p.types}</p></div><Link to="/programs/$programId" params={{programId:p.id}} className="flex items-center gap-2 font-bold text-primary">Details<ArrowRight className="size-4"/></Link></article>)}</div></>}
+import { getPartnerAnalytics } from "@/lib/homefix-api";
+import { capacityStatusLabels } from "../../server/domain/partnerAnalytics";
+
+export const Route = createFileRoute("/partner/programs")({
+  head: () => ({
+    meta: [
+      { title: "Programs — HomeFix 313 Partner" },
+      { name: "description", content: "Synthetic program pipeline and capacity overview." },
+      { property: "og:title", content: "Programs — HomeFix 313 Partner" },
+      { property: "og:description", content: "Program status and repair coverage planning." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
+  loader: () => getPartnerAnalytics(),
+  component: Programs,
+});
+
+function Programs() {
+  const analytics = Route.useLoaderData();
+  const capacityByProgram = new Map(
+    analytics.programCapacity.map((capacity) => [capacity.programId, capacity]),
+  );
+
+  return (
+    <>
+      <DemoFlag />
+      <PageIntro
+        eyebrow="Modeled program capacity"
+        title="Home Repair Programs"
+        description="Synthetic demand compared with simulated capacity. This is planning data, not current operational availability."
+      />
+      <div className="mt-8 divide-y divide-border border-y border-border">
+        {programs.map((program, index) => {
+          const capacity = capacityByProgram.get(program.id);
+          if (!capacity) return null;
+          const tone =
+            capacity.status === "open"
+              ? "positive"
+              : capacity.status === "closed"
+                ? "danger"
+                : "warning";
+          return (
+            <article
+              key={program.id}
+              className="grid gap-4 py-6 md:grid-cols-[60px_1.2fr_1fr_auto] md:items-center"
+            >
+              <b className="font-display text-3xl font-normal text-rust">
+                {String(index + 1).padStart(2, "0")}
+              </b>
+              <div>
+                <h2 className="text-2xl">{program.name}</h2>
+                <p className="text-sm text-muted-foreground">{program.organization}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{program.types}</p>
+              </div>
+              <div>
+                <StatusBadge tone={tone}>{capacityStatusLabels[capacity.status]}</StatusBadge>
+                <p className="mt-3 text-sm">
+                  <strong>{capacity.matchedNeeds}</strong> matched needs ·{" "}
+                  <strong>{capacity.simulatedCapacity}</strong> modeled capacity
+                </p>
+                <p className="mt-1 text-sm font-semibold text-rust">
+                  {capacity.excessDemand} repairs exceed modeled capacity
+                </p>
+              </div>
+              <Link
+                to="/programs/$programId"
+                params={{ programId: program.id }}
+                className="flex items-center gap-2 font-bold text-primary"
+              >
+                Details
+                <ArrowRight className="size-4" />
+              </Link>
+            </article>
+          );
+        })}
+      </div>
+    </>
+  );
+}

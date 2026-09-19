@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Check } from "lucide-react";
-import { BlueprintButton, DemoFlag, Disclaimer, PageIntro, StatusBadge } from "@/components/homefix";
-import { programs } from "@/lib/demo-data";
-export const Route=createFileRoute("/programs/$programId")({head:({params})=>{const p=programs.find(x=>x.id===params.programId);return{meta:[{title:`${p?.name??"Program"} — HomeFix 313`},{name:"description",content:p?.types??"Home repair assistance program details."},{property:"og:title",content:`${p?.name??"Program"} — HomeFix 313`},{property:"og:description",content:p?.types??"Home repair assistance program details."},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary_large_image"}]}},component:ProgramPage});
-function ProgramPage(){const {programId}=Route.useParams();const p=programs.find(x=>x.id===programId)??programs[0];return <div className="mx-auto max-w-6xl px-4 py-10 pb-24 sm:px-6 lg:px-10"><DemoFlag/><PageIntro eyebrow={p.organization} title={p.name} description={p.status} action={<StatusBadge tone={p.match==="Strong Match"?"positive":"warning"}>{p.match}</StatusBadge>}/><div className="mt-10 grid gap-10 lg:grid-cols-[1fr_330px]"><div className="divide-y divide-border border-y border-border"><Info k="Repair types covered" v={p.types}/><Info k="General eligibility" v={p.eligibility}/><Info k="Income requirements" v={p.income}/><Info k="Homeownership requirement" v={p.ownership}/><Info k="Geographic restrictions" v={p.geography}/><Info k="Application dates" v={p.dates}/><Info k="Estimated next steps" v={p.next}/></div><aside><div className="bg-secondary p-6"><p className="eyebrow">Why HomeFix matched you</p><h2 className="mt-3 text-2xl">Your property, household, and repair information appear to meet several initial requirements.</h2><div className="mt-5"><StatusBadge tone="positive">Potential Match</StatusBadge></div></div><div className="mt-6"><p className="eyebrow">Required documents</p><ul className="mt-3 divide-y divide-border border-y border-border">{p.documents.map(d=><li className="flex gap-2 py-3 text-sm" key={d}><Check className="size-4 text-primary"/>{d}</li>)}</ul></div><div className="mt-6"><BlueprintButton to="/status">Start Next Step</BlueprintButton></div></aside></div><div className="mt-8"><Disclaimer/></div></div>};function Info({k,v}:{k:string;v:string}){return <div className="grid gap-2 py-5 sm:grid-cols-[200px_1fr]"><dt className="text-xs font-bold uppercase text-muted-foreground">{k}</dt><dd className="leading-relaxed">{v}</dd></div>}
+
+export const Route = createFileRoute("/programs/$programId")({
+  component: RouteComponent,
+});
+
+function RouteComponent() {
+  return <div>Hello "/programs/$programId"!</div>;
+}

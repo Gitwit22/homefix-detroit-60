@@ -16,9 +16,28 @@ export async function processRepair(repairNeedId: string) {
     throw new Error("Repair need not found");
   }
 
-  const triage = await runRepairTriage({ caseId: need.repairCaseId, repairNeedId });
-  const matches = await runMatchingForCase(need.repairCaseId);
-  const coverage = await calculateCoveragePlan(need.repairCaseId);
+  const result = await processCase(need.repairCaseId);
+
+  return {
+    ...result,
+    repairNeedId,
+    triage: result.triage.find((item) => item.repairNeedId === repairNeedId),
+  };
+}
+
+export async function processCase(caseId: string) {
+  const needs = await db.select().from(repairNeeds).where(eq(repairNeeds.repairCaseId, caseId));
+  if (needs.length === 0) {
+    throw new Error("Case has no repair needs");
+  }
+
+  const triage = [];
+  for (const need of needs) {
+    triage.push(await runRepairTriage({ caseId, repairNeedId: need.id }));
+  }
+
+  const matches = await runMatchingForCase(caseId);
+  const coverage = await calculateCoveragePlan(caseId);
 
   await db
     .update(repairCases)
@@ -27,23 +46,22 @@ export async function processRepair(repairNeedId: string) {
       currentStep: "coverage",
       nextAction: coverage.nextBestAction.message,
     })
-    .where(eq(repairCases.id, need.repairCaseId));
+    .where(eq(repairCases.id, caseId));
 
   await db.insert(caseEvents).values({
-    repairCaseId: need.repairCaseId,
+    repairCaseId: caseId,
     eventType: "intelligence_pipeline_completed",
     title: "Repair intelligence pipeline completed",
     description: "Assessment, matching, and coverage updates are complete.",
     metadata: {
-      repairNeedId,
+      repairNeedIds: needs.map((need) => need.id),
       matches: matches.length,
       coveragePercentage: coverage.coveragePercentage,
     },
   });
 
   return {
-    caseId: need.repairCaseId,
-    repairNeedId,
+    caseId,
     triage,
     matches,
     coverage,

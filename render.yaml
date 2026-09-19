@@ -3,6 +3,7 @@ services:
     name: homefix-api
     runtime: node
     buildCommand: npm ci && npm run build:api
+    preDeployCommand: npm run db:deploy
     startCommand: npm run start:api
     healthCheckPath: /health
     envVars:
@@ -11,4 +12,14 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: CORS_ORIGINS
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: N8N_TRIAGE_WEBHOOK_URL
+        sync: false
+      - key: N8N_HOMEFIX_SECRET
         sync: false

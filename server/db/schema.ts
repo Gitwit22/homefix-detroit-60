@@ -76,6 +76,12 @@ export const repairPhotos = pgTable("repair_photos", {
     .references(() => repairNeeds.id, { onDelete: "cascade" })
     .notNull(),
   imageUrl: text("image_url").notNull(),
+  publicId: text("public_id").unique(),
+  originalFilename: text("original_filename"),
+  mimeType: text("mime_type"),
+  bytes: integer("bytes"),
+  width: integer("width"),
+  height: integer("height"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -97,6 +103,7 @@ export const repairAssessments = pgTable("repair_assessments", {
 
 export const programs = pgTable("programs", {
   id: uuid("id").defaultRandom().primaryKey(),
+  slug: text("slug").unique(),
   name: text("name").notNull(),
   organization: text("organization").notNull(),
   description: text("description"),
@@ -106,6 +113,7 @@ export const programs = pgTable("programs", {
   applicationCloseDate: timestamp("application_close_date", { withTimezone: true }),
   active: boolean("active").default(true).notNull(),
   lastVerifiedAt: timestamp("last_verified_at", { withTimezone: true }),
+  requiredDocuments: jsonb("required_documents").$type<string[]>().default([]).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

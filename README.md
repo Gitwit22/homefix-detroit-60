@@ -2,11 +2,11 @@ Sprint 2 — Friday: Data + Real Resident Intake
 Goal: replace mock data with persistent records.
 Architecture to lock first
 Lovable Frontend
-      ↓
+↓
 Supabase/Postgres
-      ↓
+↓
 HomeFix Domain Model
-      ↓
+↓
 n8n later for AI/orchestration
 For contest speed, I would use Lovable + Supabase instead of introducing another backend.
 Core tables:
@@ -31,43 +31,43 @@ bids
 job_assignments
 Friday build sequence
 1. Create the database schema
-IDs and timestamps
-resident → home
-home → repair case
-repair case → repair needs
-repair need → photos/assessment
-case → program matches
+   IDs and timestamps
+   resident → home
+   home → repair case
+   repair case → repair needs
+   repair need → photos/assessment
+   case → program matches
 2. Wire the Lovable intake to the database
-Make these persist:
-address
-household
-income range
-ownership
-repair description
-repair category
-safety questions
-photos
+   Make these persist:
+   address
+   household
+   income range
+   ownership
+   repair description
+   repair category
+   safety questions
+   photos
 3. Make the Passport real
-The HomeFix Passport should now load actual database information instead of demo constants.
+   The HomeFix Passport should now load actual database information instead of demo constants.
 4. Seed 5–8 verified Detroit repair programs
-Store structured fields:
-name
-organization
-repair_types
-ownership_required
-income_rule
-age/senior_rule
-geography
-application_status
-documents_required
-source_url
-last_verified_at
-Don't build 30 programs.
-Five accurate programs are enough for the demo.
-Friday Definition of Done
-You can:
-Start intake → submit → refresh browser → reopen the case → see the same information in the Passport.
-If that doesn't work, do not start AI yet.
+   Store structured fields:
+   name
+   organization
+   repair_types
+   ownership_required
+   income_rule
+   age/senior_rule
+   geography
+   application_status
+   documents_required
+   source_url
+   last_verified_at
+   Don't build 30 programs.
+   Five accurate programs are enough for the demo.
+   Friday Definition of Done
+   You can:
+   Start intake → submit → refresh browser → reopen the case → see the same information in the Passport.
+   If that doesn't work, do not start AI yet.
 
 Sprint 3 — Saturday: Intelligence + The Ringer
 Goal: make HomeFix actually think.
@@ -75,29 +75,29 @@ This is your most important sprint.
 Feature 1 — Photo + Description Triage
 Flow:
 Repair submitted
-      ↓
+↓
 n8n webhook
-      ↓
+↓
 AI vision/text analysis
-      ↓
+↓
 Structured response
-      ↓
+↓
 Save repair assessment
-      ↓
+↓
 Return results to HomeFix
 AI response should be JSON, not free-form text:
 {
-  "repairCategory": "roof_water_intrusion",
-  "urgency": "high",
-  "observations": [
-    "Visible ceiling staining",
-    "Possible active moisture intrusion"
-  ],
-  "safetyFlags": [],
-  "followUpQuestions": [
-    "Does water enter during rainfall?",
-    "Is the ceiling sagging?"
-  ]
+"repairCategory": "roof_water_intrusion",
+"urgency": "high",
+"observations": [
+"Visible ceiling staining",
+"Possible active moisture intrusion"
+],
+"safetyFlags": [],
+"followUpQuestions": [
+"Does water enter during rainfall?",
+"Is the ceiling sagging?"
+]
 }
 Architecture rule
 AI can say:
@@ -119,11 +119,11 @@ Repair category = roof
 Application = open
 Engine:
 Resident/Home
-      +
+   +
 Repair
-      +
+   +
 Program Rules
-      ↓
+↓
 Strong Match
 Potential Match
 Verification Needed
@@ -201,11 +201,11 @@ Unmatched Needs
 Most Important View
 WHERE HELP IS MISSING
 Example:
-Electrical       16
-Structural       12
-Roof              9
-Accessibility     6
-HVAC              4
+Electrical 16
+Structural 12
+Roof 9
+Accessibility 6
+HVAC 4
 Also show demand by ZIP code.
 This is the part that changes HomeFix from:
 “an app residents use”
@@ -285,14 +285,14 @@ Demo:
 9. Electrical = Funding Gap
 10. Partner Dashboard
 11. Show aggregate unmet demand
-If Overflow works:
+    If Overflow works:
 12. Approved roof case
 13. Program overloaded
 14. Create Overflow Job
 15. Contractor submits bid
-If Overflow misbehaves:
-do not show it.
-Mention it verbally as Phase 2.
+    If Overflow misbehaves:
+    do not show it.
+    Mention it verbally as Phase 2.
 
 Sunday QA Checklist
 Before you stop:
@@ -314,7 +314,7 @@ That last one matters.
 Build a demo fallback
 If the AI provider dies during judging:
 if AI_REQUEST_FAILED:
-    load_saved_demo_assessment
+load_saved_demo_assessment
 Your pitch should never depend on a live AI call succeeding.
 
 Monday Morning — Submission Only
@@ -344,10 +344,21 @@ Create a Render Blueprint from `render.yaml`, then set:
 
 - `DATABASE_URL` to the HomeFix Postgres connection string.
 - `CORS_ORIGINS` to the comma-separated frontend origins allowed to submit
-      intake data, such as `https://homefix-detroit-60.pages.dev`.
+  intake data, such as `https://homefix-detroit-60.pages.dev`.
 
 Render supplies `PORT`; do not set it manually. The service health check is
 `/health` and intake submissions use `POST /api/v1/intakes`.
+
+Partner intelligence uses deterministic synthetic demonstration data:
+
+- `GET /api/v1/partner-analytics` returns calculated demand, coverage, gap,
+  case, ZIP, and modeled-capacity metrics.
+- `GET /api/v1/partner-cases/:caseId` returns a generated synthetic case
+  dossier or `404` when the ID is outside the current dataset.
+
+These endpoints use `HOMEFIX_DEMO_SEED` (default `3132026`) and do not read
+from or write to Neon. Replacing the synthetic fact loader with normalized
+resident-case facts does not require changing the dashboard response shape.
 
 ### Cloudflare Pages
 
@@ -372,6 +383,31 @@ For local development, use separate terminals:
 ```sh
 npm run dev:api
 npm run dev
+```
+
+### Sprint 2–3 local setup
+
+Copy `.env.example` to `.env.local` and configure Neon, Cloudinary, and the public API URL. Then initialize the database before starting the API:
+
+```sh
+npm run db:deploy
+npm run dev:api
+npm run dev
+```
+
+`db:deploy` applies additive Drizzle migrations and idempotently seeds five managed Detroit-area program records. Program application windows change frequently: verify every official `sourceUrl`, `applicationStatus`, rule threshold, and `lastVerifiedAt` value before a public demonstration. Programs that are closed or require verification remain in the catalog but do not produce a viable match.
+
+Repair photos are uploaded through the Render API to authenticated Cloudinary assets. Accepted formats are JPEG, PNG, and WebP, with a maximum of five files per repair and 10 MB per file. Cloudinary credentials belong only on Render or in the local API environment; never expose them through `VITE_*` variables.
+
+Import `n8n/homefix-triage.workflow.json` into n8n, set `N8N_HOMEFIX_SECRET`, `OPENAI_API_KEY`, and optionally `HOMEFIX_AI_MODEL`, then set the production webhook URL as `N8N_TRIAGE_WEBHOOK_URL` on Render. HomeFix validates the structured response and uses a conservative category-specific saved assessment if n8n is unavailable, times out, or returns invalid JSON. Eligibility and coverage remain deterministic database services and never depend on AI output.
+
+Run the Sprint 2–3 verification gate with:
+
+```sh
+npm run test:sprints
+npm run build:api
+npm run build
+npm run lint
 ```
 
 Priority hierarchy

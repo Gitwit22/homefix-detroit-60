@@ -9,6 +9,7 @@ import {
 } from "../db/schema.js";
 import { normalizeRepairCategory } from "../domain/repair.js";
 import { triageResponseSchema, type TriageResponse } from "../validation/triage.js";
+import { signedPhotoUrl } from "./photos.js";
 
 const triageWebhookUrl = process.env.N8N_TRIAGE_WEBHOOK_URL;
 const triageSecret = process.env.N8N_HOMEFIX_SECRET;
@@ -25,6 +26,7 @@ async function callTriageWebhook(payload: unknown): Promise<TriageResponse> {
       Authorization: "Bearer " + triageSecret,
     },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(Number(process.env.HOMEFIX_TRIAGE_TIMEOUT_MS ?? 15_000)),
   });
 
   if (!response.ok) {
@@ -35,18 +37,44 @@ async function callTriageWebhook(payload: unknown): Promise<TriageResponse> {
   return triageResponseSchema.parse(body);
 }
 
-function fallbackTriage(category: string): TriageResponse {
-  const normalized = normalizeRepairCategory(category);
+const fallbackDetails: Record<
+  string,
+  { observation: string; question: string }
+> = {
+  roof_water_intrusion: {
+    observation: "The resident report appears consistent with possible water intrusion.",
+    question: "Does water enter during rainfall or is any ceiling area sagging?",
+  },
+  hvac: {
+    observation: "The resident report indicates unreliable or unavailable home heating.",
+    question: "Is the system producing any heat, unusual odors, or visible smoke?",
+  },
+  electrical: {
+    observation: "The resident report indicates a possible electrical safety concern.",
+    question: "Are there sparks, burning odors, warm outlets, or repeated breaker trips?",
+  },
+};
+
+export function fallbackTriage(input: {
+  category: string;
+  gettingWorse: boolean;
+  safeToOccupy: boolean;
+}): TriageResponse {
+  const normalized = normalizeRepairCategory(input.category);
+  const details = fallbackDetails[normalized] ?? {
+    observation: "The resident-reported condition requires professional evaluation.",
+    question: "Has the condition changed recently or created an immediate safety concern?",
+  };
   return {
     repairCategory: normalized,
-    urgency: "moderate",
+    urgency: !input.safeToOccupy || input.gettingWorse ? "high" : "moderate",
     summary:
       "The reported conditions appear consistent with a possible repair issue that warrants professional evaluation.",
-    observations: ["Resident-reported issue captured", "Photo and text need follow-up review"],
-    safetyFlags: [],
+    observations: [details.observation, "Photo and description require professional review."],
+    safetyFlags: input.safeToOccupy ? [] : ["Resident reported that the home may not be safe to occupy."],
     followUpQuestions: [
+      details.question,
       "Has the condition changed recently?",
-      "Are there immediate safety concerns?",
     ],
     confidence: 0.35,
   };
@@ -78,7 +106,9 @@ export async function runRepairTriage(input: { caseId: string; repairNeedId: str
     reportedCategory: normalizeRepairCategory(need.category),
     gettingWorse: need.gettingWorse,
     safeToOccupy: need.safeToOccupy,
-    imageUrls: photos.map((photo) => photo.imageUrl),
+    imageUrls: photos.map((photo) =>
+      photo.publicId ? signedPhotoUrl(photo.publicId) : photo.imageUrl,
+    ),
   };
 
   let triage: TriageResponse;
@@ -86,7 +116,11 @@ export async function runRepairTriage(input: { caseId: string; repairNeedId: str
   try {
     triage = await callTriageWebhook(webhookPayload);
   } catch (error) {
-    triage = fallbackTriage(need.category);
+    triage = fallbackTriage({
+      category: need.category,
+      gettingWorse: need.gettingWorse,
+      safeToOccupy: need.safeToOccupy,
+    });
     model = "homefix-triage-fallback-v1";
     console.error(error);
   }

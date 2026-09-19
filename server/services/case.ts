@@ -9,8 +9,10 @@ import {
   repairAssessments,
   repairCases,
   repairNeeds,
+  repairPhotos,
   residents,
 } from "../db/schema.js";
+import { signedPhotoUrl } from "./photos.js";
 
 export async function getCaseAggregate(caseId: string) {
   const caseRow = await db.select().from(repairCases).where(eq(repairCases.id, caseId)).limit(1);
@@ -43,6 +45,11 @@ export async function getCaseAggregate(caseId: string) {
           .where(inArray(repairAssessments.repairNeedId, repairNeedIds))
       : [];
 
+  const photos =
+    repairNeedIds.length > 0
+      ? await db.select().from(repairPhotos).where(inArray(repairPhotos.repairNeedId, repairNeedIds))
+      : [];
+
   const matchRows =
     repairNeedIds.length > 0
       ? await db
@@ -63,6 +70,14 @@ export async function getCaseAggregate(caseId: string) {
     resident,
     home,
     repairNeeds: needs,
+    photos: photos.map((photo) => ({
+      id: photo.id,
+      repairNeedId: photo.repairNeedId,
+      imageUrl: photo.publicId ? signedPhotoUrl(photo.publicId) : photo.imageUrl,
+      originalFilename: photo.originalFilename,
+      width: photo.width,
+      height: photo.height,
+    })),
     assessments,
     matches: matchRows.map(({ match, program }) => ({ ...match, program })),
     documents: caseDocuments,

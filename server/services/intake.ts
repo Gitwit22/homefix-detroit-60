@@ -27,14 +27,20 @@ export const intakeSchema = z.object({
     childrenInHousehold: z.boolean().default(false),
     accessibilityNeeds: z.boolean().default(false),
   }),
-  repair: z.object({
-    category: z.string().min(1),
-    description: z.string().min(1),
-    startedWhen: z.string().optional(),
-    gettingWorse: z.boolean().default(false),
-    safeToOccupy: z.boolean().default(true),
-    urgency: z.string().default("unknown"),
-  }),
+  repairs: z
+    .array(
+      z.object({
+        clientId: z.string().min(1),
+        category: z.string().min(1),
+        description: z.string().min(1),
+        startedWhen: z.string().optional(),
+        gettingWorse: z.boolean().default(false),
+        safeToOccupy: z.boolean().default(true),
+        urgency: z.string().default("unknown"),
+      }),
+    )
+    .min(1)
+    .max(8),
 });
 
 export function createCaseNumber(zipCode: string) {
@@ -104,27 +110,36 @@ export async function createIntakeCase(payload: z.infer<typeof intakeSchema>) {
 
   const repairNeedResult = await db
     .insert(repairNeeds)
-    .values({
-      repairCaseId,
-      category: normalizeRepairCategory(payload.repair.category),
-      description: payload.repair.description,
-      startedWhen: payload.repair.startedWhen ?? null,
-      gettingWorse: payload.repair.gettingWorse,
-      safeToOccupy: payload.repair.safeToOccupy,
-      urgency: payload.repair.urgency,
-      status: "reported",
-    })
+    .values(
+      payload.repairs.map((repair) => ({
+        repairCaseId,
+        category: normalizeRepairCategory(repair.category),
+        description: repair.description,
+        startedWhen: repair.startedWhen ?? null,
+        gettingWorse: repair.gettingWorse,
+        safeToOccupy: repair.safeToOccupy,
+        urgency: repair.urgency,
+        status: "reported",
+      })),
+    )
     .returning({ id: repairNeeds.id });
 
-  const repairNeedId = repairNeedResult[0]?.id;
+  const repairNeedIds = repairNeedResult.map((repairNeed) => repairNeed.id);
+  const repairNeedId = repairNeedIds[0];
   if (!repairNeedId) {
     throw new Error("Repair need could not be created");
   }
+
+  const repairs = payload.repairs.map((repair, index) => ({
+    clientId: repair.clientId,
+    repairNeedId: repairNeedIds[index]!,
+  }));
 
   return {
     success: true,
     caseId: repairCaseId,
     repairNeedId,
+    repairs,
     caseNumber,
   };
 }

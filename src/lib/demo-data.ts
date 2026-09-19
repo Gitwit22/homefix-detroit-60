@@ -67,22 +67,6 @@ export const programs = [
   },
 ] as const;
 
-export const adminCases = [
-  { id: "HF-313-0842", property: "123 Main St", zip: "48224", repair: "Roof / Water", priority: "High", match: "Strong", status: "Documents needed", capacity: "Limited" },
-  { id: "HF-313-0837", property: "456 Dexter Ave", zip: "48206", repair: "Furnace", priority: "Critical", match: "Potential", status: "Assessment review", capacity: "Open" },
-  { id: "HF-313-0829", property: "789 Grandmont Ave", zip: "48227", repair: "Electrical", priority: "High", match: "None", status: "Unmatched", capacity: "—" },
-  { id: "HF-313-0818", property: "1326 Field St", zip: "48214", repair: "Accessibility", priority: "High", match: "Strong", status: "Program review", capacity: "Waitlist" },
-] as const;
-
-export const categoryDemand = [
-  ["Roof", 58], ["HVAC", 47], ["Plumbing", 35], ["Electrical", 31], ["Accessibility", 22], ["Structural", 18], ["Lead", 13],
-] as const;
-
-export const zipDemand = [
-  { zip: "48205", value: 32, size: "xl" }, { zip: "48224", value: 28, size: "lg" }, { zip: "48227", value: 24, size: "lg" },
-  { zip: "48214", value: 19, size: "md" }, { zip: "48210", value: 16, size: "md" }, { zip: "48204", value: 14, size: "sm" },
-] as const;
-
 export const overflowJobs = [
   { id: "00182", property: "123 Main St", zip: "48224", repair: "Roof / Water Intrusion", priority: "High", program: "Critical Home Repair", status: "Open", responses: 3 },
   { id: "00191", property: "456 Dexter Ave", zip: "48206", repair: "Furnace", priority: "Critical", program: "Weatherization", status: "Assessment Needed", responses: 1 },
