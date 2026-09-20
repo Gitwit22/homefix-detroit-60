@@ -82,8 +82,10 @@ function CoveragePage() {
 
   if (!caseId) return <ResidentCaseRequired pageName="Coverage Plan" />;
   if (isLoading) return <div className="mx-auto max-w-6xl px-4 py-10">Loading coverage...</div>;
-  if (error || !coverage)
+  if (error || !coverage || !casePayload)
     return <div className="mx-auto max-w-6xl px-4 py-10">{error ?? "Coverage not found."}</div>;
+
+  const residentAction = getResidentCoverageAction(casePayload, coverage.coveredNeeds);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 pb-24 sm:px-6 lg:px-10">
@@ -140,8 +142,12 @@ function CoveragePage() {
       </section>
 
       <div className="mt-12">
-        <NextAction to="/passport" search={{ caseId }}>
-          {coverage.nextBestAction.message}
+        <NextAction
+          {...(residentAction.to ? { to: residentAction.to, search: { caseId } } : {})}
+          label={residentAction.label}
+          actionLabel={residentAction.actionLabel}
+        >
+          {residentAction.message}
         </NextAction>
       </div>
       <div className="mt-5">
@@ -149,6 +155,64 @@ function CoveragePage() {
       </div>
     </div>
   );
+}
+
+function getResidentCoverageAction(
+  casePayload: Awaited<ReturnType<typeof getCase>>,
+  coveredNeeds: number,
+) {
+  const inspectionStatus = casePayload.inspection?.status;
+  const missingDocuments = casePayload.documents.filter(
+    (document) => document.status === "missing",
+  ).length;
+
+  if (casePayload.lifecycle.complete) {
+    return {
+      label: "Case status",
+      message: "No action is needed. Your repair is complete and verified.",
+    };
+  }
+
+  if (inspectionStatus === "availability_submitted") {
+    return {
+      label: "Case status",
+      message:
+        "No action is needed from you right now. Your availability is on file, and a HomeFix partner will contact you after confirming an inspection window.",
+    };
+  }
+
+  if (inspectionStatus === "scheduled") {
+    return {
+      label: "Case status",
+      message:
+        "No action is needed from you right now. Your inspection is scheduled and the appointment details are available in your Repair Passport.",
+      to: "/passport",
+      actionLabel: "View Appointment",
+    };
+  }
+
+  if (inspectionStatus === "completed" && missingDocuments > 0) {
+    return {
+      label: "Your next step",
+      message: `Upload the remaining ${missingDocuments} document${missingDocuments === 1 ? "" : "s"} for partner review.`,
+      to: "/passport",
+      actionLabel: "Open Passport",
+    };
+  }
+
+  if (casePayload.lifecycle.stage === "potential_programs" && coveredNeeds > 0) {
+    return {
+      label: "Your next step",
+      message: "Choose acceptable times for an on-site inspection.",
+      to: "/inspection",
+      actionLabel: "Schedule Inspection",
+    };
+  }
+
+  return {
+    label: "Case status",
+    message: `No action is needed from you right now. ${casePayload.lifecycle.nextAction}`,
+  };
 }
 
 function helperText(status: string) {

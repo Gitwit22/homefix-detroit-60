@@ -589,22 +589,28 @@ export function DataTable({ headers, rows }: { headers: string[]; rows: ReactNod
 
 export function NextAction({
   children,
-  to = "/passport",
+  to,
   search,
+  label = "Next best action",
+  actionLabel = "Continue",
 }: {
   children: ReactNode;
   to?: string;
   search?: Record<string, unknown>;
+  label?: string;
+  actionLabel?: string;
 }) {
   return (
     <section className="next-action">
       <div>
-        <span className="eyebrow">Next best action</span>
+        <span className="eyebrow">{label}</span>
         <h2>{children}</h2>
       </div>
-      <BlueprintButton to={to} search={search} dataGuideTarget="next-action-continue">
-        Continue
-      </BlueprintButton>
+      {to && (
+        <BlueprintButton to={to} search={search} dataGuideTarget="next-action-continue">
+          {actionLabel}
+        </BlueprintButton>
+      )}
     </section>
   );
 }
