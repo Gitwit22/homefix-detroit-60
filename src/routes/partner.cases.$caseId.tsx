@@ -23,6 +23,7 @@ import {
   confirmInspectionAppointment,
   createOverflowJob,
   getPartnerCase,
+  rescheduleInspectionAppointment,
   reviewCaseDocument,
   saveInspectionFindings,
   type PartnerCaseDetail,
@@ -172,7 +173,9 @@ function CaseDetail() {
                   <p className="eyebrow">Authorized assisting contact</p>
                   <p className="mt-2 font-semibold">{item.assistant.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {[item.assistant.relationship, item.assistant.phone].filter(Boolean).join(" · ")}
+                    {[item.assistant.relationship, item.assistant.phone]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </p>
                 </div>
               )}
@@ -306,6 +309,17 @@ function CaseDetail() {
                   <span>{`${createdJob.workOrderNumber} opened for contractor response`}</span>
                 </li>
               )}
+              {(item.events ?? [])
+                .filter((event) =>
+                  ["inspection_scheduled", "inspection_rescheduled"].includes(event.eventType),
+                )
+                .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+                .map((event) => (
+                  <li key={event.id} className="grid grid-cols-[130px_1fr] py-4 text-sm">
+                    <b>{formatHistoryDate(event.createdAt)}</b>
+                    <span>{event.description ?? event.title}</span>
+                  </li>
+                ))}
               <li className="grid grid-cols-[130px_1fr] py-4 text-sm">
                 <b>Current</b>
                 <span>{caseStatusLabels[item.caseStatus]}</span>
@@ -355,7 +369,11 @@ function DocumentReviewWorkspace({
   const [savingId, setSavingId] = useState<string | null>(null);
 
   if (documents.length === 0) {
-    return <p className="mt-5 border-y border-border py-6 text-sm text-muted-foreground">No document requirements are attached to this case.</p>;
+    return (
+      <p className="mt-5 border-y border-border py-6 text-sm text-muted-foreground">
+        No document requirements are attached to this case.
+      </p>
+    );
   }
 
   const saveReview = async (documentId: string, status: "approved" | "rejected") => {
@@ -376,7 +394,10 @@ function DocumentReviewWorkspace({
   return (
     <div className="mt-5 divide-y divide-border border-y border-border">
       {documents.map((document) => (
-        <article key={document.id} className="grid gap-4 py-5 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+        <article
+          key={document.id}
+          className="grid gap-4 py-5 lg:grid-cols-[1fr_1fr_auto] lg:items-end"
+        >
           <div>
             <p className="eyebrow">{document.status}</p>
             <h3 className="mt-2 text-xl">{document.documentType}</h3>
@@ -438,8 +459,9 @@ function InspectionWorkspace({
   const [providerName, setProviderName] = useState(inspectionPackage?.providerName ?? "");
   const [providerPhone, setProviderPhone] = useState(inspectionPackage?.providerPhone ?? "");
   const [selectedStart, setSelectedStart] = useState(
-    inspectionPackage?.availabilityWindows[0]?.start ?? "",
+    inspectionPackage?.confirmedStart ?? inspectionPackage?.availabilityWindows[0]?.start ?? "",
   );
+  const [isRescheduling, setIsRescheduling] = useState(false);
   const [answers, setAnswers] = useState<Record<string, { answer: string; unable: boolean }>>(() =>
     Object.fromEntries(
       (inspectionPackage?.questions ?? []).map((question) => [
@@ -493,7 +515,7 @@ function InspectionWorkspace({
     );
   }
 
-  const confirmAppointment = async () => {
+  const saveAppointment = async () => {
     const window = inspectionPackage.availabilityWindows.find(
       (candidate) => candidate.start === selectedStart,
     );
@@ -504,15 +526,23 @@ function InspectionWorkspace({
     setIsSaving(true);
     setError("");
     try {
-      await confirmInspectionAppointment(caseId, {
+      const save = isRescheduling ? rescheduleInspectionAppointment : confirmInspectionAppointment;
+      await save(caseId, {
         start: window.start,
         end: window.end,
         providerName: providerName.trim(),
         ...(providerPhone.trim() ? { providerPhone: providerPhone.trim() } : {}),
       });
+      setIsRescheduling(false);
       await onUpdated();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to confirm inspection.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : isRescheduling
+            ? "Unable to reschedule inspection."
+            : "Unable to confirm inspection.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -526,9 +556,7 @@ function InspectionWorkspace({
     const incompleteFinding = inspectionPackage.needs.some((need) => {
       const finding = findings[need.repairNeedId];
       return (
-        !finding?.condition.trim() ||
-        !finding.verifiedScope.trim() ||
-        !finding.trainingSuitability
+        !finding?.condition.trim() || !finding.verifiedScope.trim() || !finding.trainingSuitability
       );
     });
     if (incompleteQuestion || incompleteFinding) {
@@ -556,9 +584,7 @@ function InspectionWorkspace({
             ...(finding.notes.trim() ? { notes: finding.notes.trim() } : {}),
             verifiedScope: finding.verifiedScope.trim(),
             trainingSuitability: finding.trainingSuitability as
-              | "not_suitable"
-              | "potential"
-              | "suitable",
+              "not_suitable" | "potential" | "suitable",
             ...(finding.estimatedCost && estimatedCost > 0
               ? { estimatedCostCents: Math.round(estimatedCost * 100) }
               : {}),
@@ -579,11 +605,13 @@ function InspectionWorkspace({
     }
   };
 
-  if (inspectionPackage.status === "availability_submitted") {
+  if (inspectionPackage.status === "availability_submitted" || isRescheduling) {
     return (
       <div className="mt-5 border-y border-border py-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <StatusBadge tone="warning">Scheduling required</StatusBadge>
+          <StatusBadge tone="warning">
+            {isRescheduling ? "Reschedule appointment" : "Scheduling required"}
+          </StatusBadge>
           <span className="text-sm text-muted-foreground">
             {inspectionPackage.availabilityWindows.length} resident windows
           </span>
@@ -626,11 +654,37 @@ function InspectionWorkspace({
         <Button
           className="mt-5 min-h-12 rounded-none"
           disabled={isSaving}
-          onClick={confirmAppointment}
+          onClick={saveAppointment}
         >
           <CalendarDays />
-          {isSaving ? "Confirming..." : "Confirm Appointment"}
+          {isSaving
+            ? isRescheduling
+              ? "Rescheduling..."
+              : "Confirming..."
+            : isRescheduling
+              ? "Confirm Reschedule"
+              : "Confirm Appointment"}
         </Button>
+        {isRescheduling && (
+          <Button
+            className="mt-5 min-h-12 rounded-none"
+            variant="outline"
+            disabled={isSaving}
+            onClick={() => {
+              setSelectedStart(
+                inspectionPackage.confirmedStart ??
+                  inspectionPackage.availabilityWindows[0]?.start ??
+                  "",
+              );
+              setProviderName(inspectionPackage.providerName ?? "");
+              setProviderPhone(inspectionPackage.providerPhone ?? "");
+              setError("");
+              setIsRescheduling(false);
+            }}
+          >
+            Cancel
+          </Button>
+        )}
       </div>
     );
   }
@@ -655,6 +709,25 @@ function InspectionWorkspace({
             {inspectionPackage.providerName}
             {inspectionPackage.providerPhone ? ` · ${inspectionPackage.providerPhone}` : ""}
           </p>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Confirmed by {inspectionPackage.confirmedByDisplayName ?? "a HomeFix partner"}
+            {inspectionPackage.confirmedAt
+              ? ` on ${formatHistoryDate(inspectionPackage.confirmedAt)}`
+              : ""}
+          </p>
+          {!completed && (
+            <Button
+              className="mt-5 min-h-11 rounded-none"
+              variant="outline"
+              onClick={() => {
+                setError("");
+                setIsRescheduling(true);
+              }}
+            >
+              <CalendarDays />
+              Reschedule Appointment
+            </Button>
+          )}
         </div>
         <ClipboardCheck className="size-7 text-primary" />
       </div>
@@ -886,7 +959,8 @@ function InspectionWorkspace({
                         ...current,
                         [need.repairNeedId]: {
                           ...finding,
-                          trainingSuitability: event.target.value as typeof finding.trainingSuitability,
+                          trainingSuitability: event.target
+                            .value as typeof finding.trainingSuitability,
                         },
                       }))
                     }
@@ -943,6 +1017,17 @@ function formatInspectionWindow(window: { start: string; end: string }) {
     minute: "2-digit",
     timeZone: "America/Detroit",
   }).format(end)}`;
+}
+
+function formatHistoryDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Detroit",
+  }).format(new Date(value));
 }
 
 function CaseLoadError({

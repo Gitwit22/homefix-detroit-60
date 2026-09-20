@@ -27,6 +27,7 @@ import {
   confirmInspection,
   listInspectionQueue,
   recordInspectionFindings,
+  rescheduleInspection,
   submitInspectionAvailability,
 } from "../../server/services/inspection.js";
 import { processCase, processRepair } from "../../server/services/processRepair.js";
@@ -169,6 +170,8 @@ async function withOverflowCaseState(caseId: string, source: PartnerDataSource) 
         confirmedEnd: aggregate.inspection.confirmedEnd?.toISOString() ?? null,
         providerName: aggregate.inspection.providerName,
         providerPhone: aggregate.inspection.providerPhone,
+        confirmedByDisplayName: aggregate.inspection.confirmedByDisplayName,
+        confirmedAt: aggregate.inspection.confirmedAt?.toISOString() ?? null,
         questions: aggregate.inspection.inspectionQuestions,
         needs: aggregate.repairNeeds.map((need) => {
           const assessment = aggregate.assessments.find((item) => item.repairNeedId === need.id);
@@ -226,9 +229,13 @@ async function withOverflowCaseState(caseId: string, source: PartnerDataSource) 
           email: aggregate.resident.email,
         }
       : null,
-    assistant:
-      aggregate?.contacts.find((contact) => contact.contactType === "assistant") ?? null,
+    assistant: aggregate?.contacts.find((contact) => contact.contactType === "assistant") ?? null,
     primaryContact: aggregate?.primaryContact ?? null,
+    events:
+      aggregate?.events.map((event) => ({
+        ...event,
+        createdAt: event.createdAt.toISOString(),
+      })) ?? [],
     documents:
       aggregate?.documents.map((document) => ({
         ...document,
@@ -404,7 +411,7 @@ export function isPartnerProtectedRequest(pathname: string, method: string) {
 
   return (
     method === "POST" &&
-    /^\/api\/v1\/cases\/[0-9a-f-]+\/inspection\/(confirm|findings)$/i.test(pathname)
+    /^\/api\/v1\/cases\/[0-9a-f-]+\/inspection\/(confirm|reschedule|findings)$/i.test(pathname)
   );
 }
 
@@ -419,6 +426,7 @@ async function requireResidentCaseAccess(request: IncomingMessage, caseId: strin
 const server = createServer(async (request, response) => {
   const requestUrl = new URL(request.url ?? "/", "http://localhost");
   const method = (request.method ?? "").toUpperCase();
+  let contractorAccess: Awaited<ReturnType<typeof requireContractorAccess>> | null = null;
 
   if (!applyCors(request, response)) {
     sendJson(response, 403, { error: "Origin is not allowed" });
@@ -540,7 +548,7 @@ const server = createServer(async (request, response) => {
 
   if (isPartnerProtectedRequest(requestUrl.pathname, method)) {
     try {
-      await requireContractorAccess(request);
+      contractorAccess = await requireContractorAccess(request);
     } catch (error) {
       const status = error instanceof RequestError ? error.status : 500;
       if (status === 500) console.error(error);
@@ -1139,12 +1147,43 @@ const server = createServer(async (request, response) => {
   );
   if (method === "POST" && inspectionConfirmMatch) {
     try {
-      const payload = await confirmInspection(inspectionConfirmMatch[1]!, await readJson(request));
+      if (!contractorAccess) throw new RequestError(401, "Partner access is required");
+      const payload = await confirmInspection(
+        inspectionConfirmMatch[1]!,
+        await readJson(request),
+        contractorAccess,
+      );
       sendJson(response, 200, payload);
     } catch (error) {
       const status = error instanceof Error && error.name === "ZodError" ? 400 : 409;
       sendJson(response, status, {
         error: error instanceof Error ? error.message : "Unable to confirm inspection",
+      });
+    }
+    return;
+  }
+
+  const inspectionRescheduleMatch = requestUrl.pathname.match(
+    /^\/api\/v1\/cases\/([0-9a-f-]+)\/inspection\/reschedule$/i,
+  );
+  if (method === "POST" && inspectionRescheduleMatch) {
+    try {
+      if (!contractorAccess) throw new RequestError(401, "Partner access is required");
+      const payload = await rescheduleInspection(
+        inspectionRescheduleMatch[1]!,
+        await readJson(request),
+        contractorAccess,
+      );
+      sendJson(response, 200, payload);
+    } catch (error) {
+      const status =
+        error instanceof RequestError
+          ? error.status
+          : error instanceof Error && error.name === "ZodError"
+            ? 400
+            : 409;
+      sendJson(response, status, {
+        error: error instanceof Error ? error.message : "Unable to reschedule inspection",
       });
     }
     return;

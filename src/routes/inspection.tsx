@@ -89,6 +89,7 @@ function formatWindow(window: AvailabilityWindow) {
 
 function InspectionPage() {
   const { caseId: searchCaseId } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const caseId = resolveResidentCaseId(searchCaseId);
   const [payload, setPayload] = useState<Awaited<ReturnType<typeof getCase>> | null>(null);
   const [selected, setSelected] = useState<AvailabilityWindow[]>([]);
@@ -149,7 +150,10 @@ function InspectionPage() {
     setError("");
     try {
       await submitInspectionAvailability(caseId, selected);
-      setPayload(await getCase(caseId));
+      await navigate({
+        to: "/passport",
+        search: { caseId, availabilitySaved: true },
+      });
     } catch (submitError) {
       setError(
         submitError instanceof Error ? submitError.message : "Unable to submit availability.",

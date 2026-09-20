@@ -62,6 +62,45 @@ export const confirmInspectionSchema = z.object({
   providerPhone: z.string().trim().max(40).optional(),
 });
 
+export type InspectionConfirmationActor = {
+  id: string;
+  displayName: string;
+};
+
+export function requireInspectionConfirmationState(status: string) {
+  if (status === "availability_submitted") return;
+  throw new Error(
+    status === "scheduled"
+      ? "Inspection is already scheduled. Use reschedule to change the appointment."
+      : "Inspection cannot be scheduled in its current state",
+  );
+}
+
+export function requireInspectionRescheduleState(status: string) {
+  if (status === "scheduled") return;
+  throw new Error(
+    status === "completed"
+      ? "A completed inspection cannot be rescheduled"
+      : "Confirm the inspection before rescheduling it",
+  );
+}
+
+export function findOfferedInspectionWindow<T extends { start: Date; end: Date }>(
+  windows: T[],
+  start: string,
+  end: string,
+) {
+  return windows.find(
+    (window) =>
+      window.start.getTime() === new Date(start).getTime() &&
+      window.end.getTime() === new Date(end).getTime(),
+  );
+}
+
+function isAppointmentConflict(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "23505";
+}
+
 export const inspectionQuestionResponseSchema = z
   .object({
     id: z.string().uuid(),
@@ -207,6 +246,8 @@ export async function getInspectionState(caseId: string) {
     confirmedEnd: appointment?.confirmedEnd ?? null,
     providerName: appointment?.providerName ?? null,
     providerPhone: appointment?.providerPhone ?? null,
+    confirmedByDisplayName: appointment?.confirmedByDisplayName ?? null,
+    confirmedAt: appointment?.confirmedAt ?? null,
   };
 }
 
@@ -233,6 +274,8 @@ export async function listInspectionQueue() {
       appointmentEnd: inspectionAppointments.confirmedEnd,
       providerName: inspectionAppointments.providerName,
       providerPhone: inspectionAppointments.providerPhone,
+      confirmedByDisplayName: inspectionAppointments.confirmedByDisplayName,
+      confirmedAt: inspectionAppointments.confirmedAt,
     })
     .from(inspectionRequests)
     .innerJoin(repairCases, eq(repairCases.id, inspectionRequests.repairCaseId))
@@ -291,6 +334,8 @@ export async function listInspectionQueue() {
       appointmentEnd: request.appointmentEnd?.toISOString() ?? null,
       providerName: request.providerName,
       providerPhone: request.providerPhone,
+      confirmedByDisplayName: request.confirmedByDisplayName,
+      confirmedAt: request.confirmedAt?.toISOString() ?? null,
       availabilityWindows: windows
         .filter((window) => window.inspectionRequestId === request.id)
         .sort((left, right) => left.start.getTime() - right.start.getTime())
@@ -391,7 +436,11 @@ export async function submitInspectionAvailability(caseId: string, input: unknow
   return { inspection: await getInspectionState(caseId), lifecycle };
 }
 
-export async function confirmInspection(caseId: string, input: unknown) {
+export async function confirmInspection(
+  caseId: string,
+  input: unknown,
+  actor: InspectionConfirmationActor,
+) {
   const parsed = confirmInspectionSchema.parse(input);
   const rows = await db
     .select()
@@ -400,6 +449,7 @@ export async function confirmInspection(caseId: string, input: unknown) {
     .limit(1);
   const request = rows[0];
   if (!request) throw new Error("Resident availability has not been submitted");
+  requireInspectionConfirmationState(request.status);
   const windows = await db
     .select()
     .from(inspectionAvailability)
@@ -409,17 +459,13 @@ export async function confirmInspection(caseId: string, input: unknown) {
         eq(inspectionAvailability.active, true),
       ),
     );
-  const selectedWindow = windows.find(
-    (window) =>
-      window.start.getTime() === new Date(parsed.start).getTime() &&
-      window.end.getTime() === new Date(parsed.end).getTime(),
-  );
+  const selectedWindow = findOfferedInspectionWindow(windows, parsed.start, parsed.end);
   if (!selectedWindow) throw new Error("Confirmed appointment must use a resident-provided window");
 
-  await db.transaction(async (transaction) => {
-    await transaction
-      .insert(inspectionAppointments)
-      .values({
+  const confirmedAt = new Date();
+  try {
+    await db.transaction(async (transaction) => {
+      await transaction.insert(inspectionAppointments).values({
         inspectionRequestId: request.id,
         availabilityId: selectedWindow.id,
         status: "scheduled",
@@ -427,29 +473,115 @@ export async function confirmInspection(caseId: string, input: unknown) {
         confirmedEnd: new Date(parsed.end),
         providerName: parsed.providerName,
         providerPhone: parsed.providerPhone ?? null,
-      })
-      .onConflictDoUpdate({
-        target: inspectionAppointments.inspectionRequestId,
-        set: {
-          availabilityId: selectedWindow.id,
-          status: "scheduled",
-          confirmedStart: new Date(parsed.start),
-          confirmedEnd: new Date(parsed.end),
+        confirmedByContractorAccountId: actor.id,
+        confirmedByDisplayName: actor.displayName,
+        confirmedAt,
+      });
+      await transaction
+        .update(inspectionRequests)
+        .set({ status: "scheduled", updatedAt: confirmedAt })
+        .where(eq(inspectionRequests.id, request.id));
+      await transaction.insert(caseEvents).values({
+        repairCaseId: caseId,
+        eventType: "inspection_scheduled",
+        title: "Professional inspection scheduled",
+        description: `${actor.displayName} scheduled ${parsed.providerName} for the inspection.`,
+        metadata: {
+          start: parsed.start,
+          end: parsed.end,
           providerName: parsed.providerName,
           providerPhone: parsed.providerPhone ?? null,
-          updatedAt: new Date(),
+          confirmedByContractorAccountId: actor.id,
+          confirmedByDisplayName: actor.displayName,
+          confirmedAt: confirmedAt.toISOString(),
         },
       });
+    });
+  } catch (error) {
+    if (isAppointmentConflict(error)) {
+      throw new Error("Inspection is already scheduled. Use reschedule to change the appointment.");
+    }
+    throw error;
+  }
+  const lifecycle = await syncCaseLifecycle(caseId);
+  return { inspection: await getInspectionState(caseId), lifecycle };
+}
+
+export async function rescheduleInspection(
+  caseId: string,
+  input: unknown,
+  actor: InspectionConfirmationActor,
+) {
+  const parsed = confirmInspectionSchema.parse(input);
+  const requestRows = await db
+    .select()
+    .from(inspectionRequests)
+    .where(eq(inspectionRequests.repairCaseId, caseId))
+    .limit(1);
+  const request = requestRows[0];
+  if (!request) throw new Error("Resident availability has not been submitted");
+  requireInspectionRescheduleState(request.status);
+
+  const [appointmentRows, windows] = await Promise.all([
+    db
+      .select()
+      .from(inspectionAppointments)
+      .where(eq(inspectionAppointments.inspectionRequestId, request.id))
+      .limit(1),
+    db
+      .select()
+      .from(inspectionAvailability)
+      .where(
+        and(
+          eq(inspectionAvailability.inspectionRequestId, request.id),
+          eq(inspectionAvailability.active, true),
+        ),
+      ),
+  ]);
+  const appointment = appointmentRows[0];
+  if (!appointment) throw new Error("Confirmed inspection appointment was not found");
+  const selectedWindow = findOfferedInspectionWindow(windows, parsed.start, parsed.end);
+  if (!selectedWindow)
+    throw new Error("Rescheduled appointment must use a resident-provided window");
+
+  const confirmedAt = new Date();
+  await db.transaction(async (transaction) => {
+    await transaction
+      .update(inspectionAppointments)
+      .set({
+        availabilityId: selectedWindow.id,
+        confirmedStart: new Date(parsed.start),
+        confirmedEnd: new Date(parsed.end),
+        providerName: parsed.providerName,
+        providerPhone: parsed.providerPhone ?? null,
+        confirmedByContractorAccountId: actor.id,
+        confirmedByDisplayName: actor.displayName,
+        confirmedAt,
+        updatedAt: confirmedAt,
+      })
+      .where(eq(inspectionAppointments.id, appointment.id));
     await transaction
       .update(inspectionRequests)
-      .set({ status: "scheduled", updatedAt: new Date() })
+      .set({ updatedAt: confirmedAt })
       .where(eq(inspectionRequests.id, request.id));
     await transaction.insert(caseEvents).values({
       repairCaseId: caseId,
-      eventType: "inspection_scheduled",
-      title: "Professional inspection scheduled",
-      description: `${parsed.providerName} confirmed the inspection appointment.`,
-      metadata: { start: parsed.start, end: parsed.end },
+      eventType: "inspection_rescheduled",
+      title: "Professional inspection rescheduled",
+      description: `${actor.displayName} rescheduled ${parsed.providerName} for the inspection.`,
+      metadata: {
+        previousStart: appointment.confirmedStart.toISOString(),
+        previousEnd: appointment.confirmedEnd.toISOString(),
+        previousProviderName: appointment.providerName,
+        previousProviderPhone: appointment.providerPhone,
+        start: parsed.start,
+        end: parsed.end,
+        providerName: parsed.providerName,
+        providerPhone: parsed.providerPhone ?? null,
+        confirmedByContractorAccountId: actor.id,
+        confirmedByDisplayName: actor.displayName,
+        confirmedAt: confirmedAt.toISOString(),
+      },
     });
   });
   const lifecycle = await syncCaseLifecycle(caseId);

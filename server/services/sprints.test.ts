@@ -21,8 +21,11 @@ const { createOverflowWorkOrderSchema, submitOverflowBidSchema } = await import(
 const {
   applyInspectionQuestionResponses,
   buildInspectionQuestionSnapshot,
+  findOfferedInspectionWindow,
   inspectionAvailabilitySchema,
   inspectionFindingsSchema,
+  requireInspectionConfirmationState,
+  requireInspectionRescheduleState,
 } = await import("./inspection.js");
 const { loadSavedDemoAssessment, loadSavedDemoMatch } = await import("../demo/deniseScenario.js");
 
@@ -334,6 +337,33 @@ test("inspection questions preserve repair ownership and require a complete resp
         },
       ]),
     /answer or mark/i,
+  );
+});
+
+test("inspection scheduling only confirms once and reschedules scheduled requests", () => {
+  assert.doesNotThrow(() => requireInspectionConfirmationState("availability_submitted"));
+  assert.throws(() => requireInspectionConfirmationState("scheduled"), /already scheduled/i);
+  assert.doesNotThrow(() => requireInspectionRescheduleState("scheduled"));
+  assert.throws(() => requireInspectionRescheduleState("availability_submitted"), /confirm/i);
+  assert.throws(() => requireInspectionRescheduleState("completed"), /cannot be rescheduled/i);
+});
+
+test("inspection confirmation requires an exact resident-offered window", () => {
+  const windows = [
+    {
+      id: "window-1",
+      start: new Date("2026-09-23T13:00:00-04:00"),
+      end: new Date("2026-09-23T17:00:00-04:00"),
+    },
+  ];
+  assert.equal(
+    findOfferedInspectionWindow(windows, "2026-09-23T13:00:00-04:00", "2026-09-23T17:00:00-04:00")
+      ?.id,
+    "window-1",
+  );
+  assert.equal(
+    findOfferedInspectionWindow(windows, "2026-09-23T14:00:00-04:00", "2026-09-23T17:00:00-04:00"),
+    undefined,
   );
 });
 

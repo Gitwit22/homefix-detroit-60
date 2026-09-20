@@ -253,6 +253,7 @@ export type CaseAggregateResponse = {
     eventType: string;
     title: string;
     description: string | null;
+    metadata: unknown;
     createdAt: string;
   }>;
   inspection: {
@@ -270,6 +271,8 @@ export type CaseAggregateResponse = {
     confirmedEnd: string | null;
     providerName: string | null;
     providerPhone: string | null;
+    confirmedByDisplayName: string | null;
+    confirmedAt: string | null;
   } | null;
   inspectionFindings: Array<{
     id: string;
@@ -490,8 +493,7 @@ async function fetchWithTimeout(
 
 function isApiUnavailable(error: unknown) {
   return (
-    error instanceof TypeError ||
-    (error instanceof DOMException && error.name === "AbortError")
+    error instanceof TypeError || (error instanceof DOMException && error.name === "AbortError")
   );
 }
 
@@ -563,11 +565,13 @@ export async function validateContractorAccess(): Promise<ContractorSession> {
   }
 }
 
-export async function getPublicOpportunities(filters: {
-  type?: PublicOpportunity["type"];
-  zipCode?: string;
-  priority?: string;
-} = {}): Promise<PublicOpportunityPage> {
+export async function getPublicOpportunities(
+  filters: {
+    type?: PublicOpportunity["type"];
+    zipCode?: string;
+    priority?: string;
+  } = {},
+): Promise<PublicOpportunityPage> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
   const search = new URLSearchParams();
   if (filters.type) search.set("type", filters.type);
@@ -591,23 +595,21 @@ export async function getPublicOpportunities(filters: {
           (fact.priority === "critical" || fact.priority === "high"),
       )
       .slice(0, 12)
-      .map(
-        (fact, index): PublicOpportunity => ({
-          publicNumber: `DEMO-${String(index + 1).padStart(3, "0")}`,
-          type: "repair",
-          repairCategory: repairTypeLabels[fact.repairType],
-          priority: fact.priority[0]!.toUpperCase() + fact.priority.slice(1),
-          publicScope: `${repairTypeLabels[fact.repairType]} repair scope pending contractor review.`,
-          city: "Detroit",
-          state: "MI",
-          zipCode: fact.zipCode,
-          fundingStatus: "Funding gap",
-          trainingOpportunityStatus: null,
-          potentialSkills: [],
-          status: "open",
-          publishedAt: fact.createdAt,
-        }),
-      );
+      .map((fact, index): PublicOpportunity => ({
+        publicNumber: `DEMO-${String(index + 1).padStart(3, "0")}`,
+        type: "repair",
+        repairCategory: repairTypeLabels[fact.repairType],
+        priority: fact.priority[0]!.toUpperCase() + fact.priority.slice(1),
+        publicScope: `${repairTypeLabels[fact.repairType]} repair scope pending contractor review.`,
+        city: "Detroit",
+        state: "MI",
+        zipCode: fact.zipCode,
+        fundingStatus: "Funding gap",
+        trainingOpportunityStatus: null,
+        potentialSkills: [],
+        status: "open",
+        publishedAt: fact.createdAt,
+      }));
     return {
       items,
       page: 1,
@@ -619,9 +621,7 @@ export async function getPublicOpportunities(filters: {
   }
 }
 
-export async function getPublicOpportunity(
-  opportunityNumber: string,
-): Promise<PublicOpportunity> {
+export async function getPublicOpportunity(opportunityNumber: string): Promise<PublicOpportunity> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
   const response = await fetchWithTimeout(
     `${apiUrl}/api/v1/opportunities/${encodeURIComponent(opportunityNumber)}`,
@@ -781,6 +781,16 @@ export function confirmInspectionAppointment(
   }>(caseId, "inspection/confirm", input, true);
 }
 
+export function rescheduleInspectionAppointment(
+  caseId: string,
+  input: { start: string; end: string; providerName: string; providerPhone?: string },
+) {
+  return postCaseAction<{
+    inspection: CaseAggregateResponse["inspection"];
+    lifecycle: CaseLifecycle;
+  }>(caseId, "inspection/reschedule", input, true);
+}
+
 export function saveInspectionFindings(
   caseId: string,
   findings: Array<{
@@ -814,7 +824,10 @@ export async function getPartnerInspectionQueue(
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
   const response = await partnerFetch(`${apiUrl}/api/v1/partner-inspections?source=${source}`);
   if (!response.ok) throw await homeFixApiError(response);
-  return response.json() as Promise<{ source: PartnerDataSource; items: PartnerInspectionQueueItem[] }>;
+  return response.json() as Promise<{
+    source: PartnerDataSource;
+    items: PartnerInspectionQueueItem[];
+  }>;
 }
 
 export async function processRepair(repairNeedId: string) {
@@ -982,18 +995,23 @@ export async function submitBid(
   },
 ) {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await partnerFetch(`${apiUrl}/api/v1/overflow-jobs/${encodeURIComponent(jobId)}/bids`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const response = await partnerFetch(
+    `${apiUrl}/api/v1/overflow-jobs/${encodeURIComponent(jobId)}/bids`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
   if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
   return response.json() as Promise<OverflowJobDetailResponse>;
 }
 
 export async function getWorkOrderBids(jobId: string): Promise<OverflowBidResponse[]> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await partnerFetch(`${apiUrl}/api/v1/overflow-jobs/${encodeURIComponent(jobId)}/bids`);
+  const response = await partnerFetch(
+    `${apiUrl}/api/v1/overflow-jobs/${encodeURIComponent(jobId)}/bids`,
+  );
   if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
   return response.json() as Promise<OverflowBidResponse[]>;
 }

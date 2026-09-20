@@ -228,6 +228,14 @@ export type PartnerCaseDetail = PartnerCaseSummary & {
     relationship: string | null;
     assistingWithApplication: boolean;
   } | null;
+  events?: Array<{
+    id: string;
+    eventType: string;
+    title: string;
+    description: string | null;
+    metadata: unknown;
+    createdAt: string;
+  }>;
   needs: Array<{
     repairNeedId: string;
     repairType: RepairType;
@@ -256,6 +264,8 @@ export type PartnerCaseDetail = PartnerCaseSummary & {
     confirmedEnd: string | null;
     providerName: string | null;
     providerPhone: string | null;
+    confirmedByDisplayName: string | null;
+    confirmedAt: string | null;
     questions: Array<{
       id: string;
       repairNeedId: string;

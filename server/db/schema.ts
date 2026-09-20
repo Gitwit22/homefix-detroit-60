@@ -120,10 +120,7 @@ export const caseContacts = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
-    uniqueIndex("case_contacts_repair_case_type_unique").on(
-      table.repairCaseId,
-      table.contactType,
-    ),
+    uniqueIndex("case_contacts_repair_case_type_unique").on(table.repairCaseId, table.contactType),
   ],
 );
 
@@ -382,12 +379,16 @@ export const inspectionAppointments = pgTable(
     confirmedEnd: timestamp("confirmed_end", { withTimezone: true }).notNull(),
     providerName: text("provider_name").notNull(),
     providerPhone: text("provider_phone"),
+    confirmedByContractorAccountId: uuid("confirmed_by_contractor_account_id").references(
+      () => contractorAccessAccounts.id,
+      { onDelete: "set null" },
+    ),
+    confirmedByDisplayName: text("confirmed_by_display_name"),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }).defaultNow().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [
-    uniqueIndex("inspection_appointments_request_unique").on(table.inspectionRequestId),
-  ],
+  (table) => [uniqueIndex("inspection_appointments_request_unique").on(table.inspectionRequestId)],
 );
 
 export const inspectionFindings = pgTable(

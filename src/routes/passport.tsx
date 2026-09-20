@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Check, ExternalLink, FileText, Upload } from "lucide-react";
+import { CalendarDays, Check, ExternalLink, FileText, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DemoSessionPanel } from "@/components/demo-session-panel";
 import { DemoFlag, PriorityBadge, SectionLabel, StatusBadge } from "@/components/homefix";
@@ -12,6 +12,8 @@ import { resolveResidentCaseId } from "@/lib/resident-case";
 export const Route = createFileRoute("/passport")({
   validateSearch: (search: Record<string, unknown>) => ({
     caseId: typeof search["caseId"] === "string" ? search["caseId"] : "",
+    availabilitySaved:
+      search["availabilitySaved"] === true || search["availabilitySaved"] === "true",
   }),
   head: () => ({
     meta: [
@@ -30,7 +32,7 @@ export const Route = createFileRoute("/passport")({
 });
 
 function PassportPage() {
-  const { caseId: searchCaseId } = Route.useSearch();
+  const { caseId: searchCaseId, availabilitySaved } = Route.useSearch();
   const caseId = resolveResidentCaseId(searchCaseId);
   const [isLoading, setIsLoading] = useState(true);
   const [payload, setPayload] = useState<Awaited<ReturnType<typeof getCase>> | null>(null);
@@ -95,6 +97,15 @@ function PassportPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 pb-24 sm:px-6 lg:px-10">
+      {availabilitySaved && (
+        <div className="mb-6 flex gap-3 border-l-4 border-primary bg-positive/20 p-5" role="status">
+          <Check className="size-5 shrink-0 text-primary" aria-hidden="true" />
+          <p className="text-sm font-semibold">
+            Your availability has been saved. A HomeFix partner will contact you to confirm an
+            inspection time.
+          </p>
+        </div>
+      )}
       <div className="border-2 border-foreground bg-paper">
         <header className="grid gap-6 border-b-8 border-primary p-6 sm:grid-cols-[1fr_auto] sm:p-8">
           <div>
@@ -180,6 +191,47 @@ function PassportPage() {
           </div>
         </div>
 
+        {payload.inspection && (
+          <section className="border-t border-foreground p-6 sm:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <SectionLabel number="04">Inspection</SectionLabel>
+                <h2 className="mt-4 text-3xl">
+                  {payload.inspection.status === "availability_submitted"
+                    ? "Awaiting scheduling"
+                    : payload.inspection.status === "completed"
+                      ? "Inspection completed"
+                      : "Inspection scheduled"}
+                </h2>
+              </div>
+              <CalendarDays className="size-7 text-primary" aria-hidden="true" />
+            </div>
+            {payload.inspection.confirmedStart && payload.inspection.confirmedEnd ? (
+              <dl className="mt-6 grid gap-x-5 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
+                <Item
+                  k="Status"
+                  v={payload.inspection.status === "completed" ? "Completed" : "Scheduled"}
+                />
+                <Item k="Date" v={formatInspectionDate(payload.inspection.confirmedStart)} />
+                <Item
+                  k="Time"
+                  v={formatInspectionTime(
+                    payload.inspection.confirmedStart,
+                    payload.inspection.confirmedEnd,
+                  )}
+                />
+                <Item k="Provider" v={payload.inspection.providerName ?? "To be confirmed"} />
+                <Item k="Contact" v={payload.inspection.providerPhone ?? "Not provided"} />
+              </dl>
+            ) : (
+              <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
+                Your availability is on file. A HomeFix partner will contact you after selecting an
+                inspection window.
+              </p>
+            )}
+          </section>
+        )}
+
         <section className="border-t border-foreground p-6 sm:p-8">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
@@ -256,7 +308,9 @@ function PassportPage() {
         </section>
 
         <section className="border-t border-foreground p-6 sm:p-8">
-          <SectionLabel number="04">Repair Passport Progress</SectionLabel>
+          <SectionLabel number={payload.inspection ? "05" : "04"}>
+            Repair Passport Progress
+          </SectionLabel>
           <ol className="mt-6 grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
             {payload.lifecycle.steps.map((step) => (
               <li key={step.stage} className="flex min-h-24 items-center gap-3 bg-paper p-4">
@@ -313,6 +367,24 @@ function documentStatusLabel(status: string) {
   if (status === "rejected") return "Needs attention";
   if (status === "uploaded") return "Available for review";
   return "Verification pending";
+}
+
+function formatInspectionDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "America/Detroit",
+  }).format(new Date(value));
+}
+
+function formatInspectionTime(start: string, end: string) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Detroit",
+  });
+  return `${formatter.format(new Date(start))}–${formatter.format(new Date(end))}`;
 }
 
 function toPriority(urgency: string) {

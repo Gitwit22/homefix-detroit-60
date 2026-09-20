@@ -36,6 +36,7 @@ test("public and partner operations are not classified as resident routes", () =
     ["GET", "/health"],
     ["GET", "/api/v1/opportunities"],
     ["POST", `/api/v1/cases/${caseId}/inspection/confirm`],
+    ["POST", `/api/v1/cases/${caseId}/inspection/reschedule`],
     ["POST", `/api/v1/cases/${caseId}/inspection/findings`],
     ["GET", `/api/v1/partner-cases/${caseId}`],
   ];
