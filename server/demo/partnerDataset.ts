@@ -132,6 +132,24 @@ export function generateSyntheticPartnerDataset(
     }
   }
 
+  const specialCaseFacts = facts.filter((fact) => fact.homeId === "HOME-DEMO-0001");
+  for (const fact of specialCaseFacts) {
+    fact.caseId = "HF-313-0842";
+    fact.propertyLabel = "123 Main Street";
+    fact.zipCode = "48205";
+    fact.createdAt = PARTNER_DEMO_GENERATED_AT;
+  }
+
+  const primaryFact = specialCaseFacts[0];
+  if (primaryFact) {
+    primaryFact.repairType = "roof_water_intrusion";
+    primaryFact.priority = "high";
+    primaryFact.matchStatus = "strong_match";
+    primaryFact.coverageStatus = "potentially_covered";
+    primaryFact.caseStatus = "program_review";
+    primaryFact.programId = "critical-home-repair";
+  }
+
   return facts;
 }
 

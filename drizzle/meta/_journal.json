@@ -43,6 +43,13 @@
       "when": 1789869579950,
       "tag": "0005_nice_typhoid_mary",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789872769713,
+      "tag": "0006_sparkling_shriek",
+      "breakpoints": true
     }
   ]
 }

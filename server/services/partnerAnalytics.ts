@@ -86,6 +86,7 @@ function buildCases(facts: SyntheticRepairFact[]): {
       ];
       return {
         caseId: first.caseId,
+        caseNumber: first.caseId,
         homeId: first.homeId,
         propertyLabel: first.propertyLabel,
         zipCode: first.zipCode,

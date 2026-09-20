@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   integer,
   jsonb,
   numeric,
@@ -197,6 +198,48 @@ export const caseEvents = pgTable("case_events", {
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const workOrders = pgTable("work_orders", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  repairCaseId: uuid("repair_case_id")
+    .references(() => repairCases.id, { onDelete: "cascade" })
+    .notNull(),
+  repairNeedId: uuid("repair_need_id")
+    .references(() => repairNeeds.id, { onDelete: "cascade" })
+    .notNull()
+    .unique(),
+  programId: uuid("program_id")
+    .references(() => programs.id)
+    .notNull(),
+  workOrderNumber: text("work_order_number").unique().notNull(),
+  repairType: text("repair_type").notNull(),
+  scope: text("scope").notNull(),
+  priority: text("priority").notNull(),
+  fundingStatus: text("funding_status").default("program_approved").notNull(),
+  capacityStatus: text("capacity_status").default("overflow").notNull(),
+  status: text("status").default("open").notNull(),
+  isSynthetic: boolean("is_synthetic").default(false).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const bids = pgTable(
+  "bids",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workOrderId: uuid("work_order_id")
+      .references(() => workOrders.id, { onDelete: "cascade" })
+      .notNull(),
+    contractorName: text("contractor_name").notNull(),
+    companyName: text("company_name").notNull(),
+    estimatedPriceCents: integer("estimated_price_cents").notNull(),
+    estimatedDurationDays: integer("estimated_duration_days").notNull(),
+    notes: text("notes"),
+    status: text("status").default("submitted").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("bids_work_order_id_created_at_idx").on(table.workOrderId, table.createdAt)],
+);
 
 export const overflowWorkOrders = pgTable("overflow_work_orders", {
   id: uuid("id").defaultRandom().primaryKey(),

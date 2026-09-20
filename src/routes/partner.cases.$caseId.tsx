@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Clock, FileWarning, Send, Wrench } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight, Clock, FileWarning, Send, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DemoFlag,
@@ -8,7 +9,7 @@ import {
   SectionLabel,
   StatusBadge,
 } from "@/components/homefix";
-import { getPartnerCase } from "@/lib/homefix-api";
+import { createOverflowJob, getPartnerCase } from "@/lib/homefix-api";
 import {
   caseStatusLabels,
   coverageStatusLabels,
@@ -18,8 +19,9 @@ import {
 
 const programNames: Record<string, string> = {
   "critical-home-repair": "Critical Home Repair",
-  weatherization: "Wayne Metro Weatherization",
-  leadsafe: "Detroit LeadSafe Housing",
+  "wayne-metro-weatherization": "Wayne Metro Weatherization",
+  "zero-percent-home-repair-loan": "0% Interest Home Repair Loan",
+  "detroit-leadsafe-housing": "Detroit LeadSafe Housing",
 };
 
 export const Route = createFileRoute("/partner/cases/$caseId")({
@@ -40,6 +42,17 @@ export const Route = createFileRoute("/partner/cases/$caseId")({
 
 function CaseDetail() {
   const item = Route.useLoaderData();
+  const [createdJob, setCreatedJob] = useState(item.overflow?.existingWorkOrder ?? null);
+  const [isCreatingJob, setIsCreatingJob] = useState(false);
+  const overflowNeed = useMemo(
+    () =>
+      item.needs.find(
+        (need) =>
+          need.programId === item.overflow?.programId &&
+          need.coverageStatus === "potentially_covered",
+      ) ?? null,
+    [item.needs, item.overflow?.programId],
+  );
   const reportedDate = new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
@@ -52,6 +65,25 @@ function CaseDetail() {
       : item.coverageStatus === "verification_needed"
         ? "Verify household and program requirements"
         : "Advance the strongest program referral";
+
+  const createJob = async () => {
+    if (!overflowNeed) return;
+    setIsCreatingJob(true);
+    try {
+      const payload = await createOverflowJob(item.caseId, overflowNeed.repairNeedId);
+      setCreatedJob({
+        id: payload.id,
+        workOrderNumber: payload.workOrderNumber,
+        status: payload.status,
+        statusLabel: payload.statusLabel,
+      });
+    } catch (error) {
+      console.error(error);
+      window.alert("We couldn’t create the overflow job yet. Please try again.");
+    } finally {
+      setIsCreatingJob(false);
+    }
+  };
 
   return (
     <>
@@ -109,12 +141,78 @@ function CaseDetail() {
             </div>
           </section>
           <section className="mt-10">
-            <SectionLabel number="02">Case history</SectionLabel>
+            <SectionLabel number="02">Overflow capacity</SectionLabel>
+            <div className="mt-5 border border-border p-6">
+              <span className="eyebrow">Delivery capacity</span>
+              <h2 className="mt-2 text-3xl">
+                {item.overflow?.programId
+                  ? programNames[item.overflow.programId]
+                  : "Not configured"}
+              </h2>
+              <dl className="mt-5 grid gap-4 sm:grid-cols-3">
+                <CapacityItem
+                  label="Funding status"
+                  value={item.overflow?.fundingStatusLabel ?? "Not available"}
+                />
+                <CapacityItem
+                  label="Capacity"
+                  value={item.overflow?.capacityStatusLabel ?? "Not available"}
+                />
+                <CapacityItem
+                  label="Selected repair"
+                  value={overflowNeed?.repairLabel ?? "Not available"}
+                />
+              </dl>
+              <p className="mt-4 text-sm text-muted-foreground">
+                {item.overflow?.explanation ??
+                  "Overflow creation is available only for configured demo cases with approved funding and full program capacity."}
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                {createdJob ? (
+                  <>
+                    <div className="border border-border px-4 py-3">
+                      <p className="eyebrow">Overflow Job Created</p>
+                      <p className="mt-2 text-xl font-semibold">{createdJob.workOrderNumber}</p>
+                      <p className="text-sm text-muted-foreground">{createdJob.statusLabel}</p>
+                    </div>
+                    <Button asChild className="min-h-12 rounded-none bg-primary">
+                      <Link
+                        to="/partner/overflow/$jobId"
+                        params={{ jobId: createdJob.workOrderNumber }}
+                      >
+                        View Job Package
+                        <ArrowRight />
+                      </Link>
+                    </Button>
+                  </>
+                ) : item.overflow?.eligible && overflowNeed ? (
+                  <Button
+                    className="min-h-12 rounded-none bg-primary"
+                    onClick={createJob}
+                    disabled={isCreatingJob}
+                  >
+                    <Wrench />
+                    {isCreatingJob ? "Creating Overflow Job…" : "Create Overflow Job"}
+                  </Button>
+                ) : (
+                  <StatusBadge tone="warning">Overflow job not available for this case</StatusBadge>
+                )}
+              </div>
+            </div>
+          </section>
+          <section className="mt-10">
+            <SectionLabel number="03">Case history</SectionLabel>
             <ol className="mt-5 divide-y divide-border border-y border-border">
               <li className="grid grid-cols-[130px_1fr] py-4 text-sm">
                 <b>{reportedDate}</b>
                 <span>Repair needs entered into the synthetic planning dataset</span>
               </li>
+              {createdJob && (
+                <li className="grid grid-cols-[130px_1fr] py-4 text-sm">
+                  <b>Current</b>
+                  <span>{`${createdJob.workOrderNumber} opened for contractor response`}</span>
+                </li>
+              )}
               <li className="grid grid-cols-[130px_1fr] py-4 text-sm">
                 <b>Current</b>
                 <span>{caseStatusLabels[item.caseStatus]}</span>
@@ -185,6 +283,15 @@ function Info({ label, value }: { label: string; value: string }) {
     <div className="bg-background p-5">
       <span className="eyebrow">{label}</span>
       <strong className="mt-2 block">{value}</strong>
+    </div>
+  );
+}
+
+function CapacityItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[10px] uppercase text-muted-foreground">{label}</dt>
+      <dd className="mt-1 font-semibold">{value}</dd>
     </div>
   );
 }
