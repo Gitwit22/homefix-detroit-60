@@ -30,7 +30,7 @@ const availabilityWindowSchema = z
   });
 
 export const inspectionAvailabilitySchema = z
-  .object({ windows: z.array(availabilityWindowSchema).min(2).max(6) })
+  .object({ windows: z.array(availabilityWindowSchema).min(3) })
   .superRefine(({ windows }, context) => {
     const starts = new Set<string>();
     for (const [index, window] of windows.entries()) {
@@ -272,14 +272,13 @@ export async function submitInspectionAvailability(caseId: string, input: unknow
     .where(eq(repairNeeds.repairCaseId, caseId));
   const needIds = needs.map((need) => need.id);
   const [assessments, photos] = await Promise.all([
-    db
-      .select()
-      .from(repairAssessments)
-      .where(inArray(repairAssessments.repairNeedId, needIds)),
+    db.select().from(repairAssessments).where(inArray(repairAssessments.repairNeedId, needIds)),
     db.select().from(repairPhotos).where(inArray(repairPhotos.repairNeedId, needIds)),
   ]);
   const inspectionQuestions = buildInspectionQuestionSnapshot(assessments);
-  const assessmentByNeed = new Map(assessments.map((assessment) => [assessment.repairNeedId, assessment]));
+  const assessmentByNeed = new Map(
+    assessments.map((assessment) => [assessment.repairNeedId, assessment]),
+  );
   const caseSnapshot: InspectionCaseSnapshot = {
     needs: needs.map((need) => {
       const assessment = assessmentByNeed.get(need.id);

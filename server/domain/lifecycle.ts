@@ -71,7 +71,7 @@ export function deriveCaseLifecycle(facts: CaseLifecycleFacts): CaseLifecycle {
     stage = "inspection";
     nextAction = facts.inspectionCompleted
       ? "Complete and verify the professional repair scope."
-      : "Confirm and complete the on-site inspection.";
+      : "Await inspector assignment and appointment confirmation.";
   }
 
   if (facts.inspectionCompleted) {

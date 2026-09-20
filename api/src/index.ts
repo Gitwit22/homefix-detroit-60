@@ -327,10 +327,10 @@ async function readDocumentFile(request: IncomingMessage) {
   });
   const [fields, files] = await form.parse(request);
   const documentTypeValue = fields["documentType"];
-  const documentType = Array.isArray(documentTypeValue)
-    ? documentTypeValue[0]
-    : documentTypeValue;
-  const file = Object.values(files).flat().find((candidate) => candidate != null);
+  const documentType = Array.isArray(documentTypeValue) ? documentTypeValue[0] : documentTypeValue;
+  const file = Object.values(files)
+    .flat()
+    .find((candidate) => candidate != null);
   return { documentType: documentType ?? "", file };
 }
 
@@ -1115,7 +1115,7 @@ const server = createServer(async (request, response) => {
       sendJson(response, status, {
         error:
           error instanceof Error && error.name === "ZodError"
-            ? "Choose between two and six valid future inspection windows."
+            ? "Choose at least three valid future inspection windows."
             : error instanceof Error
               ? error.message
               : "Unable to submit inspection availability",

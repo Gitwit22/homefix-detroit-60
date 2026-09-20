@@ -240,23 +240,23 @@ test("triage responses require a bounded preliminary training opportunity", () =
   );
 });
 
-test("inspection availability requires multiple unique future windows", () => {
+test("inspection availability requires at least three unique future windows without a maximum", () => {
   const start = new Date(Date.now() + 86_400_000);
-  const valid = Array.from({ length: 7 }, (_, index) => {
+  const valid = Array.from({ length: 100 }, (_, index) => {
     const windowStart = new Date(start.getTime() + index * 24 * 60 * 60 * 1_000);
     const windowEnd = new Date(windowStart.getTime() + 3 * 60 * 60 * 1_000);
     return { start: windowStart.toISOString(), end: windowEnd.toISOString() };
   });
 
   assert.equal(
-    inspectionAvailabilitySchema.safeParse({ windows: valid.slice(0, 6) }).success,
+    inspectionAvailabilitySchema.safeParse({ windows: valid.slice(0, 3) }).success,
     true,
   );
   assert.equal(
-    inspectionAvailabilitySchema.safeParse({ windows: valid.slice(0, 1) }).success,
+    inspectionAvailabilitySchema.safeParse({ windows: valid.slice(0, 2) }).success,
     false,
   );
-  assert.equal(inspectionAvailabilitySchema.safeParse({ windows: valid }).success, false);
+  assert.equal(inspectionAvailabilitySchema.safeParse({ windows: valid }).success, true);
   assert.equal(
     inspectionAvailabilitySchema.safeParse({ windows: [valid[0], valid[0]] }).success,
     false,
@@ -357,7 +357,10 @@ test("contractor sign-in requires a name and exactly four numeric digits", () =>
       .success,
     true,
   );
-  assert.equal(contractorSignInSchema.safeParse({ displayName: "   ", pin: "3130" }).success, false);
+  assert.equal(
+    contractorSignInSchema.safeParse({ displayName: "   ", pin: "3130" }).success,
+    false,
+  );
   assert.equal(
     contractorSignInSchema.safeParse({ displayName: "R".repeat(121), pin: "3130" }).success,
     false,

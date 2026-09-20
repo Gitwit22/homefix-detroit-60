@@ -103,6 +103,30 @@ export const repairCases = pgTable("repair_cases", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const caseContacts = pgTable(
+  "case_contacts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    repairCaseId: uuid("repair_case_id")
+      .references(() => repairCases.id, { onDelete: "cascade" })
+      .notNull(),
+    contactType: text("contact_type", { enum: ["assistant"] }).notNull(),
+    name: text("name").notNull(),
+    phone: text("phone").notNull(),
+    relationship: text("relationship"),
+    isPrimaryContact: boolean("is_primary_contact").default(false).notNull(),
+    permissionAcknowledgedAt: timestamp("permission_acknowledged_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("case_contacts_repair_case_type_unique").on(
+      table.repairCaseId,
+      table.contactType,
+    ),
+  ],
+);
+
 export const repairNeeds = pgTable("repair_needs", {
   id: uuid("id").defaultRandom().primaryKey(),
   repairCaseId: uuid("repair_case_id")

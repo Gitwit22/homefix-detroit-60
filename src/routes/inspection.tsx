@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { CalendarDays, Check, Clock3 } from "lucide-react";
+import { CalendarDays, Check, Clock3, Plus } from "lucide-react";
 
 import { DemoFlag, PageIntro, StatusBadge } from "@/components/homefix";
 import { Button } from "@/components/ui/button";
@@ -27,8 +27,9 @@ export const Route = createFileRoute("/inspection")({
 type AvailabilityWindow = { start: string; end: string };
 
 const detroitTimeZone = "America/Detroit";
-const minimumAvailabilityWindows = 2;
-const maximumAvailabilityWindows = 6;
+const minimumAvailabilityWindows = 3;
+const initialVisibleWeekdays = 7;
+const weekdaysPerAddedWeek = 5;
 
 function dateParts(date: Date) {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -50,14 +51,14 @@ function detroitOffset(date: Date) {
   return value?.replace("GMT", "") || "-05:00";
 }
 
-function nextWeekdayWindows(now = new Date()): AvailabilityWindow[] {
+function nextWeekdayWindows(weekdayCount: number, now = new Date()): AvailabilityWindow[] {
   const current = dateParts(now);
   const year = Number(current.year);
   const month = Number(current.month);
   const day = Number(current.day);
   const windows: AvailabilityWindow[] = [];
 
-  for (let offset = 1; windows.length < 14; offset += 1) {
+  for (let offset = 1; windows.length < weekdayCount * 2; offset += 1) {
     const calendarDate = new Date(Date.UTC(year, month - 1, day + offset, 12));
     const weekday = calendarDate.getUTCDay();
     if (weekday === 0 || weekday === 6) continue;
@@ -94,7 +95,14 @@ function InspectionPage() {
   const [isLoading, setIsLoading] = useState(Boolean(caseId));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const windows = nextWeekdayWindows();
+  const [visibleWeekdays, setVisibleWeekdays] = useState(initialVisibleWeekdays);
+  const generatedWindows = nextWeekdayWindows(visibleWeekdays);
+  const windows = [...generatedWindows, ...selected]
+    .filter(
+      (window, index, allWindows) =>
+        allWindows.findIndex((candidate) => candidate.start === window.start) === index,
+    )
+    .sort((left, right) => left.start.localeCompare(right.start));
 
   useEffect(() => {
     if (!caseId) return;
@@ -127,7 +135,6 @@ function InspectionPage() {
     setSelected((current) => {
       const isSelected = current.some((item) => item.start === window.start);
       if (isSelected) return current.filter((item) => item.start !== window.start);
-      if (current.length >= maximumAvailabilityWindows) return current;
       return [...current, window];
     });
     setError("");
@@ -135,11 +142,7 @@ function InspectionPage() {
 
   const submit = async () => {
     if (selected.length < minimumAvailabilityWindows) {
-      setError("Choose at least two acceptable inspection windows.");
-      return;
-    }
-    if (selected.length > maximumAvailabilityWindows) {
-      setError("Choose no more than six acceptable inspection windows.");
+      setError("Choose at least three acceptable inspection windows.");
       return;
     }
     setIsSubmitting(true);
@@ -213,29 +216,45 @@ function InspectionPage() {
         </section>
       ) : (
         <section className="mt-10">
+          {payload.inspection?.status === "availability_submitted" && (
+            <div
+              className="mb-8 border-l-4 border-warning bg-warning/10 p-6"
+              data-guide-target="inspection-submitted"
+              role="status"
+            >
+              <StatusBadge tone="warning">Awaiting inspection assignment</StatusBadge>
+              <h2 className="mt-4 text-3xl">Your application is submitted.</h2>
+              <p className="mt-2 max-w-2xl text-muted-foreground">
+                Your inspection dates are on file. HomeFix is waiting for a partner to assign an
+                inspector and confirm one of your selected windows.
+              </p>
+            </div>
+          )}
           <div className="flex flex-wrap items-end justify-between gap-4 border-b border-foreground pb-5">
             <div>
               <p className="eyebrow">Choose several acceptable windows</p>
               <h2 className="mt-2 text-3xl">What times work for you?</h2>
             </div>
-            <StatusBadge tone={selected.length >= 2 ? "positive" : "neutral"}>
-              {selected.length} of {maximumAvailabilityWindows} selected
+            <StatusBadge
+              tone={selected.length >= minimumAvailabilityWindows ? "positive" : "neutral"}
+            >
+              {selected.length} selected
             </StatusBadge>
           </div>
-          <p className="mt-4 text-sm text-muted-foreground">Choose between two and six windows.</p>
+          <p className="mt-4 text-sm text-muted-foreground">
+            Choose at least three windows. Select every time that works for you.
+          </p>
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {windows.map((window) => {
               const label = formatWindow(window);
               const active = selected.some((item) => item.start === window.start);
-              const unavailable = !active && selected.length >= maximumAvailabilityWindows;
               return (
                 <button
                   key={window.start}
                   type="button"
                   aria-pressed={active}
-                  disabled={unavailable}
                   onClick={() => toggleWindow(window)}
-                  className={`grid min-h-28 grid-cols-[auto_1fr_auto] items-center gap-3 border p-4 text-left disabled:cursor-not-allowed disabled:opacity-50 ${active ? "border-primary bg-primary/10" : "border-border bg-background"}`}
+                  className={`grid min-h-28 grid-cols-[auto_1fr_auto] items-center gap-3 border p-4 text-left ${active ? "border-primary bg-primary/10" : "border-border bg-background"}`}
                 >
                   <CalendarDays className="size-5 text-primary" />
                   <span>
@@ -250,6 +269,15 @@ function InspectionPage() {
               );
             })}
           </div>
+          <Button
+            className="mt-5 rounded-none"
+            variant="outline"
+            type="button"
+            onClick={() => setVisibleWeekdays((current) => current + weekdaysPerAddedWeek)}
+          >
+            <Plus className="size-4" />
+            Add another week
+          </Button>
           {error && (
             <p
               className="mt-5 border-l-4 border-destructive pl-4 text-sm text-destructive"
@@ -260,16 +288,20 @@ function InspectionPage() {
           )}
           {payload.inspection?.status === "availability_submitted" && (
             <p className="mt-5 text-sm font-semibold text-primary">
-              Your availability is on file. You can update it until a partner confirms the
-              appointment.
+              You can update your availability until a partner confirms the appointment.
             </p>
           )}
           <Button
             className="mt-6 min-h-12 rounded-none"
+            data-guide-target="inspection-submit"
             disabled={isSubmitting || selected.length < minimumAvailabilityWindows}
             onClick={submit}
           >
-            {isSubmitting ? "Submitting..." : "Submit Availability"}
+            {isSubmitting
+              ? "Submitting..."
+              : payload.inspection?.status === "availability_submitted"
+                ? "Update Availability"
+                : "Submit Availability"}
           </Button>
         </section>
       )}

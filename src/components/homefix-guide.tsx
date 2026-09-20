@@ -163,7 +163,7 @@ function resolveResidentStep(pathname: string, intakeStep: number): DemoStep | n
       title: "Choose inspection availability",
       intro:
         "Submit several acceptable windows so a partner can confirm an on-site inspection of the repair condition and scope.",
-      showSelector: "main button",
+      showSelector: "[data-guide-target='inspection-submit']",
     };
   }
 
@@ -489,6 +489,11 @@ export function HomeFixGuide() {
       return;
     }
     if (step.step === 5 && caseId) {
+      if (!document.querySelector("[data-guide-target='inspection-submitted']")) {
+        setAnswer("Submit at least three inspection windows before continuing your application.");
+        focusTarget("[data-guide-target='inspection-submit']");
+        return;
+      }
       void navigate({ to: "/coverage", search: { caseId } });
     }
   };

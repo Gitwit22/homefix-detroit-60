@@ -42,6 +42,8 @@ test("lifecycle requires inspection and verified scope before final review", () 
   });
 
   assert.equal(inspection.stage, "inspection");
+  assert.match(inspection.nextAction, /await inspector assignment/i);
+  assert.equal(inspection.complete, false);
   assert.equal(scope.stage, "repair_scope");
 });
 
