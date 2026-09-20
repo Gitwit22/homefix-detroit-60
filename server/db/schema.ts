@@ -7,6 +7,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -16,6 +17,14 @@ export const residents = pgTable("residents", {
   lastName: text("last_name").notNull(),
   email: text("email"),
   phone: text("phone"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const demoSessions = pgTable("demo_sessions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  displayName: text("display_name").notNull(),
+  normalizedName: text("normalized_name").unique().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -49,6 +58,9 @@ export const repairCases = pgTable("repair_cases", {
     .notNull(),
   caseNumber: text("case_number").unique().notNull(),
   demoScenario: text("demo_scenario"),
+  demoSessionId: uuid("demo_session_id").references(() => demoSessions.id, {
+    onDelete: "set null",
+  }),
   status: text("status").default("assessment_started").notNull(),
   currentStep: text("current_step").default("intake").notNull(),
   nextAction: text("next_action"),
@@ -87,21 +99,25 @@ export const repairPhotos = pgTable("repair_photos", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const repairAssessments = pgTable("repair_assessments", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  repairNeedId: uuid("repair_need_id")
-    .references(() => repairNeeds.id, { onDelete: "cascade" })
-    .notNull(),
-  predictedCategory: text("predicted_category"),
-  urgency: text("urgency"),
-  summary: text("summary"),
-  observations: jsonb("observations"),
-  safetyFlags: jsonb("safety_flags"),
-  followUpQuestions: jsonb("follow_up_questions"),
-  confidence: numeric("confidence"),
-  model: text("model"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const repairAssessments = pgTable(
+  "repair_assessments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    repairNeedId: uuid("repair_need_id")
+      .references(() => repairNeeds.id, { onDelete: "cascade" })
+      .notNull(),
+    predictedCategory: text("predicted_category"),
+    urgency: text("urgency"),
+    summary: text("summary"),
+    observations: jsonb("observations"),
+    safetyFlags: jsonb("safety_flags"),
+    followUpQuestions: jsonb("follow_up_questions"),
+    confidence: numeric("confidence"),
+    model: text("model"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("repair_assessments_repair_need_id_unique").on(table.repairNeedId)],
+);
 
 export const programs = pgTable("programs", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -160,21 +176,30 @@ export const programRepairTypes = pgTable("program_repair_types", {
   repairType: text("repair_type").notNull(),
 });
 
-export const programMatches = pgTable("program_matches", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  repairNeedId: uuid("repair_need_id")
-    .references(() => repairNeeds.id, { onDelete: "cascade" })
-    .notNull(),
-  programId: uuid("program_id")
-    .references(() => programs.id, { onDelete: "cascade" })
-    .notNull(),
-  matchStatus: text("match_status").notNull(),
-  approvalStatus: text("approval_status").default("pending").notNull(),
-  approvedAt: timestamp("approved_at", { withTimezone: true }),
-  explanation: text("explanation"),
-  missingRequirements: jsonb("missing_requirements"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const programMatches = pgTable(
+  "program_matches",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    repairNeedId: uuid("repair_need_id")
+      .references(() => repairNeeds.id, { onDelete: "cascade" })
+      .notNull(),
+    programId: uuid("program_id")
+      .references(() => programs.id, { onDelete: "cascade" })
+      .notNull(),
+    matchStatus: text("match_status").notNull(),
+    approvalStatus: text("approval_status").default("pending").notNull(),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    explanation: text("explanation"),
+    missingRequirements: jsonb("missing_requirements"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("program_matches_repair_need_program_unique").on(
+      table.repairNeedId,
+      table.programId,
+    ),
+  ],
+);
 
 export const documents = pgTable("documents", {
   id: uuid("id").defaultRandom().primaryKey(),

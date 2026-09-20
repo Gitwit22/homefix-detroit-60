@@ -15,8 +15,11 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "start:api": "node api-dist/api/src/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p server/tsconfig.json --noEmit",
+    "test": "tsx --test server/services/sprints.test.ts server/services/partnerAnalytics.test.ts",
     "test:partner-analytics": "tsx --test server/services/partnerAnalytics.test.ts",
     "test:sprints": "tsx --test server/services/sprints.test.ts server/services/partnerAnalytics.test.ts",
+    "verify": "npm run typecheck && npm run test && npm run build:api && npm run build && npm run lint",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
@@ -80,6 +83,7 @@
     "tsx": "^4.21.0",
     "tw-animate-css": "^1.3.4",
     "vaul": "^1.1.2",
+    "ws": "^8.21.3",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -88,6 +92,7 @@
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^5.2.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.32.0",

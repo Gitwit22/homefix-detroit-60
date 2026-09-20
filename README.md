@@ -30,6 +30,7 @@ work_orders
 bids
 job_assignments
 Friday build sequence
+
 1. Create the database schema
    IDs and timestamps
    resident → home
@@ -117,10 +118,8 @@ Income <= 80% AMI
 Repair category = roof
 Application = open
 Engine:
-Resident/Home
-   +
-Repair
-   +
+Resident/Home +
+Repair +
 Program Rules
 ↓
 Strong Match
@@ -154,18 +153,12 @@ That feeds both the resident experience and government analytics.
 
 Feature 4 — HomeFix Passport
 Now make the Passport assemble:
-Property
-+
-Household
-+
-Repair Needs
-+
-Assessment
-+
-Documents
-+
-Program Matches
-+
+Property +
+Household +
+Repair Needs +
+Assessment +
+Documents +
+Program Matches +
 Coverage
 The Passport should persist beyond an individual application.
 
@@ -273,6 +266,7 @@ leaking roof
 furnace issue
 electrical issue
 Demo:
+
 1. Landing
 2. Start assessment
 3. Enter Denise
@@ -344,9 +338,12 @@ Create a Render Blueprint from `render.yaml`, then set:
 - `DATABASE_URL` to the HomeFix Postgres connection string.
 - `CORS_ORIGINS` to the comma-separated frontend origins allowed to submit
   intake data, such as `https://homefix-detroit-60.pages.dev`.
+- `HOMEFIX_DEMO_MODE=1` to enable optional name-only demo sessions and the
+  session-scoped resident demo wipe endpoint. This is presentation convenience,
+  not authentication and must not be used to protect real resident data.
 - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, and
-   `R2_BUCKET_NAME` to a private Cloudflare R2 bucket and an object read/write
-   API token.
+  `R2_BUCKET_NAME` to a private Cloudflare R2 bucket and an object read/write
+  API token.
 
 Render supplies `PORT`; do not set it manually. The service health check is
 `/health` and intake submissions use `POST /api/v1/intakes`.
@@ -372,8 +369,10 @@ Create a Pages project from this repository with:
 - Node version: `22.12.0`
 
 Set `VITE_HOMEFIX_API_URL` as a Pages build variable using the Render service
-origin, for example `https://homefix-api.onrender.com`. This value is public by
-design; do not add `DATABASE_URL` to Cloudflare.
+origin, for example `https://homefix-api.onrender.com`. Set
+`VITE_HOMEFIX_DEMO_MODE=1` to show the optional session and wipe controls on the
+home page. These values are public by design; do not add `DATABASE_URL` or any
+private credential to Cloudflare.
 
 ```sh
 npm ci
@@ -444,4 +443,3 @@ The kill rule stays simple:
 If a P0 feature is unstable, stop all P2 work.
 The build sequence is therefore:
 HomeFix UI → Data → Intake → AI Triage → Rules → Matching → Passport → Coverage → Intelligence → Overflow → Freeze.
-

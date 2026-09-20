@@ -1,12 +1,20 @@
 import "dotenv/config";
 
+import { rm } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import formidable from "formidable";
 
 import { intakeSchema, createIntakeCase } from "../../server/services/intake.js";
+import {
+  demoSessionSchema,
+  getDemoSession,
+  listDemoSessionCases,
+  openDemoSession,
+  wipeDemoSessionData,
+} from "../../server/services/demoSession.js";
 import { getCaseAggregate } from "../../server/services/case.js";
 import { processCase, processRepair } from "../../server/services/processRepair.js";
-import { uploadRepairPhoto } from "../../server/services/photos.js";
+import { rollbackRepairPhoto, uploadRepairPhoto } from "../../server/services/photos.js";
 import { getProgramDetail, listProgramCatalog } from "../../server/services/program.js";
 import { calculateCoveragePlan, getCoveragePlan } from "../../server/services/coverage.js";
 import {
@@ -49,6 +57,7 @@ import {
 const port = parsePort(process.env.PORT);
 const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGINS);
 const maxBodyBytes = 100_000;
+const demoMode = process.env.HOMEFIX_DEMO_MODE === "1";
 const partnerDemoSeed = Number.parseInt(
   process.env.HOMEFIX_DEMO_SEED ?? String(DEFAULT_PARTNER_DEMO_SEED),
   10,
@@ -131,8 +140,8 @@ function applyCors(request: IncomingMessage, response: ServerResponse): boolean 
   if (!allowedOrigins.has(origin)) return false;
 
   response.setHeader("access-control-allow-origin", origin);
-  response.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
-  response.setHeader("access-control-allow-headers", "content-type");
+  response.setHeader("access-control-allow-methods", "GET, POST, DELETE, OPTIONS");
+  response.setHeader("access-control-allow-headers", "content-type, x-homefix-demo-session");
   response.setHeader("vary", "Origin");
   return true;
 }
@@ -184,6 +193,14 @@ class RequestError extends Error {
   }
 }
 
+async function requireDemoSession(request: IncomingMessage) {
+  const token = request.headers["x-homefix-demo-session"];
+  if (typeof token !== "string") throw new RequestError(401, "Demo session is required");
+  const session = await getDemoSession(token);
+  if (!session) throw new RequestError(401, "Demo session is invalid");
+  return session;
+}
+
 const server = createServer(async (request, response) => {
   const requestUrl = new URL(request.url ?? "/", "http://localhost");
   const method = (request.method ?? "").toUpperCase();
@@ -202,6 +219,72 @@ const server = createServer(async (request, response) => {
   if (method === "GET" && requestUrl.pathname === "/health") {
     sendJson(response, 200, { status: "ok", service: "homefix-api" });
     return;
+  }
+
+  if (requestUrl.pathname === "/api/v1/demo-sessions") {
+    if (!demoMode) {
+      sendJson(response, 404, { error: "Not found" });
+      return;
+    }
+    try {
+      if (method === "POST") {
+        const input = demoSessionSchema.parse(await readJson(request));
+        sendJson(response, 200, await openDemoSession(input.displayName));
+        return;
+      }
+    } catch (error) {
+      if (error instanceof RequestError) {
+        sendJson(response, error.status, { error: error.message });
+      } else if (error instanceof Error && error.name === "ZodError") {
+        sendJson(response, 400, { error: "A display name is required" });
+      } else {
+        console.error(error);
+        sendJson(response, 500, { error: "Unable to open demo session" });
+      }
+      return;
+    }
+  }
+
+  if (requestUrl.pathname === "/api/v1/demo-session/cases") {
+    if (!demoMode) {
+      sendJson(response, 404, { error: "Not found" });
+      return;
+    }
+    try {
+      if (method === "GET") {
+        const session = await requireDemoSession(request);
+        sendJson(response, 200, await listDemoSessionCases(session.id));
+        return;
+      }
+    } catch (error) {
+      const status = error instanceof RequestError ? error.status : 500;
+      if (status === 500) console.error(error);
+      sendJson(response, status, {
+        error: error instanceof RequestError ? error.message : "Unable to load demo cases",
+      });
+      return;
+    }
+  }
+
+  if (requestUrl.pathname === "/api/v1/demo-session/data") {
+    if (!demoMode) {
+      sendJson(response, 404, { error: "Not found" });
+      return;
+    }
+    try {
+      if (method === "DELETE") {
+        const session = await requireDemoSession(request);
+        sendJson(response, 200, await wipeDemoSessionData(session.id));
+        return;
+      }
+    } catch (error) {
+      const status = error instanceof RequestError ? error.status : 500;
+      if (status === 500) console.error(error);
+      sendJson(response, status, {
+        error: error instanceof RequestError ? error.message : "Unable to wipe demo data",
+      });
+      return;
+    }
   }
 
   if (method === "GET" && requestUrl.pathname === "/api/v1/partner-analytics") {
@@ -437,7 +520,13 @@ const server = createServer(async (request, response) => {
   if (method === "POST" && requestUrl.pathname === "/api/v1/intakes") {
     try {
       const payload = intakeSchema.parse(await readJson(request));
-      const result = await createIntakeCase(payload);
+      const token = request.headers["x-homefix-demo-session"];
+      const session = demoMode && typeof token === "string" ? await getDemoSession(token) : null;
+      if (typeof token === "string" && !session) {
+        sendJson(response, 401, { error: "Demo session is invalid" });
+        return;
+      }
+      const result = await createIntakeCase(payload, session ? { demoSessionId: session.id } : {});
       sendJson(response, 201, result);
     } catch (error) {
       if (error instanceof RequestError) {
@@ -456,30 +545,41 @@ const server = createServer(async (request, response) => {
 
   const repairPhotoMatch = requestUrl.pathname.match(/^\/api\/v1\/repairs\/([0-9a-f-]+)\/photos$/i);
   if (method === "POST" && repairPhotoMatch) {
+    let files: Awaited<ReturnType<typeof readPhotoFiles>> = [];
+    const uploadedPhotoIds: string[] = [];
     try {
       const repairNeedId = repairPhotoMatch[1]!;
-      const files = await readPhotoFiles(request);
+      files = await readPhotoFiles(request);
       if (files.length === 0) {
         sendJson(response, 400, { error: "At least one valid image is required" });
         return;
       }
       const photos = [];
       for (const file of files) {
-        photos.push(
-          await uploadRepairPhoto({
-            repairNeedId,
-            filepath: file.filepath,
-            originalFilename: file.originalFilename ?? "repair-photo",
-            mimeType: file.mimetype ?? "application/octet-stream",
-          }),
-        );
+        const photo = await uploadRepairPhoto({
+          repairNeedId,
+          filepath: file.filepath,
+          originalFilename: file.originalFilename ?? "repair-photo",
+          mimeType: file.mimetype ?? "application/octet-stream",
+        });
+        photos.push(photo);
+        uploadedPhotoIds.push(photo.id);
       }
       sendJson(response, 201, { photos });
     } catch (error) {
+      const cleanupResults = await Promise.allSettled(
+        uploadedPhotoIds.map((photoId) => rollbackRepairPhoto(photoId)),
+      );
+      cleanupResults.forEach((result) => {
+        if (result.status === "rejected")
+          console.error("Unable to roll back repair photo", result.reason);
+      });
       console.error(error);
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Unable to upload repair photos",
       });
+    } finally {
+      await Promise.allSettled(files.map((file) => rm(file.filepath, { force: true })));
     }
     return;
   }

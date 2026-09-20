@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { caseEvents, programMatches, programs, repairCases, repairNeeds } from "../db/schema.js";
 import type { CoveragePlan } from "../domain/coverage.js";
@@ -118,6 +118,9 @@ export async function calculateCoveragePlan(caseId: string): Promise<CoveragePla
     })
     .where(eq(repairCases.id, caseId));
 
+  await db
+    .delete(caseEvents)
+    .where(and(eq(caseEvents.repairCaseId, caseId), eq(caseEvents.eventType, "coverage_updated")));
   await db.insert(caseEvents).values({
     repairCaseId: caseId,
     eventType: "coverage_updated",

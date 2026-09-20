@@ -50,6 +50,20 @@
       "when": 1789872769713,
       "tag": "0006_sparkling_shriek",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789878972940,
+      "tag": "0007_calm_violations",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789879139979,
+      "tag": "0008_strong_photon",
+      "breakpoints": true
     }
   ]
 }

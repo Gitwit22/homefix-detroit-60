@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   caseEvents,
@@ -11,10 +11,7 @@ import {
   repairCases,
   repairNeeds,
 } from "../db/schema.js";
-import {
-  DENISE_DEMO_SCENARIO,
-  loadSavedDemoMatch,
-} from "../demo/deniseScenario.js";
+import { DENISE_DEMO_SCENARIO, loadSavedDemoMatch } from "../demo/deniseScenario.js";
 import { evaluateProgramRules } from "./eligibility.js";
 import { normalizeRepairCategory } from "../domain/repair.js";
 
@@ -171,6 +168,22 @@ export async function runMatchingForCase(caseId: string) {
     .from(documents)
     .where(eq(documents.repairCaseId, caseId));
   const existingTypes = new Set(existingDocuments.map((document) => document.documentType));
+  const requiredDocuments = [...requiredDocumentTypes];
+  if (requiredDocuments.length > 0) {
+    await db
+      .delete(documents)
+      .where(
+        and(
+          eq(documents.repairCaseId, caseId),
+          eq(documents.status, "missing"),
+          notInArray(documents.documentType, requiredDocuments),
+        ),
+      );
+  } else {
+    await db
+      .delete(documents)
+      .where(and(eq(documents.repairCaseId, caseId), eq(documents.status, "missing")));
+  }
   const missingDocuments = [...requiredDocumentTypes]
     .filter((documentType) => !existingTypes.has(documentType))
     .map((documentType) => ({ repairCaseId: caseId, documentType, status: "missing" }));
@@ -178,6 +191,14 @@ export async function runMatchingForCase(caseId: string) {
     await db.insert(documents).values(missingDocuments);
   }
 
+  await db
+    .delete(caseEvents)
+    .where(
+      and(
+        eq(caseEvents.repairCaseId, caseId),
+        eq(caseEvents.eventType, "program_matching_completed"),
+      ),
+    );
   await db.insert(caseEvents).values({
     repairCaseId: caseId,
     eventType: "program_matching_completed",

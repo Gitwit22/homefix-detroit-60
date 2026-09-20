@@ -197,9 +197,9 @@ function PassportPage() {
             <Link
               className="blueprint-button button-secondary inline-flex items-center"
               to="/intake"
-              search={{ caseId }}
+              search={{ demo: "denise-carter-pitch-v1" }}
             >
-              Update Passport
+              Start New Assessment
             </Link>
           </div>
         </footer>
