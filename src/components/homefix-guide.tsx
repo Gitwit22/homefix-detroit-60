@@ -1,6 +1,6 @@
 import { useRouterState } from "@tanstack/react-router";
 import { Volume2, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type GuidePageContent = {
   title: string;
@@ -20,7 +20,8 @@ const guideContent: Record<string, GuidePageContent> = {
     nextStep: "Enter your Detroit address.",
     whyAsk:
       "We use your home and household information to match your repair needs to programs with clear eligibility rules.",
-    simpleWords: "Tell us what is wrong, where you live, and who lives with you. We use that to find help.",
+    simpleWords:
+      "Tell us what is wrong, where you live, and who lives with you. We use that to find help.",
     readAloud:
       "This intake page collects your address, household details, and repair notes so HomeFix can build your Repair Passport.",
     showSelector: "[data-guide-target='intake-address']",
@@ -31,16 +32,19 @@ const guideContent: Record<string, GuidePageContent> = {
     nextStep: "Review the preliminary repair assessment.",
     whyAsk:
       "The assessment helps prioritize safety, identify follow-up questions, and prepare your case for matching.",
-    simpleWords: "This is a first review of your repair issue. Check what looks right and what needs updates.",
+    simpleWords:
+      "This is a first review of your repair issue. Check what looks right and what needs updates.",
     readAloud:
       "Assessment shows likely issue type, urgency, and recommended next steps before final matching.",
     showSelector: "[data-guide-target='assessment-next']",
   },
   "/passport": {
     title: "This is your Repair Passport",
-    intro: "Your Repair Passport keeps your home profile, documents, repair needs, and status in one place.",
+    intro:
+      "Your Repair Passport keeps your home profile, documents, repair needs, and status in one place.",
     nextStep: "Check that your home and household information is correct.",
-    whyAsk: "Accurate passport details help partners process your case faster and reduce repeat paperwork.",
+    whyAsk:
+      "Accurate passport details help partners process your case faster and reduce repeat paperwork.",
     simpleWords:
       "Think of this as your repair folder. Make sure your details are correct before moving forward.",
     readAloud:
@@ -67,7 +71,8 @@ const fallbackContent: GuidePageContent = {
   nextStep: "Review the page heading and follow the main action button.",
   whyAsk: "Each page collects details needed to move your repair case forward.",
   simpleWords: "I can restate this page in plain language and point out what to do next.",
-  readAloud: "This page is part of your HomeFix repair workflow. Follow the main action to continue.",
+  readAloud:
+    "This page is part of your HomeFix repair workflow. Follow the main action to continue.",
   showSelector: "main a, main button",
 };
 
@@ -82,21 +87,66 @@ export function HomeFixGuide() {
   const content = useMemo(() => resolveGuide(path), [path]);
   const [open, setOpen] = useState(false);
   const [answer, setAnswer] = useState("");
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    setAnswer("");
+  }, [path]);
+
+  useEffect(() => {
+    if ("speechSynthesis" in window) {
+      if (open) {
+        closeButtonRef.current?.focus();
+      } else {
+        window.speechSynthesis.cancel();
+      }
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  }, [path]);
+
+  useEffect(() => {
+    return () => {
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   const showTarget = () => {
     const target = document.querySelector<HTMLElement>(content.showSelector);
     if (!target) {
-      setAnswer("I couldn't find that control on this screen. Try scrolling a little and ask again.");
+      setAnswer(
+        "I couldn't find that control on this screen. Try scrolling a little and ask again.",
+      );
       return;
     }
 
     target.scrollIntoView({ behavior: "smooth", block: "center" });
+    const focusTarget = target.matches("button,a,input,select,textarea,[tabindex]")
+      ? target
+      : target.querySelector<HTMLElement>("button,a,input,select,textarea,[tabindex]");
+    if (focusTarget) {
+      if (focusTarget.tabIndex < 0) {
+        focusTarget.setAttribute("tabindex", "-1");
+      }
+      focusTarget.focus({ preventScroll: true });
+    }
     target.classList.add("guide-highlight");
     window.setTimeout(() => target.classList.remove("guide-highlight"), 1800);
     setAnswer("I highlighted the next place to click.");
   };
 
   const readPage = () => {
+    if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
+      setAnswer("Read aloud is not available in this browser.");
+      return;
+    }
+
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(
       `${content.title}. ${content.intro} Your next step: ${content.nextStep}. ${content.readAloud}`,
@@ -107,14 +157,30 @@ export function HomeFixGuide() {
 
   return (
     <>
-      <button type="button" className="guide-toggle" onClick={() => setOpen((v) => !v)}>
+      <button
+        type="button"
+        className="guide-toggle"
+        aria-expanded={open}
+        aria-controls="homefix-guide-panel"
+        onClick={() => setOpen((v) => !v)}
+      >
         Need Help?
       </button>
       {open && (
-        <aside className="guide-panel" role="dialog" aria-label="HomeFix Guide">
+        <aside
+          id="homefix-guide-panel"
+          className="guide-panel"
+          role="complementary"
+          aria-label="HomeFix Guide"
+        >
           <div className="guide-header">
             <strong>Hi, I’m the HomeFix Guide.</strong>
-            <button type="button" onClick={() => setOpen(false)} aria-label="Close guide">
+            <button
+              ref={closeButtonRef}
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="Close guide"
+            >
               <X aria-hidden="true" />
             </button>
           </div>
@@ -140,7 +206,11 @@ export function HomeFixGuide() {
             <Volume2 aria-hidden="true" />
             Read This Page
           </button>
-          {answer && <p className="guide-answer">{answer}</p>}
+          {answer && (
+            <p className="guide-answer" role="status" aria-live="polite">
+              {answer}
+            </p>
+          )}
         </aside>
       )}
     </>

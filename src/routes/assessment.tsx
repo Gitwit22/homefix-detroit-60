@@ -121,7 +121,10 @@ function AssessmentPage() {
         </p>
       </header>
       {payload.repairNeeds.length > 1 && (
-        <nav className="flex flex-wrap gap-2 border-b border-foreground py-5" aria-label="Repair assessments">
+        <nav
+          className="flex flex-wrap gap-2 border-b border-foreground py-5"
+          aria-label="Repair assessments"
+        >
           {payload.repairNeeds.map((need) => (
             <Link
               key={need.id}
@@ -222,8 +225,8 @@ function AssessmentPage() {
                   <h2 className="text-xl">{match.program.name}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {toRepairCategoryLabel(
-                      payload.repairNeeds.find((need) => need.id === match.repairNeedId)?.category ??
-                        "other",
+                      payload.repairNeeds.find((need) => need.id === match.repairNeedId)
+                        ?.category ?? "other",
                     )}
                   </p>
                 </div>
