@@ -239,7 +239,8 @@ function resolvePartnerStep(pathname: string): DemoStep | null {
       title: "Overflow Network",
       intro:
         "When an approved repair exceeds program delivery capacity, HomeFix can prepare a structured job package for contractor response.",
-      showSelector: "[data-guide-target='partner-nav-overflow']",
+      showSelector:
+        "[data-guide-target='partner-overflow-job']||[data-guide-target='partner-nav-overflow']",
       backSelector: "[data-guide-target='partner-nav-programs']",
       completeLabel: "Done",
     };
@@ -248,10 +249,23 @@ function resolvePartnerStep(pathname: string): DemoStep | null {
   return null;
 }
 
+function resolveSelector(selector?: string) {
+  if (!selector) return null;
+  return (
+    selector
+      .split("||")
+      .map((item) => item.trim())
+      .find((item) => document.querySelector<HTMLElement>(item)) ?? null
+  );
+}
+
 function focusTarget(selector?: string) {
   if (!selector)
     return "I couldn't find that control on this screen. Try scrolling a little and ask again.";
-  const target = document.querySelector<HTMLElement>(selector);
+  const targetSelector = resolveSelector(selector);
+  if (!targetSelector)
+    return "I couldn't find that control on this screen. Try scrolling a little and ask again.";
+  const target = document.querySelector<HTMLElement>(targetSelector);
   if (!target)
     return "I couldn't find that control on this screen. Try scrolling a little and ask again.";
 
@@ -272,7 +286,9 @@ function focusTarget(selector?: string) {
 
 function clickTarget(selector?: string) {
   if (!selector) return false;
-  const target = document.querySelector<HTMLElement>(selector);
+  const targetSelector = resolveSelector(selector);
+  if (!targetSelector) return false;
+  const target = document.querySelector<HTMLElement>(targetSelector);
   if (!target) return false;
   target.click();
   return true;
@@ -433,8 +449,23 @@ export function HomeFixGuide() {
       return;
     }
 
+    const caseId =
+      new URLSearchParams(window.location.search).get("caseId") ??
+      window.localStorage.getItem("homefix:lastCaseId") ??
+      "";
+
     if (direction === "back") {
-      window.history.back();
+      if (step.step === 2 || step.step === 3 || step.step === 4) {
+        void navigate({ to: "/intake", search: { demo: "denise-carter-pitch-v1" } });
+        return;
+      }
+      if (step.step === 5 && caseId) {
+        void navigate({ to: "/assessment", search: { caseId } });
+        return;
+      }
+      if (step.step === 6 && caseId) {
+        void navigate({ to: "/passport", search: { caseId } });
+      }
       return;
     }
 
@@ -442,11 +473,6 @@ export function HomeFixGuide() {
       void navigate({ to: "/intake", search: { demo: "denise-carter-pitch-v1" } });
       return;
     }
-
-    const caseId =
-      new URLSearchParams(window.location.search).get("caseId") ??
-      window.localStorage.getItem("homefix:lastCaseId") ??
-      "";
     if (step.step === 4 && caseId) {
       void navigate({ to: "/passport", search: { caseId } });
       return;
