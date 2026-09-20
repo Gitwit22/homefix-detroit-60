@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { CoverageMeter, DemoFlag, Disclaimer, NextAction, StatusBadge } from "@/components/homefix";
+import { ResidentCaseRequired } from "@/components/resident-case-required";
 import { getCase, getCoverage } from "@/lib/homefix-api";
 import { toRepairCategoryLabel } from "@/lib/repair-categories";
+import { resolveResidentCaseId } from "@/lib/resident-case";
 
 export const Route = createFileRoute("/coverage")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -28,7 +30,8 @@ export const Route = createFileRoute("/coverage")({
 });
 
 function CoveragePage() {
-  const { caseId } = Route.useSearch();
+  const { caseId: searchCaseId } = Route.useSearch();
+  const caseId = resolveResidentCaseId(searchCaseId);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [coverage, setCoverage] = useState<Awaited<ReturnType<typeof getCoverage>> | null>(null);
@@ -76,6 +79,7 @@ function CoveragePage() {
     return map;
   }, [casePayload]);
 
+  if (!caseId) return <ResidentCaseRequired pageName="Coverage Plan" />;
   if (isLoading) return <div className="mx-auto max-w-6xl px-4 py-10">Loading coverage...</div>;
   if (error || !coverage)
     return <div className="mx-auto max-w-6xl px-4 py-10">{error ?? "Coverage not found."}</div>;

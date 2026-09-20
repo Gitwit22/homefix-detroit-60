@@ -1,6 +1,7 @@
 import "dotenv/config";
 
 import { inArray } from "drizzle-orm";
+import { pathToFileURL } from "node:url";
 
 import { detroitProgramCatalog } from "../data/detroitPrograms.js";
 import { db } from "./index.js";
@@ -117,7 +118,7 @@ export async function seedPrograms() {
   return { programs: detroitProgramCatalog.length };
 }
 
-if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, "/")}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   seedPrograms()
     .then((result) => console.log(`Seeded ${result.programs} HomeFix programs.`))
     .catch((error) => {

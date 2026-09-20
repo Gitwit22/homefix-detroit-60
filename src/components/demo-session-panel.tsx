@@ -26,6 +26,7 @@ import {
   storeDemoSession,
   type DemoSession,
 } from "@/lib/demo-session";
+import { lastCaseStorageKey } from "@/lib/resident-case";
 
 const demoDraftKey = "homefix:denise-carter-pitch-v1:draft";
 
@@ -83,7 +84,7 @@ export function DemoSessionPanel({ onReset }: { onReset: () => void }) {
     setError("");
     try {
       await wipeDemoSessionData(session.token);
-      localStorage.removeItem("homefix:lastCaseId");
+      localStorage.removeItem(lastCaseStorageKey);
       localStorage.removeItem(demoDraftKey);
       clearDemoSession();
       setSession(null);

@@ -12,6 +12,7 @@ import {
 } from "@/components/homefix";
 import { submitIntakeServer } from "@/lib/intake.server";
 import { processCase, uploadRepairPhotos } from "@/lib/homefix-api";
+import { lastCaseStorageKey } from "@/lib/resident-case";
 
 export const Route = createFileRoute("/intake")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -310,7 +311,7 @@ function IntakePage() {
           repairs: response.repairs,
         };
         setCreatedCase(savedCase);
-        localStorage.setItem("homefix:lastCaseId", response.caseId);
+        localStorage.setItem(lastCaseStorageKey, response.caseId);
       }
 
       for (const repair of response.repairs) {

@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Check, Circle } from "lucide-react";
 import { BlueprintButton, DemoFlag, PageIntro, StatusBadge } from "@/components/homefix";
+import { ResidentCaseRequired } from "@/components/resident-case-required";
 import { getCase } from "@/lib/homefix-api";
+import { resolveResidentCaseId } from "@/lib/resident-case";
 
 export const Route = createFileRoute("/status")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -36,7 +38,8 @@ const journeySteps = [
 ];
 
 function StatusPage() {
-  const { caseId } = Route.useSearch();
+  const { caseId: searchCaseId } = Route.useSearch();
+  const caseId = resolveResidentCaseId(searchCaseId);
   const [payload, setPayload] = useState<Awaited<ReturnType<typeof getCase>> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(Boolean(caseId));
@@ -73,6 +76,9 @@ function StatusPage() {
     return 0;
   }, [payload]);
 
+  if (!caseId) {
+    return <ResidentCaseRequired pageName="Case Status" />;
+  }
   if (isLoading) {
     return <div className="mx-auto max-w-6xl px-4 py-10">Loading repair journey...</div>;
   }

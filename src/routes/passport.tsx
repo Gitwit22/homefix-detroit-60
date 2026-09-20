@@ -2,8 +2,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Check, FileText } from "lucide-react";
 import { DemoFlag, PriorityBadge, SectionLabel, StatusBadge } from "@/components/homefix";
+import { ResidentCaseRequired } from "@/components/resident-case-required";
 import { getCase } from "@/lib/homefix-api";
 import { toRepairCategoryLabel } from "@/lib/repair-categories";
+import { resolveResidentCaseId } from "@/lib/resident-case";
 
 export const Route = createFileRoute("/passport")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -26,7 +28,8 @@ export const Route = createFileRoute("/passport")({
 });
 
 function PassportPage() {
-  const { caseId } = Route.useSearch();
+  const { caseId: searchCaseId } = Route.useSearch();
+  const caseId = resolveResidentCaseId(searchCaseId);
   const [isLoading, setIsLoading] = useState(true);
   const [payload, setPayload] = useState<Awaited<ReturnType<typeof getCase>> | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +74,7 @@ function PassportPage() {
     return ids.size;
   }, [payload]);
 
+  if (!caseId) return <ResidentCaseRequired pageName="Repair Passport" />;
   if (isLoading) return <div className="mx-auto max-w-7xl px-4 py-10">Loading passport...</div>;
   if (error || !payload || !payload.home || !payload.resident)
     return <div className="mx-auto max-w-7xl px-4 py-10">{error ?? "Passport not found."}</div>;

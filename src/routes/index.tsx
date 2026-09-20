@@ -11,6 +11,7 @@ import {
 import { DemoSessionPanel } from "@/components/demo-session-panel";
 import { Button } from "@/components/ui/button";
 import { startGuideDemo } from "@/lib/homefix-guide";
+import { lastCaseStorageKey } from "@/lib/resident-case";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -38,7 +39,7 @@ function HomePage() {
   const demoMode = import.meta.env["VITE_HOMEFIX_DEMO_MODE"] === "1";
 
   useEffect(() => {
-    setRecentCaseId(localStorage.getItem("homefix:lastCaseId") ?? "");
+    setRecentCaseId(localStorage.getItem(lastCaseStorageKey) ?? "");
   }, []);
 
   const benefits = [
