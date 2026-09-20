@@ -169,7 +169,7 @@ export type ProgramDetailResponse = {
 
 export type ProgramCatalogResponse = Omit<ProgramDetailResponse, "rules">[];
 
-const apiUrl = import.meta.env.VITE_HOMEFIX_API_URL?.replace(/\/$/, "");
+const apiUrl = import.meta.env["VITE_HOMEFIX_API_URL"]?.replace(/\/$/, "");
 
 export async function submitIntake(payload: IntakePayload): Promise<IntakeResponse> {
   if (!apiUrl) {
