@@ -735,7 +735,7 @@ const server = createServer(async (request, response) => {
       const source = parsePartnerDataSource(requestUrl);
       sendJson(response, 200, {
         source,
-        items: source === "demo" ? [] : await listInspectionQueue(),
+        items: await listInspectionQueue(),
       });
     } catch (error) {
       console.error(error);
