@@ -1,4 +1,8 @@
-import type { PartnerAnalytics, PartnerCaseDetail } from "../../server/domain/partnerAnalytics";
+import {
+  repairTypeLabels,
+  type PartnerAnalytics,
+  type PartnerCaseDetail,
+} from "../../server/domain/partnerAnalytics";
 import type { CaseLifecycle } from "../../server/domain/lifecycle";
 import {
   DEFAULT_PARTNER_DEMO_SEED,
@@ -431,13 +435,20 @@ export type PublicOpportunityPage = {
   page: number;
   pageSize: number;
   total: number;
+  degraded?: boolean;
+  warning?: string;
 };
 
 const apiUrl = import.meta.env["VITE_HOMEFIX_API_URL"]?.replace(/\/$/, "");
 const requestTimeoutMs = 30_000;
+const fallbackRequestTimeoutMs = 5_000;
 
-async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
-  return requestWithTimeout((signal) => fetch(input, { ...init, signal }), requestTimeoutMs);
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  timeoutMs = requestTimeoutMs,
+) {
+  return requestWithTimeout((signal) => fetch(input, { ...init, signal }), timeoutMs);
 }
 
 function isApiUnavailable(error: unknown) {
@@ -447,11 +458,15 @@ function isApiUnavailable(error: unknown) {
   );
 }
 
-async function partnerFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+async function partnerFetch(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs = requestTimeoutMs,
+) {
   const session = getStoredContractorSession();
   const headers = new Headers(init.headers);
   if (session) headers.set("x-homefix-partner-session", session.token);
-  const response = await fetchWithTimeout(input, { ...init, headers });
+  const response = await fetchWithTimeout(input, { ...init, headers }, timeoutMs);
   if (response.status === 401) clearContractorSession();
   return response;
 }
@@ -494,9 +509,49 @@ export async function getPublicOpportunities(filters: {
   if (filters.zipCode) search.set("zipCode", filters.zipCode);
   if (filters.priority) search.set("priority", filters.priority);
   const query = search.size > 0 ? `?${search.toString()}` : "";
-  const response = await fetchWithTimeout(`${apiUrl}/api/v1/opportunities${query}`);
-  if (!response.ok) throw await homeFixApiError(response);
-  return response.json() as Promise<PublicOpportunityPage>;
+  try {
+    const response = await fetchWithTimeout(
+      `${apiUrl}/api/v1/opportunities${query}`,
+      undefined,
+      fallbackRequestTimeoutMs,
+    );
+    if (!response.ok) throw await homeFixApiError(response);
+    return response.json() as Promise<PublicOpportunityPage>;
+  } catch (error) {
+    if (!isApiUnavailable(error)) throw error;
+    const items = generateSyntheticPartnerDataset()
+      .filter(
+        (fact) =>
+          fact.coverageStatus === "funding_gap" &&
+          (fact.priority === "critical" || fact.priority === "high"),
+      )
+      .slice(0, 12)
+      .map(
+        (fact, index): PublicOpportunity => ({
+          publicNumber: `DEMO-${String(index + 1).padStart(3, "0")}`,
+          type: "repair",
+          repairCategory: repairTypeLabels[fact.repairType],
+          priority: fact.priority[0]!.toUpperCase() + fact.priority.slice(1),
+          publicScope: `${repairTypeLabels[fact.repairType]} repair scope pending contractor review.`,
+          city: "Detroit",
+          state: "MI",
+          zipCode: fact.zipCode,
+          fundingStatus: "Funding gap",
+          trainingOpportunityStatus: null,
+          potentialSkills: [],
+          status: "open",
+          publishedAt: fact.createdAt,
+        }),
+      );
+    return {
+      items,
+      page: 1,
+      pageSize: items.length,
+      total: items.length,
+      degraded: true,
+      warning: "The live opportunity service is unavailable; showing redacted demo jobs.",
+    };
+  }
 }
 
 export async function getPublicOpportunity(
@@ -781,7 +836,11 @@ export async function getPartnerAnalytics(
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
   const query = source === "combined" ? "" : `?source=${source}`;
   try {
-    const response = await partnerFetch(`${apiUrl}/api/v1/partner-analytics${query}`);
+    const response = await partnerFetch(
+      `${apiUrl}/api/v1/partner-analytics${query}`,
+      undefined,
+      fallbackRequestTimeoutMs,
+    );
     if (!response.ok) throw await homeFixApiError(response);
     return response.json() as Promise<PartnerAnalytics>;
   } catch (error) {

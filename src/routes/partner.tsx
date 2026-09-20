@@ -15,10 +15,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
-	HomeFixApiError,
 	getPartnerDemoControl,
 	updatePartnerDemoControl,
-	validateContractorAccess,
 	type PartnerDemoControl,
 } from "@/lib/homefix-api";
 import {
@@ -27,16 +25,8 @@ import {
 } from "@/lib/contractor-session";
 
 export const Route = createFileRoute("/partner")({
-	beforeLoad: async () => {
+	beforeLoad: () => {
 		if (!getStoredContractorSession()) throw redirect({ to: "/contractors" });
-		try {
-			await validateContractorAccess();
-		} catch (error) {
-			if (error instanceof HomeFixApiError && error.status === 401) {
-				throw redirect({ to: "/contractors" });
-			}
-			throw error;
-		}
 	},
 	component: PartnerLayout,
 });

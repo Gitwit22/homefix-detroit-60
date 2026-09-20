@@ -111,7 +111,7 @@ export function DemoFlag() {
 
 export function ViewSwitcher() {
   const path = useRouterState({ select: (s) => s.location.pathname });
-  const partner = path.startsWith("/partner");
+  const partner = path.startsWith("/partner") || path.startsWith("/contractor");
   const partnerTarget = getStoredContractorSession() ? "/partner" : "/contractors";
   return (
     <div className="view-switcher" aria-label="Demo view switcher">

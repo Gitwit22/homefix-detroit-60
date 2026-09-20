@@ -66,6 +66,12 @@ function ContractorJobs() {
           }
         />
 
+        {page.warning && (
+          <p className="mt-6 border-y border-warning bg-warning/15 px-4 py-3 text-sm font-semibold" role="status">
+            {page.warning}
+          </p>
+        )}
+
         <section className="mt-8 border-y border-foreground py-5" aria-label="Job filters">
           <div className="grid gap-4 sm:grid-cols-2 lg:max-w-2xl">
             <label className="grid gap-2 text-xs font-bold uppercase">
