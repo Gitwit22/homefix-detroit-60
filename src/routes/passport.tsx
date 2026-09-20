@@ -85,7 +85,9 @@ function PassportPage() {
         <header className="grid gap-6 border-b-8 border-primary p-6 sm:grid-cols-[1fr_auto] sm:p-8">
           <div>
             <DemoFlag />
-            <p className="mt-8 text-xs font-bold uppercase text-rust">HomeFix Passport</p>
+            <p className="mt-8 text-xs font-bold uppercase text-rust">
+              Your Repair Passport is ready
+            </p>
             <h1 className="mt-3 text-5xl uppercase leading-none sm:text-7xl">
               {payload.home.streetAddress}
             </h1>
@@ -106,6 +108,16 @@ function PassportPage() {
             </div>
           </div>
         </header>
+
+        <div className="flex gap-3 border-b border-foreground bg-positive/20 p-5 sm:px-8">
+          <Check className="size-5 shrink-0" />
+          <p className="text-sm">
+            <strong>Your Repair Passport has been saved on this device.</strong>
+            <span className="mt-1 block text-muted-foreground">
+              No account is required. Return from this browser to continue your repair journey.
+            </span>
+          </p>
+        </div>
 
         <div className="grid lg:grid-cols-2">
           <div className="border-b border-border p-6 sm:p-8 lg:border-b-0 lg:border-r">
@@ -136,7 +148,7 @@ function PassportPage() {
             </div>
           </div>
           <div className="p-6 sm:p-8">
-            <SectionLabel number="03">Repair profile</SectionLabel>
+            <SectionLabel number="03">Repair needs and assessment</SectionLabel>
             <div className="mt-6 divide-y divide-border border-y border-border">
               {payload.repairNeeds.map((need) => (
                 <Repair

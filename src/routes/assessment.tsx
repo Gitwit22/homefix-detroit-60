@@ -239,14 +239,19 @@ function AssessmentPage() {
         </div>
       </section>
       <Disclaimer />
-      <div className="mt-8">
+      <div className="mt-8 max-w-2xl border-l-4 border-primary pl-5">
+        <h2 className="text-2xl">Your Repair Passport is ready.</h2>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          HomeFix organized your property information, repair assessment, and potential resources
+          into one reusable record.
+        </p>
         <Link
-          className="blueprint-button button-primary inline-flex items-center"
+          className="blueprint-button button-primary mt-5 inline-flex items-center"
           data-guide-target="assessment-next"
           to="/passport"
           search={{ caseId }}
         >
-          Open Repair Passport
+          View My Repair Passport
         </Link>
       </div>
     </div>

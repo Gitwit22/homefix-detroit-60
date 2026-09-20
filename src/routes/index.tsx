@@ -79,44 +79,30 @@ function HomePage() {
                 Snap the problem, build your Repair Passport, and find a path toward getting it fixed.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                {recentCaseId ? (
-                  <>
-                    <div className="w-full sm:max-w-xs">
-                      <p className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        Welcome back
-                      </p>
-                      <BlueprintButton to="/passport" search={{ caseId: recentCaseId }}>
-                        Resume My Repair
-                      </BlueprintButton>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="min-h-12 rounded-none"
-                      onClick={() => startGuideDemo("resident")}
-                    >
-                      Take Guided Demo
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <BlueprintButton
-                      to="/intake"
-                      search={{ demo: "denise-carter-pitch-v1" }}
-                      dataGuideTarget="resident-start-assessment"
-                    >
-                      Start Repair Assessment
-                    </BlueprintButton>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="min-h-12 rounded-none"
-                      onClick={() => startGuideDemo("resident")}
-                    >
-                      Take Guided Demo
-                    </Button>
-                  </>
+                <BlueprintButton
+                  to="/intake"
+                  search={{}}
+                  dataGuideTarget="resident-start-assessment"
+                >
+                  Start Repair Assessment
+                </BlueprintButton>
+                {recentCaseId && (
+                  <BlueprintButton
+                    to="/passport"
+                    search={{ caseId: recentCaseId }}
+                    variant="secondary"
+                  >
+                    Resume My Repair
+                  </BlueprintButton>
                 )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-12 rounded-none"
+                  onClick={() => startGuideDemo("resident")}
+                >
+                  Take Guided Demo
+                </Button>
               </div>
             </div>
             <ol className="mt-12 flex flex-wrap gap-6 border-t border-foreground pt-5 text-xs font-bold uppercase">
@@ -201,7 +187,7 @@ function HomePage() {
             ))}
           </div>
           <div className="mt-12">
-            <BlueprintButton to="/intake" search={{ demo: "denise-carter-pitch-v1" }} variant="rust">
+            <BlueprintButton to="/intake" search={{}} variant="rust">
               Start Repair Assessment
             </BlueprintButton>
           </div>
