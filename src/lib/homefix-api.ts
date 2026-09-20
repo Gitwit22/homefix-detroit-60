@@ -1,4 +1,5 @@
 import type { PartnerAnalytics, PartnerCaseDetail } from "../../server/domain/partnerAnalytics";
+import { getStoredDemoSession, type DemoSession } from "./demo-session";
 
 export type { PartnerAnalytics, PartnerCaseDetail };
 
@@ -111,7 +112,13 @@ export type CaseAggregateResponse = {
     program: { id: string; name: string };
   }>;
   documents: Array<{ id: string; documentType: string; status: string }>;
-  events: Array<{ id: string; eventType: string; title: string; description: string | null }>;
+  events: Array<{
+    id: string;
+    eventType: string;
+    title: string;
+    description: string | null;
+    createdAt: string;
+  }>;
 };
 
 export type CoveragePlanResponse = {
@@ -270,14 +277,26 @@ export type OverflowWorkOrder = {
 
 const apiUrl = import.meta.env["VITE_HOMEFIX_API_URL"]?.replace(/\/$/, "");
 
+export type DemoSessionCase = {
+  caseId: string;
+  caseNumber: string;
+  status: string;
+  streetAddress: string;
+  createdAt: string;
+};
+
 export async function submitIntake(payload: IntakePayload): Promise<IntakeResponse> {
   if (!apiUrl) {
     throw new Error("VITE_HOMEFIX_API_URL is not configured");
   }
 
+  const demoSession = getStoredDemoSession();
   const response = await fetch(`${apiUrl}/api/v1/intakes`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...(demoSession ? { "x-homefix-demo-session": demoSession.token } : {}),
+    },
     body: JSON.stringify(payload),
   });
 
@@ -286,6 +305,36 @@ export async function submitIntake(payload: IntakePayload): Promise<IntakeRespon
   }
 
   return response.json() as Promise<IntakeResponse>;
+}
+
+export async function openDemoSession(displayName: string): Promise<DemoSession> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetch(`${apiUrl}/api/v1/demo-sessions`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ displayName }),
+  });
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<DemoSession>;
+}
+
+export async function getDemoSessionCases(token: string): Promise<DemoSessionCase[]> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetch(`${apiUrl}/api/v1/demo-session/cases`, {
+    headers: { "x-homefix-demo-session": token },
+  });
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<DemoSessionCase[]>;
+}
+
+export async function wipeDemoSessionData(token: string) {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetch(`${apiUrl}/api/v1/demo-session/data`, {
+    method: "DELETE",
+    headers: { "x-homefix-demo-session": token },
+  });
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<{ deletedCases: number; deletedPhotos: number }>;
 }
 
 export async function getCase(caseId: string): Promise<CaseAggregateResponse> {

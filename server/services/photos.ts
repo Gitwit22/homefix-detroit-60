@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { eq } from "drizzle-orm";
 
@@ -44,6 +49,25 @@ export async function signedPhotoUrl(objectKey: string) {
     new GetObjectCommand({ Bucket: config.bucket, Key: objectKey }),
     { expiresIn },
   );
+}
+
+export async function deleteRepairPhotoObject(objectKey: string) {
+  const config = getR2Config();
+  await getR2Client().send(new DeleteObjectCommand({ Bucket: config.bucket, Key: objectKey }));
+}
+
+export async function rollbackRepairPhoto(photoId: string) {
+  const rows = await db
+    .select({ publicId: repairPhotos.publicId, imageUrl: repairPhotos.imageUrl })
+    .from(repairPhotos)
+    .where(eq(repairPhotos.id, photoId))
+    .limit(1);
+  const photo = rows[0];
+  if (!photo) return;
+  if (photo.publicId && photo.imageUrl.startsWith("r2://")) {
+    await deleteRepairPhotoObject(photo.publicId);
+  }
+  await db.delete(repairPhotos).where(eq(repairPhotos.id, photoId));
 }
 
 function extensionForMimeType(mimeType: string) {

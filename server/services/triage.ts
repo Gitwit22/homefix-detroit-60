@@ -7,10 +7,7 @@ import {
   repairNeeds,
   repairPhotos,
 } from "../db/schema.js";
-import {
-  DENISE_DEMO_SCENARIO,
-  loadSavedDemoAssessment,
-} from "../demo/deniseScenario.js";
+import { DENISE_DEMO_SCENARIO, loadSavedDemoAssessment } from "../demo/deniseScenario.js";
 import { normalizeRepairCategory } from "../domain/repair.js";
 import { triageResponseSchema, type TriageResponse } from "../validation/triage.js";
 import { signedPhotoUrl } from "./photos.js";
@@ -44,10 +41,7 @@ async function callTriageWebhook(payload: unknown): Promise<TriageResponse> {
   return triageResponseSchema.parse(body);
 }
 
-const fallbackDetails: Record<
-  string,
-  { observation: string; question: string }
-> = {
+const fallbackDetails: Record<string, { observation: string; question: string }> = {
   roof_water_intrusion: {
     observation: "The resident report appears consistent with possible water intrusion.",
     question: "Does water enter during rainfall or is any ceiling area sagging?",
@@ -78,11 +72,10 @@ export function fallbackTriage(input: {
     summary:
       "The reported conditions appear consistent with a possible repair issue that warrants professional evaluation.",
     observations: [details.observation, "Photo and description require professional review."],
-    safetyFlags: input.safeToOccupy ? [] : ["Resident reported that the home may not be safe to occupy."],
-    followUpQuestions: [
-      details.question,
-      "Has the condition changed recently?",
-    ],
+    safetyFlags: input.safeToOccupy
+      ? []
+      : ["Resident reported that the home may not be safe to occupy."],
+    followUpQuestions: [details.question, "Has the condition changed recently?"],
     confidence: 0.35,
   };
 }
@@ -154,52 +147,75 @@ export async function runRepairTriage(input: { caseId: string; repairNeedId: str
     console.error(error);
   }
 
-  await db.delete(repairAssessments).where(eq(repairAssessments.repairNeedId, repairNeedId));
+  await db.transaction(async (transaction) => {
+    await transaction
+      .insert(repairAssessments)
+      .values({
+        repairNeedId,
+        predictedCategory: triage.repairCategory,
+        urgency: triage.urgency,
+        summary: triage.summary,
+        observations: triage.observations,
+        safetyFlags: triage.safetyFlags,
+        followUpQuestions: triage.followUpQuestions,
+        confidence: String(triage.confidence),
+        model,
+      })
+      .onConflictDoUpdate({
+        target: repairAssessments.repairNeedId,
+        set: {
+          predictedCategory: triage.repairCategory,
+          urgency: triage.urgency,
+          summary: triage.summary,
+          observations: triage.observations,
+          safetyFlags: triage.safetyFlags,
+          followUpQuestions: triage.followUpQuestions,
+          confidence: String(triage.confidence),
+          model,
+        },
+      });
 
-  await db.insert(repairAssessments).values({
-    repairNeedId,
-    predictedCategory: triage.repairCategory,
-    urgency: triage.urgency,
-    summary: triage.summary,
-    observations: triage.observations,
-    safetyFlags: triage.safetyFlags,
-    followUpQuestions: triage.followUpQuestions,
-    confidence: String(triage.confidence),
-    model,
+    await transaction
+      .update(repairNeeds)
+      .set({
+        category:
+          foundCase.demoScenario === DENISE_DEMO_SCENARIO ? need.category : triage.repairCategory,
+        urgency: triage.urgency,
+        status: "assessed",
+      })
+      .where(eq(repairNeeds.id, repairNeedId));
+
+    await transaction
+      .delete(caseEvents)
+      .where(
+        and(
+          eq(caseEvents.repairCaseId, caseId),
+          eq(caseEvents.eventType, `repair_assessed:${repairNeedId}`),
+        ),
+      );
+    await transaction.insert(caseEvents).values({
+      repairCaseId: caseId,
+      eventType: `repair_assessed:${repairNeedId}`,
+      title: "Preliminary repair assessment completed",
+      description: triage.summary,
+      metadata: {
+        urgency: triage.urgency,
+        repairCategory: triage.repairCategory,
+        confidence: triage.confidence,
+        model,
+        ...(failureCode ? { failureCode } : {}),
+      },
+    });
+
+    await transaction
+      .update(repairCases)
+      .set({
+        status: "assessment_completed",
+        currentStep: "assessment",
+        nextAction: "Review potential program matches",
+      })
+      .where(eq(repairCases.id, caseId));
   });
-
-  await db
-    .update(repairNeeds)
-    .set({
-      category:
-        foundCase.demoScenario === DENISE_DEMO_SCENARIO ? need.category : triage.repairCategory,
-      urgency: triage.urgency,
-      status: "assessed",
-    })
-    .where(eq(repairNeeds.id, repairNeedId));
-
-  await db.insert(caseEvents).values({
-    repairCaseId: caseId,
-    eventType: "repair_assessed",
-    title: "Preliminary repair assessment completed",
-    description: triage.summary,
-    metadata: {
-      urgency: triage.urgency,
-      repairCategory: triage.repairCategory,
-      confidence: triage.confidence,
-      model,
-      ...(failureCode ? { failureCode } : {}),
-    },
-  });
-
-  await db
-    .update(repairCases)
-    .set({
-      status: "assessment_completed",
-      currentStep: "assessment",
-      nextAction: "Review potential program matches",
-    })
-    .where(eq(repairCases.id, caseId));
 
   return {
     repairNeedId,

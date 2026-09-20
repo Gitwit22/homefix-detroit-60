@@ -57,7 +57,18 @@ type RepairDraft = {
 const demoDraftKey = "homefix:denise-carter-pitch-v1:draft";
 const intakeGuideEvent = "homefix-guide:intake-step";
 
-function createRepairDraft(index: number): RepairDraft {
+function createRepairDraft(index: number, useDemoDefaults = true): RepairDraft {
+  if (!useDemoDefaults) {
+    return {
+      clientId: crypto.randomUUID(),
+      category: "",
+      description: "",
+      startedWhen: "",
+      safe: "Not sure",
+      worse: "No",
+      files: [],
+    };
+  }
   return {
     clientId: crypto.randomUUID(),
     category: index === 1 ? "Heating" : index === 2 ? "Electrical" : "Roof / Water",
@@ -80,15 +91,17 @@ function IntakePage() {
   const [step, setStep] = useState(1);
   const [owner, setOwner] = useState("Owner");
   const [primary, setPrimary] = useState("Yes");
-  const [senior, setSenior] = useState("Yes");
+  const [senior, setSenior] = useState(demo ? "Yes" : "No");
   const [children, setChildren] = useState("No");
   const [access, setAccess] = useState("No");
-  const [repairs, setRepairs] = useState<RepairDraft[]>(() => [
-    createRepairDraft(0),
-    createRepairDraft(1),
-    createRepairDraft(2),
-  ]);
+  const [repairs, setRepairs] = useState<RepairDraft[]>(() =>
+    demo
+      ? [createRepairDraft(0), createRepairDraft(1), createRepairDraft(2)]
+      : [createRepairDraft(0, false)],
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+  const errorRef = useRef<HTMLParagraphElement>(null);
   const [createdCase, setCreatedCase] = useState<{
     caseId: string;
     repairNeedId: string;
@@ -96,17 +109,17 @@ function IntakePage() {
   } | null>(null);
   const uploadedRepairIds = useRef(new Set<string>());
 
-  const [firstName, setFirstName] = useState("Denise");
-  const [lastName, setLastName] = useState("Carter");
-  const [email, setEmail] = useState("denise@example.com");
-  const [phone, setPhone] = useState("3135550100");
-  const [streetAddress, setStreetAddress] = useState("123 Main Street");
-  const [zipCode, setZipCode] = useState("48224");
-  const [yearsAtProperty, setYearsAtProperty] = useState("12");
+  const [firstName, setFirstName] = useState(demo ? "Denise" : "");
+  const [lastName, setLastName] = useState(demo ? "Carter" : "");
+  const [email, setEmail] = useState(demo ? "denise@example.com" : "");
+  const [phone, setPhone] = useState(demo ? "3135550100" : "");
+  const [streetAddress, setStreetAddress] = useState(demo ? "123 Main Street" : "");
+  const [zipCode, setZipCode] = useState(demo ? "48224" : "");
+  const [yearsAtProperty, setYearsAtProperty] = useState(demo ? "12" : "");
 
-  const [householdSize, setHouseholdSize] = useState("3");
-  const [incomeRange, setIncomeRange] = useState("$41,000-$60,000");
-  const [applicantAge, setApplicantAge] = useState("68");
+  const [householdSize, setHouseholdSize] = useState(demo ? "3" : "");
+  const [incomeRange, setIncomeRange] = useState(demo ? "$41,000-$60,000" : "");
+  const [applicantAge, setApplicantAge] = useState(demo ? "68" : "");
 
   useEffect(() => {
     if (!demo) return;
@@ -199,7 +212,57 @@ function IntakePage() {
     );
   };
 
+  const validateStep = () => {
+    if (step === 1) {
+      if (!firstName.trim() || !lastName.trim() || !streetAddress.trim()) {
+        return "Enter the resident name and Detroit street address.";
+      }
+      if (!/^482\d{2}$/.test(zipCode)) return "Enter a valid five-digit Detroit ZIP code.";
+      if (email && !/^\S+@\S+\.\S+$/.test(email))
+        return "Enter a valid email address or leave it blank.";
+      if (
+        !yearsAtProperty ||
+        !Number.isInteger(Number(yearsAtProperty)) ||
+        Number(yearsAtProperty) < 0
+      ) {
+        return "Enter the number of years at the property.";
+      }
+    }
+    if (step === 2) {
+      if (!Number.isInteger(Number(householdSize)) || Number(householdSize) < 1) {
+        return "Household size must be at least 1.";
+      }
+      if (!incomeRange) return "Choose a household income range.";
+      if (!Number.isInteger(Number(applicantAge)) || Number(applicantAge) < 18) {
+        return "Primary applicant age must be at least 18.";
+      }
+    }
+    if (step === 3 && repairs.some((repair) => !repair.category || !repair.description.trim())) {
+      return "Choose a category and describe each repair before continuing.";
+    }
+    if (
+      step === 4 &&
+      repairs.some((repair) =>
+        repair.files.some(
+          (file) =>
+            !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
+            file.size > 10 * 1024 * 1024,
+        ),
+      )
+    ) {
+      return "Each photo must be a JPG, PNG, or WebP file no larger than 10 MB.";
+    }
+    return "";
+  };
+
   const next = async () => {
+    const validationError = validateStep();
+    if (validationError) {
+      setFormError(validationError);
+      requestAnimationFrame(() => errorRef.current?.focus());
+      return;
+    }
+    setFormError("");
     if (step < 5) {
       setStep(step + 1);
       return;
@@ -292,6 +355,16 @@ function IntakePage() {
             Your answers help organize your Repair Passport and identify possible next steps.
             Financial questions are broad and preliminary.
           </p>
+          {formError && (
+            <p
+              ref={errorRef}
+              className="mt-5 border-l-4 border-destructive bg-destructive/10 p-4 text-sm font-semibold text-destructive"
+              role="alert"
+              tabIndex={-1}
+            >
+              {formError}
+            </p>
+          )}
           <div className="mt-10 border-y border-foreground py-8">
             {step === 1 && (
               <div className="grid gap-6 sm:grid-cols-2">
@@ -362,6 +435,7 @@ function IntakePage() {
                     value={incomeRange}
                     onChange={(event) => setIncomeRange(event.target.value)}
                   >
+                    <option value="">Choose a range</option>
                     <option value="Below $20,000">Below $20,000</option>
                     <option value="$21,000-$40,000">$21,000–$40,000</option>
                     <option value="$41,000-$60,000">$41,000–$60,000</option>
@@ -442,6 +516,7 @@ function IntakePage() {
                             updateRepair(repair.clientId, { startedWhen: event.target.value })
                           }
                         >
+                          <option value="">Choose a timeframe</option>
                           <option>Within the last week</option>
                           <option>A few months ago</option>
                           <option>More than a year ago</option>
@@ -468,7 +543,10 @@ function IntakePage() {
                     variant="outline"
                     className="min-h-12 rounded-none"
                     onClick={() =>
-                      setRepairs((current) => [...current, createRepairDraft(current.length)])
+                      setRepairs((current) => [
+                        ...current,
+                        createRepairDraft(current.length, false),
+                      ])
                     }
                   >
                     <Plus /> Add another repair
@@ -528,7 +606,10 @@ function IntakePage() {
               variant="outline"
               className="min-h-12 rounded-none"
               disabled={step === 1}
-              onClick={() => setStep(step - 1)}
+              onClick={() => {
+                setFormError("");
+                setStep(step - 1);
+              }}
               data-guide-target="intake-back"
             >
               <ArrowLeft />

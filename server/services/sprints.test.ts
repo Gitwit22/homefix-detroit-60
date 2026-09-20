@@ -6,11 +6,10 @@ import { detroitProgramCatalog } from "../data/detroitPrograms.js";
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost/test";
 
 const { fallbackTriage } = await import("./triage.js");
+const { demoSessionSchema } = await import("./demoSession.js");
 const { evaluateProgramRules } = await import("./eligibility.js");
 const { createOverflowWorkOrderSchema, submitOverflowBidSchema } = await import("./overflow.js");
-const { loadSavedDemoAssessment, loadSavedDemoMatch } = await import(
-  "../demo/deniseScenario.js"
-);
+const { loadSavedDemoAssessment, loadSavedDemoMatch } = await import("../demo/deniseScenario.js");
 
 test("saved Denise assessments are deterministic and isolated per call", () => {
   const first = loadSavedDemoAssessment("roof_water_intrusion");
@@ -76,6 +75,12 @@ test("fallback triage remains conservative and honors resident safety answers", 
   assert.match(result.observations[0]!, /possible electrical safety concern/i);
   assert.equal(result.safetyFlags.length, 1);
   assert.ok(result.followUpQuestions.some((question) => question.includes("breaker")));
+});
+
+test("demo sessions require a concise non-empty display name", () => {
+  assert.equal(demoSessionSchema.safeParse({ displayName: "  Denise  " }).success, true);
+  assert.equal(demoSessionSchema.safeParse({ displayName: "   " }).success, false);
+  assert.equal(demoSessionSchema.safeParse({ displayName: "D".repeat(81) }).success, false);
 });
 
 test("managed program catalog has stable unique records and complete matching data", () => {

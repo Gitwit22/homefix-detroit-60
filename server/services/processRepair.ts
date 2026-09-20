@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { caseEvents, repairCases, repairNeeds } from "../db/schema.js";
 import { calculateCoveragePlan } from "./coverage.js";
@@ -48,6 +48,14 @@ export async function processCase(caseId: string) {
     })
     .where(eq(repairCases.id, caseId));
 
+  await db
+    .delete(caseEvents)
+    .where(
+      and(
+        eq(caseEvents.repairCaseId, caseId),
+        eq(caseEvents.eventType, "intelligence_pipeline_completed"),
+      ),
+    );
   await db.insert(caseEvents).values({
     repairCaseId: caseId,
     eventType: "intelligence_pipeline_completed",

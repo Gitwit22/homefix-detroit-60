@@ -8,8 +8,9 @@ import {
   SectionLabel,
   StatusBadge,
 } from "@/components/homefix";
-import { startGuideDemo } from "@/lib/homefix-guide";
+import { DemoSessionPanel } from "@/components/demo-session-panel";
 import { Button } from "@/components/ui/button";
+import { startGuideDemo } from "@/lib/homefix-guide";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -23,8 +24,7 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "HomeFix 313 — A path toward home repair" },
       {
         property: "og:description",
-        content:
-          "Snap the problem, build your Repair Passport, and find a path toward getting it fixed.",
+        content: "Snap the problem, build your Repair Passport, and find a path toward getting it fixed.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -35,6 +35,7 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const [recentCaseId, setRecentCaseId] = useState("");
+  const demoMode = import.meta.env["VITE_HOMEFIX_DEMO_MODE"] === "1";
 
   useEffect(() => {
     setRecentCaseId(localStorage.getItem("homefix:lastCaseId") ?? "");
@@ -71,13 +72,10 @@ function HomePage() {
               <h1 className="mt-4 max-w-3xl font-display text-5xl leading-[.97] sm:text-6xl lg:text-8xl">
                 Your home has a story.
                 <br />
-                <em className="font-normal text-primary">
-                  HomeFix helps you figure out what happens next.
-                </em>
+                <em className="font-normal text-primary">HomeFix helps you figure out what happens next.</em>
               </h1>
               <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
-                Snap the problem, build your Repair Passport, and find a path toward getting it
-                fixed.
+                Snap the problem, build your Repair Passport, and find a path toward getting it fixed.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 {recentCaseId ? (
@@ -169,6 +167,7 @@ function HomePage() {
           </article>
         </div>
       </section>
+      {demoMode && <DemoSessionPanel onReset={() => setRecentCaseId("")} />}
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-10">
         <SectionLabel number="01">What HomeFix helps you do</SectionLabel>
         <div className="mt-8 grid gap-px bg-border md:grid-cols-3">
@@ -201,11 +200,7 @@ function HomePage() {
             ))}
           </div>
           <div className="mt-12">
-            <BlueprintButton
-              to="/intake"
-              search={{ demo: "denise-carter-pitch-v1" }}
-              variant="rust"
-            >
+            <BlueprintButton to="/intake" search={{ demo: "denise-carter-pitch-v1" }} variant="rust">
               Start Repair Assessment
             </BlueprintButton>
           </div>
