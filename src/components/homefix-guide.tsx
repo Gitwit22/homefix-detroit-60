@@ -239,7 +239,7 @@ function resolvePartnerStep(pathname: string): DemoStep | null {
       title: "Overflow Network",
       intro:
         "When an approved repair exceeds program delivery capacity, HomeFix can prepare a structured job package for contractor response.",
-      showSelector: "[data-guide-target='partner-overflow-job']",
+      showSelector: "[data-guide-target='partner-nav-overflow']",
       backSelector: "[data-guide-target='partner-nav-programs']",
       completeLabel: "Done",
     };
@@ -429,7 +429,10 @@ export function HomeFixGuide() {
       return;
     }
 
-    const caseId = new URLSearchParams(window.location.search).get("caseId") ?? "";
+    const caseId =
+      new URLSearchParams(window.location.search).get("caseId") ??
+      window.localStorage.getItem("homefix:lastCaseId") ??
+      "";
     if (step.step === 4 && caseId) {
       void navigate({ to: "/passport", search: { caseId } });
       return;
