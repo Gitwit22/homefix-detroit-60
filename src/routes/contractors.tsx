@@ -4,7 +4,8 @@ import { useState, type FormEvent } from "react";
 
 import { DemoFlag } from "@/components/homefix";
 import { Button } from "@/components/ui/button";
-import { HomeFixApiError, openContractorAccess } from "@/lib/homefix-api";
+import { Checkbox } from "@/components/ui/checkbox";
+import { HomeFixApiError, registerContractor, signInContractor } from "@/lib/homefix-api";
 import {
   getStoredContractorSession,
   storeContractorSession,
@@ -26,8 +27,10 @@ export const Route = createFileRoute("/contractors")({
 function ContractorAccessPage() {
   const navigate = Route.useNavigate();
   const storedSession = getStoredContractorSession();
+  const [mode, setMode] = useState<"register" | "sign-in">("register");
   const [displayName, setDisplayName] = useState(storedSession?.displayName ?? "");
   const [pin, setPin] = useState("");
+  const [complianceConfirmed, setComplianceConfirmed] = useState(false);
   const [error, setError] = useState("");
   const [isWorking, setIsWorking] = useState(false);
 
@@ -37,20 +40,28 @@ function ContractorAccessPage() {
       setError("Enter a business or contractor name and a four-digit code.");
       return;
     }
+    if (mode === "register" && !complianceConfirmed) {
+      setError("Confirm the compliance acknowledgment before creating your account.");
+      return;
+    }
 
     setIsWorking(true);
     setError("");
     try {
-      const session = await openContractorAccess(displayName, pin);
+      const session =
+        mode === "register"
+          ? await registerContractor(displayName, pin, true)
+          : await signInContractor(displayName, pin);
       storeContractorSession(session);
       await navigate({ to: "/partner" });
     } catch (accessError) {
       console.error(accessError);
-      setError(
-        accessError instanceof HomeFixApiError && accessError.status === 401
-          ? "That name and four-digit code do not match."
-          : "Contractor access could not be opened. Please try again.",
-      );
+      if (accessError instanceof HomeFixApiError) setError(accessError.message);
+      else if (accessError instanceof DOMException && accessError.name === "AbortError")
+        setError("The contractor service took too long to respond. Please try again.");
+      else if (accessError instanceof TypeError)
+        setError("The contractor service could not be reached. Check your connection and try again.");
+      else setError("Contractor access failed. Please try again.");
     } finally {
       setIsWorking(false);
     }
@@ -85,11 +96,34 @@ function ContractorAccessPage() {
 
           <div className="self-center border border-white/40 bg-background p-6 text-foreground sm:p-8">
             <BriefcaseBusiness className="size-8 text-primary" aria-hidden="true" />
-            <h2 className="mt-5 text-3xl">Create or open access</h2>
+            <h2 className="mt-5 text-3xl">
+              {mode === "register" ? "Create contractor account" : "Sign in"}
+            </h2>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              Use your business name or contractor name and a four-digit code. Use the same name
-              and code when you return.
+              {mode === "register"
+                ? "Create access with your business or contractor name and a four-digit code."
+                : "Use the same business or contractor name and code you registered with."}
             </p>
+            <div
+              className="mt-6 grid grid-cols-2 border border-foreground"
+              aria-label="Contractor access mode"
+            >
+              {(["register", "sign-in"] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className={`min-h-11 px-3 text-sm font-bold ${mode === option ? "bg-foreground text-background" : "bg-background"}`}
+                  aria-pressed={mode === option}
+                  onClick={() => {
+                    setMode(option);
+                    setError("");
+                  }}
+                  disabled={isWorking}
+                >
+                  {option === "register" ? "Create Account" : "Sign In"}
+                </button>
+              ))}
+            </div>
             <form className="mt-7 grid gap-4" onSubmit={submit}>
               <label className="grid gap-2 text-sm font-semibold" htmlFor="contractor-name">
                 Business or contractor name
@@ -123,13 +157,44 @@ function ContractorAccessPage() {
                   />
                 </span>
               </label>
+              {mode === "register" && (
+                <label
+                  className="flex cursor-pointer items-start gap-3 border border-border bg-secondary/35 p-4 text-sm font-semibold leading-relaxed"
+                  htmlFor="contractor-compliance"
+                >
+                  <Checkbox
+                    id="contractor-compliance"
+                    className="mt-0.5 size-5 rounded-none"
+                    checked={complianceConfirmed}
+                    onCheckedChange={(checked) => setComplianceConfirmed(checked === true)}
+                    aria-required="true"
+                    disabled={isWorking}
+                  />
+                  <span>
+                    I confirm that I am properly licensed, insured, and authorized to perform the
+                    services I am registering to provide, where required by applicable law.
+                    <small className="mt-2 block font-normal text-muted-foreground">
+                      Required. This representation does not verify your license or insurance.
+                    </small>
+                  </span>
+                </label>
+              )}
               {error && (
-                <p className="border-l-4 border-destructive bg-destructive/10 p-3 text-sm font-semibold" role="alert">
+                <p
+                  className="border-l-4 border-destructive bg-destructive/10 p-3 text-sm font-semibold text-destructive"
+                  role="alert"
+                >
                   {error}
                 </p>
               )}
               <Button type="submit" className="min-h-12 rounded-none" disabled={isWorking}>
-                {isWorking ? "Opening workspace..." : "Create or Sign In"}
+                {isWorking
+                  ? mode === "register"
+                    ? "Creating account..."
+                    : "Signing in..."
+                  : mode === "register"
+                    ? "Create Contractor Account"
+                    : "Sign In"}
                 <ArrowRight aria-hidden="true" />
               </Button>
             </form>

@@ -484,12 +484,27 @@ async function residentFetch(
   return response;
 }
 
-export async function openContractorAccess(
+export async function registerContractor(
+  displayName: string,
+  pin: string,
+  contractorComplianceConfirmed: true,
+): Promise<ContractorSession> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetchWithTimeout(`${apiUrl}/api/v1/contractor-access/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ displayName, pin, contractorComplianceConfirmed }),
+  });
+  if (!response.ok) throw await homeFixApiError(response);
+  return response.json() as Promise<ContractorSession>;
+}
+
+export async function signInContractor(
   displayName: string,
   pin: string,
 ): Promise<ContractorSession> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetchWithTimeout(`${apiUrl}/api/v1/contractor-access`, {
+  const response = await fetchWithTimeout(`${apiUrl}/api/v1/contractor-access/sign-in`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ displayName, pin }),

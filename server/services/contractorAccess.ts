@@ -8,10 +8,30 @@ import { contractorAccessAccounts } from "../db/schema.js";
 
 const scrypt = promisify(scryptCallback);
 
-export const contractorAccessSchema = z.object({
+export const contractorSignInSchema = z.object({
   displayName: z.string().trim().min(1).max(120),
   pin: z.string().regex(/^\d{4}$/),
 });
+
+export const contractorRegistrationSchema = contractorSignInSchema.extend({
+  contractorComplianceConfirmed: z.literal(true),
+});
+
+export class ContractorAccessError extends Error {
+  constructor(readonly code: "ACCOUNT_EXISTS" | "INVALID_CREDENTIALS") {
+    super(code);
+    this.name = "ContractorAccessError";
+  }
+}
+
+function isUniqueViolation(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "23505"
+  );
+}
 
 export async function hashContractorPin(pin: string) {
   const salt = randomBytes(16).toString("hex");
@@ -27,8 +47,42 @@ export async function verifyContractorPin(pin: string, storedHash: string) {
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
-export async function openContractorAccess(displayName: string, pin: string) {
-  const parsed = contractorAccessSchema.parse({ displayName, pin });
+export async function registerContractor(input: z.infer<typeof contractorRegistrationSchema>) {
+  const parsed = contractorRegistrationSchema.parse(input);
+  const normalizedName = parsed.displayName.toLocaleLowerCase("en-US");
+  const existingRows = await db
+    .select({ id: contractorAccessAccounts.id })
+    .from(contractorAccessAccounts)
+    .where(eq(contractorAccessAccounts.normalizedName, normalizedName))
+    .limit(1);
+  if (existingRows[0]) throw new ContractorAccessError("ACCOUNT_EXISTS");
+
+  let rows;
+  try {
+    rows = await db
+      .insert(contractorAccessAccounts)
+      .values({
+        displayName: parsed.displayName,
+        normalizedName,
+        pinHash: await hashContractorPin(parsed.pin),
+        contractorComplianceConfirmed: true,
+        contractorComplianceConfirmedAt: new Date(),
+      })
+      .returning({
+        id: contractorAccessAccounts.id,
+        displayName: contractorAccessAccounts.displayName,
+      });
+  } catch (error) {
+    if (isUniqueViolation(error)) throw new ContractorAccessError("ACCOUNT_EXISTS");
+    throw error;
+  }
+  const account = rows[0];
+  if (!account) throw new Error("Contractor access could not be created");
+  return { token: account.id, displayName: account.displayName };
+}
+
+export async function signInContractor(displayName: string, pin: string) {
+  const parsed = contractorSignInSchema.parse({ displayName, pin });
   const normalizedName = parsed.displayName.toLocaleLowerCase("en-US");
   const existingRows = await db
     .select()
@@ -37,31 +91,15 @@ export async function openContractorAccess(displayName: string, pin: string) {
     .limit(1);
   const existing = existingRows[0];
 
-  if (existing) {
-    if (!(await verifyContractorPin(parsed.pin, existing.pinHash))) {
-      throw new Error("INVALID_CONTRACTOR_CREDENTIALS");
-    }
-    await db
-      .update(contractorAccessAccounts)
-      .set({ displayName: parsed.displayName, updatedAt: new Date() })
-      .where(eq(contractorAccessAccounts.id, existing.id));
-    return { token: existing.id, displayName: parsed.displayName };
+  if (!existing || !(await verifyContractorPin(parsed.pin, existing.pinHash))) {
+    throw new ContractorAccessError("INVALID_CREDENTIALS");
   }
 
-  const rows = await db
-    .insert(contractorAccessAccounts)
-    .values({
-      displayName: parsed.displayName,
-      normalizedName,
-      pinHash: await hashContractorPin(parsed.pin),
-    })
-    .returning({
-      id: contractorAccessAccounts.id,
-      displayName: contractorAccessAccounts.displayName,
-    });
-  const account = rows[0];
-  if (!account) throw new Error("Contractor access could not be created");
-  return { token: account.id, displayName: account.displayName };
+  await db
+    .update(contractorAccessAccounts)
+    .set({ displayName: parsed.displayName, updatedAt: new Date() })
+    .where(eq(contractorAccessAccounts.id, existing.id));
+  return { token: existing.id, displayName: parsed.displayName };
 }
 
 export async function getContractorAccess(token: string) {

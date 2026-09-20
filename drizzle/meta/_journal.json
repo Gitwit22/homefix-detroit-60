@@ -141,6 +141,13 @@
       "when": 1789909668369,
       "tag": "0019_white_shadow_king",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1789924352792,
+      "tag": "0020_magical_phantom_reporter",
+      "breakpoints": true
     }
   ]
 }

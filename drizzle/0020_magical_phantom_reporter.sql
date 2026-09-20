@@ -1,0 +1,2 @@
+ALTER TABLE "contractor_access_accounts" ADD COLUMN "contractor_compliance_confirmed" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "contractor_access_accounts" ADD COLUMN "contractor_compliance_confirmed_at" timestamp with time zone;

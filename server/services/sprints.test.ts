@@ -11,7 +11,8 @@ const { triageResponseSchema } = await import("../validation/triage.js");
 const { triageRepairCategories, triageUrgencies } = await import("../domain/repair.js");
 const { demoSessionSchema } = await import("./demoSession.js");
 const {
-  contractorAccessSchema,
+  contractorRegistrationSchema,
+  contractorSignInSchema,
   hashContractorPin,
   verifyContractorPin,
 } = await import("./contractorAccess.js");
@@ -348,23 +349,42 @@ test("demo sessions require a concise display name and four-digit PIN", () => {
   assert.equal(demoSessionSchema.safeParse({ displayName: "Denise", pin: "31A0" }).success, false);
 });
 
-test("contractor access requires a name and exactly four numeric digits", () => {
+test("contractor sign-in requires a name and exactly four numeric digits", () => {
   assert.equal(
-    contractorAccessSchema.safeParse({ displayName: "  Reed Residential Services  ", pin: "3130" })
+    contractorSignInSchema.safeParse({ displayName: "  Reed Residential Services  ", pin: "3130" })
       .success,
     true,
   );
-  assert.equal(contractorAccessSchema.safeParse({ displayName: "   ", pin: "3130" }).success, false);
+  assert.equal(contractorSignInSchema.safeParse({ displayName: "   ", pin: "3130" }).success, false);
   assert.equal(
-    contractorAccessSchema.safeParse({ displayName: "R".repeat(121), pin: "3130" }).success,
+    contractorSignInSchema.safeParse({ displayName: "R".repeat(121), pin: "3130" }).success,
     false,
   );
   assert.equal(
-    contractorAccessSchema.safeParse({ displayName: "Reed Residential", pin: "313" }).success,
+    contractorSignInSchema.safeParse({ displayName: "Reed Residential", pin: "313" }).success,
     false,
   );
   assert.equal(
-    contractorAccessSchema.safeParse({ displayName: "Reed Residential", pin: "31A0" }).success,
+    contractorSignInSchema.safeParse({ displayName: "Reed Residential", pin: "31A0" }).success,
+    false,
+  );
+});
+
+test("contractor registration requires an explicit compliance acknowledgment", () => {
+  const credentials = { displayName: "Reed Residential", pin: "3130" };
+  assert.equal(
+    contractorRegistrationSchema.safeParse({
+      ...credentials,
+      contractorComplianceConfirmed: true,
+    }).success,
+    true,
+  );
+  assert.equal(contractorRegistrationSchema.safeParse(credentials).success, false);
+  assert.equal(
+    contractorRegistrationSchema.safeParse({
+      ...credentials,
+      contractorComplianceConfirmed: false,
+    }).success,
     false,
   );
 });

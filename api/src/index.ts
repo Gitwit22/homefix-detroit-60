@@ -15,9 +15,12 @@ import {
   wipeDemoSessionData,
 } from "../../server/services/demoSession.js";
 import {
-  contractorAccessSchema,
+  ContractorAccessError,
+  contractorRegistrationSchema,
+  contractorSignInSchema,
   getContractorAccess,
-  openContractorAccess,
+  registerContractor,
+  signInContractor,
 } from "../../server/services/contractorAccess.js";
 import { getCaseAggregate } from "../../server/services/case.js";
 import {
@@ -423,22 +426,43 @@ const server = createServer(async (request, response) => {
     return;
   }
 
-  if (requestUrl.pathname === "/api/v1/contractor-access") {
+  if (method === "POST" && requestUrl.pathname === "/api/v1/contractor-access/register") {
     try {
-      if (method === "POST") {
-        const input = contractorAccessSchema.parse(await readJson(request));
-        sendJson(response, 200, await openContractorAccess(input.displayName, input.pin));
-        return;
-      }
-      if (method === "GET") {
-        sendJson(response, 200, await requireContractorAccess(request));
-        return;
-      }
+      const input = contractorRegistrationSchema.parse(await readJson(request));
+      sendJson(response, 201, await registerContractor(input));
     } catch (error) {
       const status =
         error instanceof RequestError
           ? error.status
-          : error instanceof Error && error.message === "INVALID_CONTRACTOR_CREDENTIALS"
+          : error instanceof ContractorAccessError && error.code === "ACCOUNT_EXISTS"
+            ? 409
+            : error instanceof Error && error.name === "ZodError"
+              ? 400
+              : 500;
+      if (status === 500) console.error(error);
+      sendJson(response, status, {
+        error:
+          error instanceof RequestError
+            ? error.message
+            : status === 409
+              ? "An account already exists for that business or contractor name. Sign in instead."
+              : status === 400
+                ? "Enter a business or contractor name, a four-digit code, and confirm the compliance acknowledgment."
+                : "The contractor account could not be created. Please try again.",
+      });
+    }
+    return;
+  }
+
+  if (method === "POST" && requestUrl.pathname === "/api/v1/contractor-access/sign-in") {
+    try {
+      const input = contractorSignInSchema.parse(await readJson(request));
+      sendJson(response, 200, await signInContractor(input.displayName, input.pin));
+    } catch (error) {
+      const status =
+        error instanceof RequestError
+          ? error.status
+          : error instanceof ContractorAccessError && error.code === "INVALID_CREDENTIALS"
             ? 401
             : error instanceof Error && error.name === "ZodError"
               ? 400
@@ -446,16 +470,29 @@ const server = createServer(async (request, response) => {
       if (status === 500) console.error(error);
       sendJson(response, status, {
         error:
-          status === 401
-            ? error instanceof RequestError
-              ? error.message
-              : "Business or contractor name and code do not match"
-            : status === 400
-              ? "A business or contractor name and four-digit code are required"
-              : "Unable to open contractor access",
+          error instanceof RequestError
+            ? error.message
+            : status === 401
+              ? "Business or contractor name and four-digit code do not match."
+              : status === 400
+                ? "Enter a business or contractor name and a four-digit code."
+                : "Contractor sign-in failed. Please try again.",
       });
-      return;
     }
+    return;
+  }
+
+  if (method === "GET" && requestUrl.pathname === "/api/v1/contractor-access") {
+    try {
+      sendJson(response, 200, await requireContractorAccess(request));
+    } catch (error) {
+      const status = error instanceof RequestError ? error.status : 500;
+      if (status === 500) console.error(error);
+      sendJson(response, status, {
+        error: error instanceof RequestError ? error.message : "Unable to verify contractor access",
+      });
+    }
+    return;
   }
 
   if (method === "GET" && requestUrl.pathname === "/api/v1/opportunities") {

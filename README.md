@@ -1,13 +1,15 @@
 ## Contractor access
 
-The resident homepage links contractors to `/contractors`. A business or contractor name plus a
-four-digit PIN creates an access account on first use and signs into the same account on later
-visits. The browser stores the returned session token and the `/partner` route validates it with
-the API before loading the partner workspace.
+The resident homepage links contractors to `/contractors`. Registration requires a business or
+contractor name, a four-digit PIN, and an explicit acknowledgment that the contractor is properly
+licensed, insured, and authorized where applicable. Returning contractors use the separate sign-in
+mode without repeating the acknowledgment. The browser stores the returned session token and the
+`/partner` route validates it with the API before loading the partner workspace.
 
 Contractor access endpoints:
 
-- `POST /api/v1/contractor-access` creates or signs into an account.
+- `POST /api/v1/contractor-access/register` creates an account after required compliance acknowledgment.
+- `POST /api/v1/contractor-access/sign-in` signs into an existing account.
 - `GET /api/v1/contractor-access` validates the current session.
 - Protected partner requests send the token in `x-homefix-partner-session`.
 
@@ -15,8 +17,9 @@ Partner analytics, cases, programs, opportunities, overflow, inspections, unmet-
 control endpoints require a valid contractor session. Apply database migrations during deployment
 with `npm run db:migrate`, or use `npm run db:deploy` to migrate and seed programs.
 
-This name-and-PIN flow is buildathon access control only. It is not contractor identity,
-licensing, insurance, procurement, or authorization verification and must be replaced before
+The acknowledgment records the contractor's representation separately from document verification.
+It does not mark a license, insurance policy, identity, procurement status, or authorization as
+verified. This name-and-PIN flow remains buildathon access control and must be replaced before
 production use.
 
 Sprint 2 — Friday: Data + Real Resident Intake

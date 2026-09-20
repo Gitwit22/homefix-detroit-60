@@ -46,6 +46,12 @@ export const contractorAccessAccounts = pgTable("contractor_access_accounts", {
   displayName: text("display_name").notNull(),
   normalizedName: text("normalized_name").unique().notNull(),
   pinHash: text("pin_hash").notNull(),
+  contractorComplianceConfirmed: boolean("contractor_compliance_confirmed")
+    .default(false)
+    .notNull(),
+  contractorComplianceConfirmedAt: timestamp("contractor_compliance_confirmed_at", {
+    withTimezone: true,
+  }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
