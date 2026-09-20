@@ -46,9 +46,7 @@ function Overflow() {
         {jobs.length === 0 ? (
           <div className="border border-dashed border-border p-6 text-sm">
             <p>No overflow jobs have been created yet.</p>
-            <p className="mt-2 text-muted-foreground">
-              Create one from an eligible repair case.
-            </p>
+            <p className="mt-2 text-muted-foreground">Create one from an eligible repair case.</p>
           </div>
         ) : (
           <DataTable
@@ -66,6 +64,11 @@ function Overflow() {
                 to="/partner/overflow/$jobId"
                 params={{ jobId: job.workOrderNumber }}
                 className="flex items-center gap-2 font-bold text-primary"
+                data-guide-target={
+                  jobs[0]?.workOrderNumber === job.workOrderNumber
+                    ? "partner-overflow-job"
+                    : undefined
+                }
               >
                 {job.workOrderNumber}
                 <ArrowRight className="size-4" />
