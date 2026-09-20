@@ -27,7 +27,11 @@ import {
   submitInspectionAvailability,
 } from "../../server/services/inspection.js";
 import { processCase, processRepair } from "../../server/services/processRepair.js";
-import { rollbackRepairPhoto, uploadRepairPhoto } from "../../server/services/photos.js";
+import {
+  getRepairCaseId,
+  rollbackRepairPhoto,
+  uploadRepairPhoto,
+} from "../../server/services/photos.js";
 import {
   caseExists,
   reviewCaseDocument,
@@ -81,6 +85,7 @@ import {
   resetPartnerDemoData,
   restorePartnerDemoData,
 } from "../../server/services/demoControl.js";
+import { residentResourceForRequest } from "./accessPolicy.js";
 
 const port = parsePort(process.env.PORT);
 const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGINS);
@@ -494,6 +499,25 @@ const server = createServer(async (request, response) => {
       if (status === 500) console.error(error);
       sendJson(response, status, {
         error: error instanceof RequestError ? error.message : "Unable to verify partner access",
+      });
+      return;
+    }
+  }
+
+  const residentResource = residentResourceForRequest(requestUrl.pathname, method);
+  if (residentResource) {
+    try {
+      const caseId =
+        residentResource.type === "case"
+          ? residentResource.id
+          : await getRepairCaseId(residentResource.id);
+      if (!caseId) throw new RequestError(404, "Repair need not found");
+      await requireResidentCaseAccess(request, caseId);
+    } catch (error) {
+      const status = error instanceof RequestError ? error.status : 500;
+      if (status === 500) console.error(error);
+      sendJson(response, status, {
+        error: error instanceof RequestError ? error.message : "Unable to verify case access",
       });
       return;
     }
@@ -941,8 +965,9 @@ const server = createServer(async (request, response) => {
         if (result.status === "rejected")
           console.error("Unable to roll back repair photo", result.reason);
       });
-      console.error(error);
-      sendJson(response, 400, {
+      const status = error instanceof RequestError ? error.status : 400;
+      if (status >= 500) console.error(error);
+      sendJson(response, status, {
         error: error instanceof Error ? error.message : "Unable to upload repair photos",
       });
     } finally {
@@ -962,8 +987,11 @@ const server = createServer(async (request, response) => {
       }
       sendJson(response, 200, payload);
     } catch (error) {
-      console.error(error);
-      sendJson(response, 500, { error: "Unable to load case" });
+      const status = error instanceof RequestError ? error.status : 500;
+      if (status === 500) console.error(error);
+      sendJson(response, status, {
+        error: error instanceof RequestError ? error.message : "Unable to load case",
+      });
     }
     return;
   }
@@ -976,7 +1004,6 @@ const server = createServer(async (request, response) => {
     let documentId: string | null = null;
     try {
       const caseId = caseDocumentsMatch[1]!;
-      await requireResidentCaseAccess(request, caseId);
       const { documentType, file } = await readDocumentFile(request);
       if (!file) throw new RequestError(400, "A valid document is required");
       filepath = file.filepath;
@@ -1042,7 +1069,12 @@ const server = createServer(async (request, response) => {
       );
       sendJson(response, 200, payload);
     } catch (error) {
-      const status = error instanceof Error && error.name === "ZodError" ? 400 : 409;
+      const status =
+        error instanceof RequestError
+          ? error.status
+          : error instanceof Error && error.name === "ZodError"
+            ? 400
+            : 409;
       sendJson(response, status, {
         error: error instanceof Error ? error.message : "Unable to submit inspection availability",
       });
@@ -1089,16 +1121,14 @@ const server = createServer(async (request, response) => {
   if (method === "GET" && coverageMatch) {
     try {
       const caseId = coverageMatch[1]!;
-      const existingCase = await getCaseAggregate(caseId);
-      if (!existingCase) {
-        sendJson(response, 404, { error: "Case not found" });
-        return;
-      }
       const payload = await getCoveragePlan(caseId);
       sendJson(response, 200, payload);
     } catch (error) {
-      console.error(error);
-      sendJson(response, 500, { error: "Unable to load coverage plan" });
+      const status = error instanceof RequestError ? error.status : 500;
+      if (status === 500) console.error(error);
+      sendJson(response, status, {
+        error: error instanceof RequestError ? error.message : "Unable to load coverage plan",
+      });
     }
     return;
   }
@@ -1110,8 +1140,11 @@ const server = createServer(async (request, response) => {
       const payload = await processRepair(repairNeedId);
       sendJson(response, 200, payload);
     } catch (error) {
-      console.error(error);
-      sendJson(response, 500, { error: "Unable to process repair" });
+      const status = error instanceof RequestError ? error.status : 500;
+      if (status === 500) console.error(error);
+      sendJson(response, status, {
+        error: error instanceof RequestError ? error.message : "Unable to process repair",
+      });
     }
     return;
   }
@@ -1120,16 +1153,14 @@ const server = createServer(async (request, response) => {
   if (method === "POST" && processCaseMatch) {
     try {
       const caseId = processCaseMatch[1]!;
-      const existingCase = await getCaseAggregate(caseId);
-      if (!existingCase) {
-        sendJson(response, 404, { error: "Case not found" });
-        return;
-      }
       const payload = await processCase(caseId);
       sendJson(response, 200, payload);
     } catch (error) {
-      console.error(error);
-      sendJson(response, 500, { error: "Unable to process case" });
+      const status = error instanceof RequestError ? error.status : 500;
+      if (status === 500) console.error(error);
+      sendJson(response, status, {
+        error: error instanceof RequestError ? error.message : "Unable to process case",
+      });
     }
     return;
   }

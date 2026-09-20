@@ -22,6 +22,15 @@ export async function deleteRepairPhotoObject(objectKey: string) {
   await deletePrivateObject(objectKey);
 }
 
+export async function getRepairCaseId(repairNeedId: string) {
+  const rows = await db
+    .select({ repairCaseId: repairNeeds.repairCaseId })
+    .from(repairNeeds)
+    .where(eq(repairNeeds.id, repairNeedId))
+    .limit(1);
+  return rows[0]?.repairCaseId ?? null;
+}
+
 export async function rollbackRepairPhoto(photoId: string) {
   const rows = await db
     .select({ publicId: repairPhotos.publicId, imageUrl: repairPhotos.imageUrl })

@@ -471,6 +471,19 @@ async function partnerFetch(
   return response;
 }
 
+async function residentFetch(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs = requestTimeoutMs,
+) {
+  const session = getStoredDemoSession();
+  const headers = new Headers(init.headers);
+  if (session) headers.set("x-homefix-demo-session", session.token);
+  const response = await fetchWithTimeout(input, { ...init, headers }, timeoutMs);
+  if (response.status === 401) clearDemoSession();
+  return response;
+}
+
 export async function openContractorAccess(
   displayName: string,
   pin: string,
@@ -667,7 +680,7 @@ export async function updatePartnerDemoControl(
 
 export async function getCase(caseId: string): Promise<CaseAggregateResponse> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetch(`${apiUrl}/api/v1/cases/${caseId}`);
+  const response = await residentFetch(`${apiUrl}/api/v1/cases/${caseId}`);
   if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
   return response.json() as Promise<CaseAggregateResponse>;
 }
@@ -754,7 +767,7 @@ export async function getPartnerInspectionQueue(
 
 export async function processRepair(repairNeedId: string) {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetchWithTimeout(`${apiUrl}/api/v1/repairs/${repairNeedId}/process`, {
+  const response = await residentFetch(`${apiUrl}/api/v1/repairs/${repairNeedId}/process`, {
     method: "POST",
   });
   if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
@@ -773,7 +786,7 @@ export async function uploadRepairPhotos(
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
   const body = new FormData();
   files.forEach((file) => body.append("photos", file));
-  const response = await fetchWithTimeout(
+  const response = await residentFetch(
     `${apiUrl}/api/v1/repairs/${repairNeedId}/photos?stage=${evidenceStage}`,
     { method: "POST", body },
   );
@@ -786,10 +799,8 @@ export async function uploadCaseDocument(caseId: string, documentType: string, f
   const body = new FormData();
   body.append("documentType", documentType);
   body.append("document", file);
-  const demoSession = getStoredDemoSession();
-  const response = await fetchWithTimeout(`${apiUrl}/api/v1/cases/${caseId}/documents`, {
+  const response = await residentFetch(`${apiUrl}/api/v1/cases/${caseId}/documents`, {
     method: "POST",
-    headers: demoSession ? { "x-homefix-demo-session": demoSession.token } : {},
     body,
   });
   if (!response.ok) throw await homeFixApiError(response);
@@ -816,7 +827,7 @@ export async function reviewCaseDocument(
 
 export async function processCase(caseId: string) {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetchWithTimeout(`${apiUrl}/api/v1/cases/${caseId}/process`, {
+  const response = await residentFetch(`${apiUrl}/api/v1/cases/${caseId}/process`, {
     method: "POST",
   });
   if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
@@ -825,7 +836,7 @@ export async function processCase(caseId: string) {
 
 export async function getCoverage(caseId: string): Promise<CoveragePlanResponse> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetch(`${apiUrl}/api/v1/cases/${caseId}/coverage`);
+  const response = await residentFetch(`${apiUrl}/api/v1/cases/${caseId}/coverage`);
   if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
   return response.json() as Promise<CoveragePlanResponse>;
 }
