@@ -288,6 +288,7 @@ export function HomeFixGuide() {
   const [residentDemoActive, setResidentDemoActive] = useState(false);
   const [partnerDemoActive, setPartnerDemoActive] = useState(false);
   const [intakeStep, setIntakeStep] = useState(1);
+  const [startPartnerOnArrival, setStartPartnerOnArrival] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   const activeResidentStep = useMemo(
@@ -352,6 +353,15 @@ export function HomeFixGuide() {
   }, [activePartnerStep, activeResidentStep, partner, partnerDemoActive, residentDemoActive]);
 
   useEffect(() => {
+    if (!startPartnerOnArrival || !partner) return;
+    setStartPartnerOnArrival(false);
+    setResidentDemoActive(false);
+    setPartnerDemoActive(true);
+    setAnswer("");
+    setOpen(true);
+  }, [partner, startPartnerOnArrival]);
+
+  useEffect(() => {
     if (open) {
       closeButtonRef.current?.focus();
     } else if ("speechSynthesis" in window) {
@@ -404,6 +414,10 @@ export function HomeFixGuide() {
     if (clickTarget(selector)) return;
 
     if (partnerDemoActive) {
+      if (direction === "back" && path.startsWith("/partner/overflow/")) {
+        void navigate({ to: "/partner/overflow" });
+        return;
+      }
       const partnerTargets = [
         "/partner",
         "/partner/cases",
@@ -536,8 +550,8 @@ export function HomeFixGuide() {
                         type="button"
                         onClick={() => {
                           exitDemo();
+                          setStartPartnerOnArrival(true);
                           void navigate({ to: "/partner" });
-                          window.setTimeout(() => startGuideDemo("partner"), 0);
                         }}
                       >
                         {demoStep.alternateActionLabel}
