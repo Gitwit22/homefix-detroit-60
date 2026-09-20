@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { AlertTriangle } from "lucide-react";
 import { DemoFlag, Metric, PageIntro, SectionLabel, StatusBadge } from "@/components/homefix";
+import { PartnerRouteError, PartnerRouteLoading } from "@/components/partner-route-state";
 import { getPartnerAnalytics } from "@/lib/homefix-api";
 
 export const Route = createFileRoute("/partner/unmet-needs")({
@@ -18,6 +19,8 @@ export const Route = createFileRoute("/partner/unmet-needs")({
     ],
   }),
   loader: () => getPartnerAnalytics(),
+  pendingComponent: PartnerRouteLoading,
+  errorComponent: PartnerRouteError,
   component: Unmet,
 });
 
@@ -62,7 +65,19 @@ function Unmet() {
               <div>
                 <h2 className="text-2xl">{metric.label}</h2>
                 <small className="text-muted-foreground">
-                  Leading ZIPs: {metric.leadingZipCodes.join(", ")}
+                  Leading ZIPs:{" "}
+                  {metric.leadingZipCodes.map((zip, zipIndex) => (
+                    <span key={zip}>
+                      {zipIndex > 0 ? ", " : ""}
+                      <Link
+                        to="/partner/cases"
+                        search={{ zip, coverage: "funding_gap" }}
+                        className="font-semibold text-primary"
+                      >
+                        {zip}
+                      </Link>
+                    </span>
+                  ))}
                 </small>
               </div>
               <strong>{metric.unmatched} needs</strong>
@@ -72,7 +87,16 @@ function Unmet() {
                 </span>
                 <p>{metric.gapRate}%</p>
               </div>
-              <StatusBadge tone="danger">No resource</StatusBadge>
+              <div className="justify-self-start sm:justify-self-end">
+                <StatusBadge tone="danger">No resource</StatusBadge>
+                <Link
+                  to="/partner/cases"
+                  search={{ repairType: metric.repairType, coverage: "funding_gap" }}
+                  className="mt-3 block font-bold text-primary"
+                >
+                  View Affected Cases
+                </Link>
+              </div>
             </div>
           ))}
         </div>

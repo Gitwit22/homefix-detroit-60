@@ -9,6 +9,7 @@ import {
   SectionLabel,
   StatusBadge,
 } from "@/components/homefix";
+import { PartnerRouteError, PartnerRouteLoading } from "@/components/partner-route-state";
 import { getPartnerAnalytics, type PartnerAnalytics } from "@/lib/homefix-api";
 import {
   capacityStatusLabels,
@@ -36,6 +37,8 @@ export const Route = createFileRoute("/partner/")({
     ],
   }),
   loader: () => getPartnerAnalytics(),
+  pendingComponent: PartnerRouteLoading,
+  errorComponent: PartnerRouteError,
   component: PartnerDashboard,
 });
 
@@ -53,15 +56,27 @@ function PartnerDashboard() {
         description="A synthetic planning dataset showing repair demand, possible program coverage, and where help is missing."
       />
       <section className="grid grid-cols-2 gap-y-8 border-b border-foreground py-8 sm:grid-cols-3 xl:grid-cols-6">
-        <Metric value={analytics.totals.homes} label="Homes represented" />
+        <Link to="/partner/cases" className="block">
+          <Metric value={analytics.totals.homes} label="Homes represented" />
+        </Link>
         <Metric value={analytics.totals.repairNeeds} label="Repair needs identified" />
-        <Metric value={analytics.totals.highPriorityRepairs} label="High-priority repairs" />
-        <Metric
-          value={analytics.totals.potentiallyCoveredRepairs}
-          label="Potential resource matches"
-        />
+        <Link to="/partner/cases" search={{ priority: "high" }} className="block">
+          <Metric value={analytics.totals.highPriorityRepairs} label="High-priority repairs" />
+        </Link>
+        <Link
+          to="/partner/cases"
+          search={{ coverage: "potentially_covered" }}
+          className="block"
+        >
+          <Metric
+            value={analytics.totals.potentiallyCoveredRepairs}
+            label="Potential resource matches"
+          />
+        </Link>
         <Metric value={analytics.totals.verificationNeeded} label="Verification needed" />
-        <Metric value={analytics.totals.unmatchedNeeds} label="Unmatched repair needs" accent />
+        <Link to="/partner/unmet-needs" className="block">
+          <Metric value={analytics.totals.unmatchedNeeds} label="Unmatched repair needs" accent />
+        </Link>
       </section>
 
       <section className="grid gap-10 py-10 xl:grid-cols-[1fr_1.1fr]">
@@ -69,7 +84,12 @@ function PartnerDashboard() {
           <SectionLabel number="01">Repair demand</SectionLabel>
           <div className="mt-6 space-y-4">
             {analytics.byRepairType.map((metric) => (
-              <div key={metric.repairType}>
+              <Link
+                key={metric.repairType}
+                to="/partner/cases"
+                search={{ repairType: metric.repairType }}
+                className="block"
+              >
                 <div className="flex justify-between text-sm">
                   <b>{metric.label}</b>
                   <span>{metric.repairNeeds}</span>
@@ -80,7 +100,7 @@ function PartnerDashboard() {
                     style={{ width: `${(metric.repairNeeds / maximumDemand) * 100}%` }}
                   />
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -90,14 +110,16 @@ function PartnerDashboard() {
             {analytics.byZipCode.map((metric) => {
               const size = 64 + Math.round((metric.repairNeeds / maximumZipDemand) * 54);
               return (
-                <div
+                <Link
                   key={metric.zipCode}
+                  to="/partner/cases"
+                  search={{ zip: metric.zipCode }}
                   className="grid place-items-center rounded-full border border-primary bg-primary/80 text-center text-primary-foreground shadow-lg"
                   style={{ width: size, height: size }}
                 >
                   <b>{metric.zipCode}</b>
                   <small>{metric.repairNeeds} needs</small>
-                </div>
+                </Link>
               );
             })}
             <div className="absolute bottom-3 left-3 bg-background/90 px-3 py-2 text-[10px] font-bold uppercase">

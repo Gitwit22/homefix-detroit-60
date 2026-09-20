@@ -2,11 +2,23 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 
 import { DemoFlag, PageIntro, StatusBadge } from "@/components/homefix";
+import { PartnerRouteError, PartnerRouteLoading } from "@/components/partner-route-state";
 import { getPartnerAnalytics, getPrograms, type ProgramCatalogResponse } from "@/lib/homefix-api";
 import { toRepairCategoryLabel } from "@/lib/repair-categories";
 import { capacityStatusLabels } from "../../server/domain/partnerAnalytics";
 
 export const Route = createFileRoute("/partner/programs")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    q: typeof search["q"] === "string" && search["q"].trim() ? search["q"].trim() : undefined,
+    repairType:
+      typeof search["repairType"] === "string" && search["repairType"] !== "all"
+        ? search["repairType"]
+        : undefined,
+    status:
+      typeof search["status"] === "string" && search["status"] !== "all"
+        ? search["status"]
+        : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Programs - HomeFix 313 Partner" },
@@ -17,6 +29,8 @@ export const Route = createFileRoute("/partner/programs")({
     const [catalog, analytics] = await Promise.all([getPrograms(), getPartnerAnalytics()]);
     return { catalog, analytics };
   },
+  pendingComponent: PartnerRouteLoading,
+  errorComponent: PartnerRouteError,
   component: Programs,
 });
 
@@ -56,9 +70,37 @@ const capacityAliases: Record<string, string> = {
 
 function Programs() {
   const { catalog, analytics } = Route.useLoaderData();
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
   const capacityByProgram = new Map(
     analytics.programCapacity.map((capacity) => [capacity.programId, capacity]),
   );
+  const repairTypeOptions = [...new Set(catalog.flatMap((program) => program.repairTypes))]
+    .filter(Boolean)
+    .sort();
+  const statusOptions = [...new Set(catalog.map((program) => program.applicationStatus))]
+    .filter(Boolean)
+    .sort();
+  const matchesFilters = (program: ProgramCatalogResponse[number]) => {
+    if (search.q) {
+      const query = search.q.toLowerCase();
+      const text = `${program.name} ${program.organization} ${program.description ?? ""}`.toLowerCase();
+      if (!text.includes(query)) return false;
+    }
+    if (search.repairType && !program.repairTypes.includes(search.repairType)) return false;
+    if (search.status && program.applicationStatus !== search.status) return false;
+    return true;
+  };
+  const updateSearch = (next: Record<string, string | undefined>) =>
+    navigate({
+      search: (prev) => ({
+        ...prev,
+        ...next,
+      }),
+      replace: true,
+    });
+  const clearFilters = () => navigate({ search: {}, replace: true });
+  const filteredTotal = catalog.filter(matchesFilters).length;
 
   return (
     <>
@@ -68,9 +110,53 @@ function Programs() {
         title="Home Repair Programs"
         description="Resident programs, closed initiatives, and funding layers are separated so catalog visibility never implies eligibility or open enrollment."
       />
+      <div className="mt-6 grid gap-3 md:grid-cols-3">
+        <input
+          type="search"
+          placeholder="Search programs..."
+          value={search.q ?? ""}
+          onChange={(event) => updateSearch({ q: event.target.value || undefined })}
+          className="h-12 border border-border px-3"
+        />
+        <select
+          value={search.repairType ?? "all"}
+          onChange={(event) =>
+            updateSearch({ repairType: event.target.value === "all" ? undefined : event.target.value })
+          }
+          className="h-12 border border-border px-3"
+        >
+          <option value="all">All Repair Types</option>
+          {repairTypeOptions.map((repairType) => (
+            <option key={repairType} value={repairType}>
+              {toRepairCategoryLabel(repairType)}
+            </option>
+          ))}
+        </select>
+        <select
+          value={search.status ?? "all"}
+          onChange={(event) => updateSearch({ status: event.target.value === "all" ? undefined : event.target.value })}
+          className="h-12 border border-border px-3"
+        >
+          <option value="all">All Statuses</option>
+          {statusOptions.map((status) => (
+            <option key={status} value={status}>
+              {status.replaceAll("_", " ")}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="mt-10 space-y-14">
-        {groups.map((group) => {
-          const items = catalog.filter(group.accepts);
+        {filteredTotal === 0 ? (
+          <div className="border border-dashed border-border p-6 text-sm">
+            <p>No programs match the current filters.</p>
+            <button type="button" className="mt-3 font-bold text-primary" onClick={clearFilters}>
+              Clear Filters
+            </button>
+          </div>
+        ) : (
+          groups.map((group) => {
+            const items = catalog.filter((program) => group.accepts(program) && matchesFilters(program));
+            if (items.length === 0) return null;
           return (
             <section key={group.title}>
               <div className="border-b border-border pb-4 md:flex md:items-end md:justify-between">
@@ -129,6 +215,7 @@ function Programs() {
                       <Link
                         to="/programs/$programId"
                         params={{ programId: program.slug ?? program.id }}
+                        search={{ from: "partner" }}
                         className="flex items-center gap-2 font-bold text-primary"
                       >
                         Details
@@ -140,7 +227,8 @@ function Programs() {
               </div>
             </section>
           );
-        })}
+          })
+        )}
       </div>
     </>
   );
