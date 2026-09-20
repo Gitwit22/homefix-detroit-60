@@ -76,11 +76,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-background text-foreground">
       <header className="app-header">
         <Link to="/" className="brand-mark" aria-label="HomeFix 313 home">
-          <span className="brand-number">313</span>
-          <span>
-            <strong>HomeFix</strong>
-            <small>Detroit repair passport</small>
-          </span>
+          <img src="/logo.png" alt="" className="brand-logo" />
         </Link>
         {!partner && (
           <nav className="resident-nav" aria-label="Resident navigation">

@@ -1,14 +1,14 @@
 Sprint 2 — Friday: Data + Real Resident Intake
 Goal: replace mock data with persistent records.
 Architecture to lock first
-Lovable Frontend
+HomeFix Frontend
 ↓
 Supabase/Postgres
 ↓
 HomeFix Domain Model
 ↓
 n8n later for AI/orchestration
-For contest speed, I would use Lovable + Supabase instead of introducing another backend.
+For contest speed, use the HomeFix frontend with Supabase instead of introducing another backend.
 Core tables:
 residents
 homes
@@ -37,7 +37,7 @@ Friday build sequence
    repair case → repair needs
    repair need → photos/assessment
    case → program matches
-2. Wire the Lovable intake to the database
+2. Wire the HomeFix intake to the database
    Make these persist:
    address
    household
@@ -443,5 +443,5 @@ Everything else
 The kill rule stays simple:
 If a P0 feature is unstable, stop all P2 work.
 The build sequence is therefore:
-Lovable UI → Data → Intake → AI Triage → Rules → Matching → Passport → Coverage → Intelligence → Overflow → Freeze.
+HomeFix UI → Data → Intake → AI Triage → Rules → Matching → Passport → Coverage → Intelligence → Overflow → Freeze.
 
