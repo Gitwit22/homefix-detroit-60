@@ -47,6 +47,9 @@ function ContractorJobs() {
       (type === "all" || item.type === type) &&
       (zipCode === "all" || item.zipCode === zipCode),
   );
+  const awaitingInspection = jobs.filter(
+    (job) => job.type === "inspection" && job.status === "open",
+  ).length;
 
   return (
     <div className="min-h-[calc(100vh-4.5rem)] bg-background">
@@ -109,10 +112,16 @@ function ContractorJobs() {
           </div>
         </section>
 
-        <div className="mt-8 flex items-end justify-between gap-4">
-          <div>
-            <p className="eyebrow">Public opportunity board</p>
-            <h2 className="mt-2 text-3xl">{jobs.length} jobs available</h2>
+        <div className="mt-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:gap-10">
+            <div>
+              <p className="eyebrow">Open cases</p>
+              <h2 className="mt-2 text-3xl">{jobs.length} jobs available</h2>
+            </div>
+            <div className="border-l-4 border-warning pl-4">
+              <p className="eyebrow">Inspection</p>
+              <h2 className="mt-2 text-3xl">{awaitingInspection} awaiting inspection</h2>
+            </div>
           </div>
           <StatusBadge tone="positive">Sensitive details hidden</StatusBadge>
         </div>
