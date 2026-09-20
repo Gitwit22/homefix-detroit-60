@@ -7,13 +7,14 @@ const caseId = "11111111-1111-4111-8111-111111111111";
 const repairId = "22222222-2222-4222-8222-222222222222";
 
 test("resident case routes are classified for ownership enforcement", () => {
-  for (const [method, pathname] of [
+  const routes: ReadonlyArray<readonly [string, string]> = [
     ["GET", `/api/v1/cases/${caseId}`],
     ["GET", `/api/v1/cases/${caseId}/coverage`],
     ["POST", `/api/v1/cases/${caseId}/process`],
     ["POST", `/api/v1/cases/${caseId}/documents`],
     ["POST", `/api/v1/cases/${caseId}/inspection/availability`],
-  ]) {
+  ];
+  for (const [method, pathname] of routes) {
     assert.deepEqual(residentResourceForRequest(pathname, method), { type: "case", id: caseId });
   }
 });
@@ -31,13 +32,14 @@ test("repair routes are classified for case ownership enforcement", () => {
 });
 
 test("public and partner operations are not classified as resident routes", () => {
-  for (const [method, pathname] of [
+  const routes: ReadonlyArray<readonly [string, string]> = [
     ["GET", "/health"],
     ["GET", "/api/v1/opportunities"],
     ["POST", `/api/v1/cases/${caseId}/inspection/confirm`],
     ["POST", `/api/v1/cases/${caseId}/inspection/findings`],
     ["GET", `/api/v1/partner-cases/${caseId}`],
-  ]) {
+  ];
+  for (const [method, pathname] of routes) {
     assert.equal(residentResourceForRequest(pathname, method), null);
   }
 });
