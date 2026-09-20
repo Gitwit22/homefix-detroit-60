@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HomeFixGuide } from "@/components/homefix-guide";
+import { getStoredContractorSession } from "@/lib/contractor-session";
 import { cn } from "@/lib/utils";
 
 export const residentLinks = [
@@ -111,12 +112,13 @@ export function DemoFlag() {
 export function ViewSwitcher() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const partner = path.startsWith("/partner");
+  const partnerTarget = getStoredContractorSession() ? "/partner" : "/contractors";
   return (
     <div className="view-switcher" aria-label="Demo view switcher">
       <Link to="/" className={cn(!partner && "is-active")}>
         Resident View
       </Link>
-      <Link to="/partner" className={cn(partner && "is-active")}>
+      <Link to={partnerTarget} className={cn(partner && "is-active")}>
         Partner Admin
       </Link>
     </div>

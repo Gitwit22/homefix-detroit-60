@@ -7,6 +7,11 @@ import {
   requestWithTimeout,
 } from "./api-request";
 import { clearDemoSession, getStoredDemoSession, type DemoSession } from "./demo-session";
+import {
+  clearContractorSession,
+  getStoredContractorSession,
+  type ContractorSession,
+} from "./contractor-session";
 
 export type { PartnerAnalytics, PartnerCaseDetail };
 export { HomeFixApiError };
@@ -428,6 +433,36 @@ async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
   return requestWithTimeout((signal) => fetch(input, { ...init, signal }), requestTimeoutMs);
 }
 
+async function partnerFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+  const session = getStoredContractorSession();
+  const headers = new Headers(init.headers);
+  if (session) headers.set("x-homefix-partner-session", session.token);
+  const response = await fetchWithTimeout(input, { ...init, headers });
+  if (response.status === 401) clearContractorSession();
+  return response;
+}
+
+export async function openContractorAccess(
+  displayName: string,
+  pin: string,
+): Promise<ContractorSession> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetchWithTimeout(`${apiUrl}/api/v1/contractor-access`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ displayName, pin }),
+  });
+  if (!response.ok) throw await homeFixApiError(response);
+  return response.json() as Promise<ContractorSession>;
+}
+
+export async function validateContractorAccess(): Promise<ContractorSession> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await partnerFetch(`${apiUrl}/api/v1/contractor-access`);
+  if (!response.ok) throw await homeFixApiError(response);
+  return response.json() as Promise<ContractorSession>;
+}
+
 export async function getPublicOpportunities(filters: {
   type?: PublicOpportunity["type"];
   zipCode?: string;
@@ -536,7 +571,7 @@ export type PartnerDemoControl = { baselineEnabled: boolean };
 
 export async function getPartnerDemoControl(): Promise<PartnerDemoControl> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetchWithTimeout(`${apiUrl}/api/v1/partner-demo-control`);
+  const response = await partnerFetch(`${apiUrl}/api/v1/partner-demo-control`);
   if (!response.ok) throw await homeFixApiError(response);
   return response.json() as Promise<PartnerDemoControl>;
 }
@@ -546,7 +581,7 @@ export async function updatePartnerDemoControl(
   operatorCode: string,
 ): Promise<PartnerDemoControl> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetchWithTimeout(`${apiUrl}/api/v1/partner-demo-control/${action}`, {
+  const response = await partnerFetch(`${apiUrl}/api/v1/partner-demo-control/${action}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ operatorCode }),
@@ -562,10 +597,16 @@ export async function getCase(caseId: string): Promise<CaseAggregateResponse> {
   return response.json() as Promise<CaseAggregateResponse>;
 }
 
-async function postCaseAction<T>(caseId: string, path: string, body: unknown): Promise<T> {
+async function postCaseAction<T>(
+  caseId: string,
+  path: string,
+  body: unknown,
+  partnerOnly = false,
+): Promise<T> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
   const demoSession = getStoredDemoSession();
-  const response = await fetchWithTimeout(`${apiUrl}/api/v1/cases/${caseId}/${path}`, {
+  const request = partnerOnly ? partnerFetch : fetchWithTimeout;
+  const response = await request(`${apiUrl}/api/v1/cases/${caseId}/${path}`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -597,7 +638,7 @@ export function confirmInspectionAppointment(
   return postCaseAction<{
     inspection: CaseAggregateResponse["inspection"];
     lifecycle: CaseLifecycle;
-  }>(caseId, "inspection/confirm", input);
+  }>(caseId, "inspection/confirm", input, true);
 }
 
 export function saveInspectionFindings(
@@ -619,17 +660,19 @@ export function saveInspectionFindings(
     unableToVerify: boolean;
   }>,
 ) {
-  return postCaseAction<{ lifecycle: CaseLifecycle }>(caseId, "inspection/findings", {
-    findings,
-    questionResponses,
-  });
+  return postCaseAction<{ lifecycle: CaseLifecycle }>(
+    caseId,
+    "inspection/findings",
+    { findings, questionResponses },
+    true,
+  );
 }
 
 export async function getPartnerInspectionQueue(
   source: PartnerDataSource = getPartnerDataSource(),
 ) {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetchWithTimeout(`${apiUrl}/api/v1/partner-inspections?source=${source}`);
+  const response = await partnerFetch(`${apiUrl}/api/v1/partner-inspections?source=${source}`);
   if (!response.ok) throw await homeFixApiError(response);
   return response.json() as Promise<{ source: PartnerDataSource; items: PartnerInspectionQueueItem[] }>;
 }
@@ -684,7 +727,7 @@ export async function reviewCaseDocument(
   input: { status: "uploaded" | "approved" | "rejected"; reviewNotes?: string | null },
 ) {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetchWithTimeout(
+  const response = await partnerFetch(
     `${apiUrl}/api/v1/partner-cases/${encodeURIComponent(caseId)}/documents/${documentId}`,
     {
       method: "PATCH",
@@ -717,7 +760,7 @@ export async function getPartnerAnalytics(
 ): Promise<PartnerAnalytics> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
   const query = source === "combined" ? "" : `?source=${source}`;
-  const response = await fetchWithTimeout(`${apiUrl}/api/v1/partner-analytics${query}`);
+  const response = await partnerFetch(`${apiUrl}/api/v1/partner-analytics${query}`);
   if (!response.ok) throw await homeFixApiError(response);
   return response.json() as Promise<PartnerAnalytics>;
 }
@@ -728,7 +771,7 @@ export async function getPartnerCase(
 ): Promise<PartnerCaseDetail> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
   const query = source === "combined" ? "" : `?source=${source}`;
-  const response = await fetchWithTimeout(
+  const response = await partnerFetch(
     `${apiUrl}/api/v1/partner-cases/${encodeURIComponent(caseId)}${query}`,
   );
   if (!response.ok) throw await homeFixApiError(response);
@@ -744,7 +787,7 @@ export async function getProgram(programId: string): Promise<ProgramDetailRespon
 
 export async function createOverflowJob(caseId: string, repairNeedId?: string) {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetch(
+  const response = await partnerFetch(
     `${apiUrl}/api/v1/partner-cases/${encodeURIComponent(caseId)}/overflow-jobs`,
     {
       method: "POST",
@@ -758,14 +801,14 @@ export async function createOverflowJob(caseId: string, repairNeedId?: string) {
 
 export async function getOverflowJobs(): Promise<OverflowJobSummaryResponse[]> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetchWithTimeout(`${apiUrl}/api/v1/overflow-jobs`);
+  const response = await partnerFetch(`${apiUrl}/api/v1/overflow-jobs`);
   if (!response.ok) throw await homeFixApiError(response);
   return response.json() as Promise<OverflowJobSummaryResponse[]>;
 }
 
 export async function getOverflowJob(jobId: string): Promise<OverflowJobDetailResponse> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetchWithTimeout(
+  const response = await partnerFetch(
     `${apiUrl}/api/v1/overflow-jobs/${encodeURIComponent(jobId)}`,
   );
   if (!response.ok) throw await homeFixApiError(response);
@@ -783,7 +826,7 @@ export async function submitBid(
   },
 ) {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetch(`${apiUrl}/api/v1/overflow-jobs/${encodeURIComponent(jobId)}/bids`, {
+  const response = await partnerFetch(`${apiUrl}/api/v1/overflow-jobs/${encodeURIComponent(jobId)}/bids`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),
@@ -794,7 +837,7 @@ export async function submitBid(
 
 export async function getWorkOrderBids(jobId: string): Promise<OverflowBidResponse[]> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetch(`${apiUrl}/api/v1/overflow-jobs/${encodeURIComponent(jobId)}/bids`);
+  const response = await partnerFetch(`${apiUrl}/api/v1/overflow-jobs/${encodeURIComponent(jobId)}/bids`);
   if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
   return response.json() as Promise<OverflowBidResponse[]>;
 }
@@ -808,28 +851,28 @@ export async function getPrograms(): Promise<ProgramCatalogResponse> {
 
 export async function getOverflowCandidates(): Promise<OverflowCandidate[]> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetch(`${apiUrl}/api/v1/overflow/candidates`);
+  const response = await partnerFetch(`${apiUrl}/api/v1/overflow/candidates`);
   if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
   return response.json() as Promise<OverflowCandidate[]>;
 }
 
 export async function getOverflowWorkOrders(): Promise<OverflowWorkOrder[]> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetch(`${apiUrl}/api/v1/overflow/work-orders`);
+  const response = await partnerFetch(`${apiUrl}/api/v1/overflow/work-orders`);
   if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
   return response.json() as Promise<OverflowWorkOrder[]>;
 }
 
 export async function getOverflowWorkOrder(workOrderId: string): Promise<OverflowWorkOrder> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetch(`${apiUrl}/api/v1/overflow/work-orders/${workOrderId}`);
+  const response = await partnerFetch(`${apiUrl}/api/v1/overflow/work-orders/${workOrderId}`);
   if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
   return response.json() as Promise<OverflowWorkOrder>;
 }
 
 export async function createOverflowWorkOrder(repairNeedId: string): Promise<OverflowWorkOrder> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetch(`${apiUrl}/api/v1/overflow/work-orders`, {
+  const response = await partnerFetch(`${apiUrl}/api/v1/overflow/work-orders`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ repairNeedId }),
@@ -848,7 +891,7 @@ export async function submitOverflowBid(
   },
 ): Promise<OverflowWorkOrder> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetch(`${apiUrl}/api/v1/overflow/work-orders/${workOrderId}/bids`, {
+  const response = await partnerFetch(`${apiUrl}/api/v1/overflow/work-orders/${workOrderId}/bids`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),

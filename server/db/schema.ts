@@ -41,6 +41,15 @@ export const demoSessions = pgTable("demo_sessions", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const contractorAccessAccounts = pgTable("contractor_access_accounts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  displayName: text("display_name").notNull(),
+  normalizedName: text("normalized_name").unique().notNull(),
+  pinHash: text("pin_hash").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const demoControl = pgTable("demo_control", {
   id: text("id").primaryKey(),
   baselineEnabled: boolean("baseline_enabled").default(true).notNull(),

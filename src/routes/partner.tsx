@@ -1,5 +1,5 @@
-import { createFileRoute, Outlet, useRouter } from "@tanstack/react-router";
-import { Database, RotateCcw, Trash2 } from "lucide-react";
+import { createFileRoute, Outlet, redirect, useRouter } from "@tanstack/react-router";
+import { Database, LogOut, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -15,15 +15,35 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
+	HomeFixApiError,
 	getPartnerDemoControl,
 	updatePartnerDemoControl,
+	validateContractorAccess,
 	type PartnerDemoControl,
 } from "@/lib/homefix-api";
+import {
+	clearContractorSession,
+	getStoredContractorSession,
+} from "@/lib/contractor-session";
 
-export const Route = createFileRoute("/partner")({ component: PartnerLayout });
+export const Route = createFileRoute("/partner")({
+	beforeLoad: async () => {
+		if (!getStoredContractorSession()) throw redirect({ to: "/contractors" });
+		try {
+			await validateContractorAccess();
+		} catch (error) {
+			if (error instanceof HomeFixApiError && error.status === 401) {
+				throw redirect({ to: "/contractors" });
+			}
+			throw error;
+		}
+	},
+	component: PartnerLayout,
+});
 
 function PartnerLayout() {
 	const router = useRouter();
+	const session = getStoredContractorSession();
 	const [control, setControl] = useState<PartnerDemoControl | null>(null);
 	const [operatorCode, setOperatorCode] = useState("");
 	const [error, setError] = useState("");
@@ -48,6 +68,11 @@ function PartnerLayout() {
 		}
 	};
 
+	const signOut = async () => {
+		clearContractorSession();
+		await router.navigate({ to: "/contractors" });
+	};
+
 	return (
 		<>
 			<div className="border-b border-foreground bg-background px-4 py-3 sm:px-6">
@@ -64,6 +89,10 @@ function PartnerLayout() {
 						</div>
 					</div>
 					<div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+						<div className="mr-2 text-xs sm:text-right">
+							<p className="font-bold">{session?.displayName}</p>
+							<p className="text-muted-foreground">Contractor access</p>
+						</div>
 						<label className="sr-only" htmlFor="partner-operator-code">Operator code</label>
 						<input
 							id="partner-operator-code"
@@ -106,6 +135,9 @@ function PartnerLayout() {
 								</AlertDialogFooter>
 							</AlertDialogContent>
 						</AlertDialog>
+						<Button type="button" variant="outline" className="h-10 rounded-none" onClick={() => void signOut()}>
+							<LogOut /> Sign Out
+						</Button>
 					</div>
 					{error && <p className="text-xs font-semibold text-destructive lg:basis-full" role="alert">{error}</p>}
 				</div>

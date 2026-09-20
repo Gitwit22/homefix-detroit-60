@@ -1,3 +1,24 @@
+## Contractor access
+
+The resident homepage links contractors to `/contractors`. A business or contractor name plus a
+four-digit PIN creates an access account on first use and signs into the same account on later
+visits. The browser stores the returned session token and the `/partner` route validates it with
+the API before loading the partner workspace.
+
+Contractor access endpoints:
+
+- `POST /api/v1/contractor-access` creates or signs into an account.
+- `GET /api/v1/contractor-access` validates the current session.
+- Protected partner requests send the token in `x-homefix-partner-session`.
+
+Partner analytics, cases, programs, opportunities, overflow, inspections, unmet-needs, and demo
+control endpoints require a valid contractor session. Apply database migrations during deployment
+with `npm run db:migrate`, or use `npm run db:deploy` to migrate and seed programs.
+
+This name-and-PIN flow is buildathon access control only. It is not contractor identity,
+licensing, insurance, procurement, or authorization verification and must be replaced before
+production use.
+
 Sprint 2 — Friday: Data + Real Resident Intake
 Goal: replace mock data with persistent records.
 Architecture to lock first

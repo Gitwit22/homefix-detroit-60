@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowDown, FileSearch, FolderCheck, Wrench } from "lucide-react";
+import { ArrowDown, ArrowRight, BriefcaseBusiness, FileSearch, FolderCheck, Wrench } from "lucide-react";
 import {
   BlueprintButton,
   DemoFlag,
@@ -178,6 +178,25 @@ function HomePage() {
               Start Repair Assessment
             </BlueprintButton>
           </div>
+        </div>
+      </section>
+      <section className="border-y border-foreground bg-warning/15">
+        <div className="mx-auto grid max-w-7xl gap-6 px-4 py-10 sm:px-6 md:grid-cols-[auto_1fr_auto] md:items-center lg:px-10">
+          <BriefcaseBusiness className="size-10 text-primary" aria-hidden="true" />
+          <div>
+            <p className="eyebrow">Contractors and repair partners</p>
+            <h2 className="mt-2 text-3xl">Interested in taking available repair cases?</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              Open the partner workspace to review Detroit repair demand, coordinate inspections,
+              and see work prepared for contractor response.
+            </p>
+          </div>
+          <Button asChild className="min-h-12 rounded-none md:justify-self-end">
+            <Link to="/contractors">
+              Contractor Access
+              <ArrowRight aria-hidden="true" />
+            </Link>
+          </Button>
         </div>
       </section>
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-10">

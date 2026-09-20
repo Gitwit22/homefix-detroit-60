@@ -10,6 +10,11 @@ const { buildTriageWebhookPayload, fallbackTriage } = await import("./triage.js"
 const { triageResponseSchema } = await import("../validation/triage.js");
 const { triageRepairCategories, triageUrgencies } = await import("../domain/repair.js");
 const { demoSessionSchema } = await import("./demoSession.js");
+const {
+  contractorAccessSchema,
+  hashContractorPin,
+  verifyContractorPin,
+} = await import("./contractorAccess.js");
 const { evaluateProgramRules } = await import("./eligibility.js");
 const { createOverflowWorkOrderSchema, submitOverflowBidSchema } = await import("./overflow.js");
 const {
@@ -341,6 +346,35 @@ test("demo sessions require a concise display name and four-digit PIN", () => {
   );
   assert.equal(demoSessionSchema.safeParse({ displayName: "Denise", pin: "313" }).success, false);
   assert.equal(demoSessionSchema.safeParse({ displayName: "Denise", pin: "31A0" }).success, false);
+});
+
+test("contractor access requires a name and exactly four numeric digits", () => {
+  assert.equal(
+    contractorAccessSchema.safeParse({ displayName: "  Reed Residential Services  ", pin: "3130" })
+      .success,
+    true,
+  );
+  assert.equal(contractorAccessSchema.safeParse({ displayName: "   ", pin: "3130" }).success, false);
+  assert.equal(
+    contractorAccessSchema.safeParse({ displayName: "R".repeat(121), pin: "3130" }).success,
+    false,
+  );
+  assert.equal(
+    contractorAccessSchema.safeParse({ displayName: "Reed Residential", pin: "313" }).success,
+    false,
+  );
+  assert.equal(
+    contractorAccessSchema.safeParse({ displayName: "Reed Residential", pin: "31A0" }).success,
+    false,
+  );
+});
+
+test("contractor PIN hashes verify without storing the original code", async () => {
+  const hash = await hashContractorPin("3130");
+  assert.doesNotMatch(hash, /3130/);
+  assert.equal(await verifyContractorPin("3130", hash), true);
+  assert.equal(await verifyContractorPin("9999", hash), false);
+  assert.equal(await verifyContractorPin("3130", "invalid"), false);
 });
 
 test("managed program catalog has stable unique records and complete matching data", () => {

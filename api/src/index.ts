@@ -14,6 +14,11 @@ import {
   openDemoSession,
   wipeDemoSessionData,
 } from "../../server/services/demoSession.js";
+import {
+  contractorAccessSchema,
+  getContractorAccess,
+  openContractorAccess,
+} from "../../server/services/contractorAccess.js";
 import { getCaseAggregate } from "../../server/services/case.js";
 import {
   confirmInspection,
@@ -267,7 +272,10 @@ function applyCors(request: IncomingMessage, response: ServerResponse): boolean 
 
   response.setHeader("access-control-allow-origin", origin);
   response.setHeader("access-control-allow-methods", "GET, POST, PATCH, DELETE, OPTIONS");
-  response.setHeader("access-control-allow-headers", "content-type, x-homefix-demo-session");
+  response.setHeader(
+    "access-control-allow-headers",
+    "content-type, x-homefix-demo-session, x-homefix-partner-session",
+  );
   response.setHeader("vary", "Origin");
   return true;
 }
@@ -355,6 +363,33 @@ async function requireDemoSession(request: IncomingMessage) {
   return session;
 }
 
+async function requireContractorAccess(request: IncomingMessage) {
+  const token = request.headers["x-homefix-partner-session"];
+  if (typeof token !== "string") throw new RequestError(401, "Partner access is required");
+  const account = await getContractorAccess(token);
+  if (!account) throw new RequestError(401, "Partner session is invalid");
+  return account;
+}
+
+export function isPartnerProtectedRequest(pathname: string, method: string) {
+  if (
+    pathname.startsWith("/api/v1/partner-demo-control") ||
+    pathname === "/api/v1/partner-analytics" ||
+    pathname === "/api/v1/partner-inspections" ||
+    pathname.startsWith("/api/v1/partner-cases/") ||
+    pathname.startsWith("/api/v1/overflow-jobs") ||
+    pathname.startsWith("/api/v1/overflow/candidates") ||
+    pathname.startsWith("/api/v1/overflow/work-orders")
+  ) {
+    return true;
+  }
+
+  return (
+    method === "POST" &&
+    /^\/api\/v1\/cases\/[0-9a-f-]+\/inspection\/(confirm|findings)$/i.test(pathname)
+  );
+}
+
 async function requireResidentCaseAccess(request: IncomingMessage, caseId: string) {
   const foundCase = await caseExists(caseId);
   if (!foundCase) throw new RequestError(404, "Case not found");
@@ -381,6 +416,41 @@ const server = createServer(async (request, response) => {
   if (method === "GET" && requestUrl.pathname === "/health") {
     sendJson(response, 200, { status: "ok", service: "homefix-api" });
     return;
+  }
+
+  if (requestUrl.pathname === "/api/v1/contractor-access") {
+    try {
+      if (method === "POST") {
+        const input = contractorAccessSchema.parse(await readJson(request));
+        sendJson(response, 200, await openContractorAccess(input.displayName, input.pin));
+        return;
+      }
+      if (method === "GET") {
+        sendJson(response, 200, await requireContractorAccess(request));
+        return;
+      }
+    } catch (error) {
+      const status =
+        error instanceof RequestError
+          ? error.status
+          : error instanceof Error && error.message === "INVALID_CONTRACTOR_CREDENTIALS"
+            ? 401
+            : error instanceof Error && error.name === "ZodError"
+              ? 400
+              : 500;
+      if (status === 500) console.error(error);
+      sendJson(response, status, {
+        error:
+          status === 401
+            ? error instanceof RequestError
+              ? error.message
+              : "Business or contractor name and code do not match"
+            : status === 400
+              ? "A business or contractor name and four-digit code are required"
+              : "Unable to open contractor access",
+      });
+      return;
+    }
   }
 
   if (method === "GET" && requestUrl.pathname === "/api/v1/opportunities") {
@@ -414,6 +484,19 @@ const server = createServer(async (request, response) => {
       sendJson(response, 500, { error: "Unable to load public opportunity" });
     }
     return;
+  }
+
+  if (isPartnerProtectedRequest(requestUrl.pathname, method)) {
+    try {
+      await requireContractorAccess(request);
+    } catch (error) {
+      const status = error instanceof RequestError ? error.status : 500;
+      if (status === 500) console.error(error);
+      sendJson(response, status, {
+        error: error instanceof RequestError ? error.message : "Unable to verify partner access",
+      });
+      return;
+    }
   }
 
   if (requestUrl.pathname === "/api/v1/demo-sessions") {
