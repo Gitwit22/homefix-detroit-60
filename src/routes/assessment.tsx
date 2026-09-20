@@ -239,6 +239,7 @@ function AssessmentPage() {
       <div className="mt-8">
         <Link
           className="blueprint-button button-primary inline-flex items-center"
+          data-guide-target="assessment-next"
           to="/passport"
           search={{ caseId }}
         >

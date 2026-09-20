@@ -188,6 +188,7 @@ function PassportPage() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
               className="blueprint-button button-primary inline-flex items-center"
+              data-guide-target="passport-next"
               to="/coverage"
               search={{ caseId }}
             >

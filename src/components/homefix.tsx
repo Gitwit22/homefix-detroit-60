@@ -1,5 +1,13 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -27,6 +35,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { HomeFixGuide } from "@/components/homefix-guide";
 import { cn } from "@/lib/utils";
 
 export const residentLinks = [
@@ -45,6 +54,17 @@ export const partnerLinks = [
   { to: "/partner/overflow", label: "Overflow Jobs", icon: BriefcaseBusiness },
   { to: "/partner/analytics", label: "Analytics", icon: BarChart3 },
 ] as const;
+
+const EASY_READ_KEY = "homefix:easy-read";
+
+const AccessibilitySettingsContext = createContext({
+  easyRead: false,
+  setEasyRead: (_value: boolean) => {},
+});
+
+export function useAccessibilitySettings() {
+  return useContext(AccessibilitySettingsContext);
+}
 
 export function DemoFlag() {
   return (
@@ -72,40 +92,101 @@ export function ViewSwitcher() {
 export function AppShell({ children }: { children: ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const partner = path.startsWith("/partner");
+  const [easyRead, setEasyRead] = useState(false);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(EASY_READ_KEY);
+    if (saved === "1") setEasyRead(true);
+  }, []);
+
+  const updateEasyRead = (value: boolean) => {
+    setEasyRead(value);
+    window.localStorage.setItem(EASY_READ_KEY, value ? "1" : "0");
+  };
+
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="app-header">
-        <Link to="/" className="brand-mark" aria-label="HomeFix 313 home">
-          <img src="/logo.png" alt="" className="brand-logo" />
-        </Link>
-        {!partner && (
-          <nav className="resident-nav" aria-label="Resident navigation">
-            {residentLinks.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                activeOptions={{ exact: item.to === "/" }}
-                activeProps={{ className: "is-active" }}
+    <AccessibilitySettingsContext.Provider value={{ easyRead, setEasyRead: updateEasyRead }}>
+      <div className={cn("min-h-screen bg-background text-foreground", easyRead && "easy-read")}>
+        <header className="app-header">
+            <Link to="/" className="brand-mark" aria-label="HomeFix 313 home">
+              <img src="/logo.png" alt="" className="brand-logo" />
+            </Link>
+            {!partner && (
+              <nav className="resident-nav" aria-label="Resident navigation">
+                {residentLinks.map((item) => (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    activeOptions={{ exact: item.to === "/" }}
+                    activeProps={{ className: "is-active" }}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </nav>
+            )}
+            <div className="header-actions">
+              <button
+                type="button"
+                className={cn("easy-read-toggle", easyRead && "is-active")}
+                aria-pressed={easyRead}
+                onClick={() => updateEasyRead(!easyRead)}
               >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        )}
-        <ViewSwitcher />
-      </header>
-      {partner ? (
-        <div className="partner-layout">
-          <aside className="partner-sidebar">
-            <div className="sidebar-title">
-              <span>Partner workspace</span>
-              <strong>
-                Detroit Repair
-                <br />
-                Intelligence
-              </strong>
+                <span aria-hidden="true">Aa</span> Easy Read
+              </button>
+              <ViewSwitcher />
             </div>
-            <nav aria-label="Partner navigation">
+        </header>
+        {partner ? (
+            <div className="partner-layout">
+              <aside className="partner-sidebar">
+                <div className="sidebar-title">
+                  <span>Partner workspace</span>
+                  <strong>
+                    Detroit Repair
+                    <br />
+                    Intelligence
+                  </strong>
+                </div>
+                <nav aria-label="Partner navigation">
+                  {partnerLinks.map(({ to, label, icon: Icon }) => (
+                    <Link
+                      key={to}
+                      to={to}
+                      activeOptions={{ exact: to === "/partner" }}
+                      activeProps={{ className: "is-active" }}
+                    >
+                      <Icon aria-hidden="true" />
+                      {label}
+                    </Link>
+                  ))}
+                </nav>
+                <div className="sidebar-foot">
+                  <DemoFlag />
+                  <p>Planning view for community partners.</p>
+                </div>
+              </aside>
+              <main className="partner-main">{children}</main>
+            </div>
+        ) : (
+            <main>{children}</main>
+        )}
+        {!partner ? (
+            <nav className="mobile-nav" aria-label="Resident mobile navigation">
+              {residentLinks.map(({ to, label, icon: Icon }) => (
+                <Link
+                  key={to}
+                  to={to}
+                  activeOptions={{ exact: to === "/" }}
+                  activeProps={{ className: "is-active" }}
+                >
+                  <Icon aria-hidden="true" />
+                  <span>{label.replace("Repair ", "")}</span>
+                </Link>
+              ))}
+            </nav>
+        ) : (
+            <nav className="partner-mobile-nav" aria-label="Partner mobile navigation">
               {partnerLinks.map(({ to, label, icon: Icon }) => (
                 <Link
                   key={to}
@@ -114,50 +195,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                   activeProps={{ className: "is-active" }}
                 >
                   <Icon aria-hidden="true" />
-                  {label}
+                  <span>{label}</span>
                 </Link>
               ))}
             </nav>
-            <div className="sidebar-foot">
-              <DemoFlag />
-              <p>Planning view for community partners.</p>
-            </div>
-          </aside>
-          <main className="partner-main">{children}</main>
-        </div>
-      ) : (
-        <main>{children}</main>
-      )}
-      {!partner ? (
-        <nav className="mobile-nav" aria-label="Resident mobile navigation">
-          {residentLinks.map(({ to, label, icon: Icon }) => (
-            <Link
-              key={to}
-              to={to}
-              activeOptions={{ exact: to === "/" }}
-              activeProps={{ className: "is-active" }}
-            >
-              <Icon aria-hidden="true" />
-              <span>{label.replace("Repair ", "")}</span>
-            </Link>
-          ))}
-        </nav>
-      ) : (
-        <nav className="partner-mobile-nav" aria-label="Partner mobile navigation">
-          {partnerLinks.map(({ to, label, icon: Icon }) => (
-            <Link
-              key={to}
-              to={to}
-              activeOptions={{ exact: to === "/partner" }}
-              activeProps={{ className: "is-active" }}
-            >
-              <Icon aria-hidden="true" />
-              <span>{label}</span>
-            </Link>
-          ))}
-        </nav>
-      )}
-    </div>
+        )}
+        {!partner && <HomeFixGuide />}
+      </div>
+    </AccessibilitySettingsContext.Provider>
   );
 }
 
@@ -218,15 +263,17 @@ export function BlueprintButton({
   children,
   variant = "primary",
   search,
+  dataGuideTarget,
 }: {
   to: string;
   children: ReactNode;
   variant?: "primary" | "secondary" | "rust";
   search?: Record<string, unknown>;
+  dataGuideTarget?: string;
 }) {
   return (
     <Button asChild className={cn("blueprint-button", `button-${variant}`)}>
-      <Link to={to} search={search}>
+      <Link to={to} search={search} data-guide-target={dataGuideTarget}>
         {children}
         <ArrowRight aria-hidden="true" />
       </Link>
@@ -252,13 +299,13 @@ export function ProgressRail({ current }: { current: number }) {
     <ol className="progress-rail" aria-label={`Step ${current} of 5`}>
       {steps.map((step, i) => (
         <li
-          key={step}
-          className={cn(i + 1 < current && "complete", i + 1 === current && "current")}
+            key={step}
+            className={cn(i + 1 < current && "complete", i + 1 === current && "current")}
         >
-          <span>
-            {i + 1 < current ? <Check aria-hidden="true" /> : String(i + 1).padStart(2, "0")}
-          </span>
-          <b>{step}</b>
+            <span>
+              {i + 1 < current ? <Check aria-hidden="true" /> : String(i + 1).padStart(2, "0")}
+            </span>
+            <b>{step}</b>
         </li>
       ))}
     </ol>
@@ -493,7 +540,7 @@ export function NextAction({
         <span className="eyebrow">Next best action</span>
         <h2>{children}</h2>
       </div>
-      <BlueprintButton to={to} search={search}>
+      <BlueprintButton to={to} search={search} dataGuideTarget="next-action-continue">
         Continue
       </BlueprintButton>
     </section>

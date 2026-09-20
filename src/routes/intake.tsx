@@ -301,6 +301,7 @@ function IntakePage() {
                 </FormField>
                 <FormField label="Detroit street address">
                   <input
+                    data-guide-target="intake-address"
                     value={streetAddress}
                     onChange={(event) => setStreetAddress(event.target.value)}
                   />
