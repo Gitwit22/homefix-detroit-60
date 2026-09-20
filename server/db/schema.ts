@@ -364,6 +364,28 @@ export const inspectionAvailability = pgTable(
   ],
 );
 
+export const inspectionAssignments = pgTable(
+  "inspection_assignments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    inspectionRequestId: uuid("inspection_request_id")
+      .references(() => inspectionRequests.id, { onDelete: "cascade" })
+      .notNull(),
+    providerOrganizationId: uuid("provider_organization_id"),
+    providerOrganizationName: text("provider_organization_name").notNull(),
+    assignedToAccountId: uuid("assigned_to_account_id").references(
+      () => contractorAccessAccounts.id,
+      { onDelete: "set null" },
+    ),
+    assignedWorkerName: text("assigned_worker_name").notNull(),
+    assignedWorkerPhone: text("assigned_worker_phone"),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("inspection_assignments_request_unique").on(table.inspectionRequestId)],
+);
+
 export const inspectionAppointments = pgTable(
   "inspection_appointments",
   {

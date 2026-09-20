@@ -196,15 +196,22 @@ function PassportPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <SectionLabel number="04">Inspection</SectionLabel>
-                <h2 className="mt-4 text-3xl">
-                  {payload.inspection.status === "availability_submitted"
-                    ? "Awaiting scheduling"
-                    : payload.inspection.status === "completed"
-                      ? "Inspection completed"
-                      : "Inspection scheduled"}
-                </h2>
+                <h2 className="mt-4 text-3xl">{inspectionHeading(payload.inspection.status)}</h2>
               </div>
               <CalendarDays className="size-7 text-primary" aria-hidden="true" />
+            </div>
+            <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold">
+              <span>✓ Availability Submitted</span>
+              <span>
+                {["assigned", "scheduled", "completed"].includes(payload.inspection.status)
+                  ? "✓ Inspector Assigned"
+                  : "○ Inspector Assignment"}
+              </span>
+              <span>
+                {["scheduled", "completed"].includes(payload.inspection.status)
+                  ? "✓ Inspection Scheduled"
+                  : "○ Appointment Scheduling"}
+              </span>
             </div>
             {payload.inspection.confirmedStart && payload.inspection.confirmedEnd ? (
               <dl className="mt-6 grid gap-x-5 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -221,7 +228,22 @@ function PassportPage() {
                   )}
                 />
                 <Item k="Provider" v={payload.inspection.providerName ?? "To be confirmed"} />
+                <Item
+                  k="Organization"
+                  v={payload.inspection.providerOrganizationName ?? "To be confirmed"}
+                />
                 <Item k="Contact" v={payload.inspection.providerPhone ?? "Not provided"} />
+              </dl>
+            ) : payload.inspection.status === "assigned" ? (
+              <dl className="mt-6 grid gap-x-5 gap-y-6 sm:grid-cols-2">
+                <Item k="Inspector" v={payload.inspection.assignedWorkerName ?? "Assigned"} />
+                <Item
+                  k="Organization"
+                  v={payload.inspection.providerOrganizationName ?? "HomeFix provider"}
+                />
+                <p className="sm:col-span-2 text-sm text-muted-foreground">
+                  We are coordinating an appointment using the availability you provided.
+                </p>
               </dl>
             ) : (
               <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
@@ -360,6 +382,14 @@ function PassportPage() {
       </div>
     </div>
   );
+}
+
+function inspectionHeading(status: string) {
+  if (status === "availability_requested") return "Awaiting inspection availability";
+  if (status === "availability_submitted") return "Awaiting inspector assignment";
+  if (status === "assigned") return "Inspector assigned";
+  if (status === "completed") return "Inspection completed";
+  return "Inspection scheduled";
 }
 
 function documentStatusLabel(status: string) {

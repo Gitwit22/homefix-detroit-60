@@ -20,7 +20,9 @@ export const Route = createFileRoute("/partner/inspections")({
 
 function InspectionQueue() {
   const queue = Route.useLoaderData();
-  const awaitingSchedule = queue.items.filter((item) => item.status === "availability_submitted");
+  const needsAvailability = queue.items.filter((item) => item.status === "availability_requested");
+  const needsAssignment = queue.items.filter((item) => item.status === "availability_submitted");
+  const assigned = queue.items.filter((item) => item.status === "assigned");
   const scheduled = queue.items.filter((item) => item.status === "scheduled");
   const completed = queue.items.filter((item) => item.status === "completed");
 
@@ -32,14 +34,16 @@ function InspectionQueue() {
         title="Inspection Queue"
         description="Turn resident availability into confirmed visits and verified repair scopes."
         action={
-          <StatusBadge tone={awaitingSchedule.length > 0 ? "warning" : "positive"}>
-            {awaitingSchedule.length} awaiting schedule
+          <StatusBadge tone={needsAssignment.length > 0 ? "warning" : "positive"}>
+            {needsAssignment.length} need assignment
           </StatusBadge>
         }
       />
 
-      <section className="mt-8 grid gap-px bg-border sm:grid-cols-3">
-        <QueueStat label="Awaiting schedule" value={awaitingSchedule.length} />
+      <section className="mt-8 grid gap-px bg-border sm:grid-cols-5">
+        <QueueStat label="Needs availability" value={needsAvailability.length} />
+        <QueueStat label="Needs assignment" value={needsAssignment.length} />
+        <QueueStat label="Assigned" value={assigned.length} />
         <QueueStat label="Scheduled" value={scheduled.length} />
         <QueueStat label="Completed" value={completed.length} />
       </section>
@@ -64,7 +68,9 @@ function InspectionQueue() {
                   <p className="mt-1 text-sm text-muted-foreground">Detroit, MI {item.zipCode}</p>
                 </div>
                 <div>
-                  <StatusBadge tone={statusTone(item.status)}>{statusLabel(item.status)}</StatusBadge>
+                  <StatusBadge tone={statusTone(item.status)}>
+                    {statusLabel(item.status)}
+                  </StatusBadge>
                   <p className="mt-2 text-sm text-muted-foreground">
                     {item.availabilityWindows.length} resident window
                     {item.availabilityWindows.length === 1 ? "" : "s"}
@@ -93,7 +99,8 @@ function InspectionQueue() {
                           : "No active window"}
                     </strong>
                     <small className="text-muted-foreground">
-                      {item.providerName ?? (item.appointmentStart ? "Provider pending" : "Next offered window")}
+                      {item.assignedWorkerName ??
+                        (item.appointmentStart ? "Provider pending" : primaryAction(item.status))}
                     </small>
                   </span>
                 </div>
@@ -124,7 +131,8 @@ function QueueStat({ label, value }: { label: string; value: number }) {
 }
 
 function statusLabel(status: string) {
-  if (status === "availability_submitted") return "Needs scheduling";
+  if (status === "availability_submitted") return "Needs assignment";
+  if (status === "assigned") return "Inspector assigned";
   if (status === "scheduled") return "Scheduled";
   if (status === "completed") return "Completed";
   return "Availability requested";
@@ -132,6 +140,7 @@ function statusLabel(status: string) {
 
 function statusTone(status: string): "warning" | "info" | "positive" | "neutral" {
   if (status === "availability_submitted") return "warning";
+  if (status === "assigned") return "info";
   if (status === "scheduled") return "info";
   if (status === "completed") return "positive";
   return "neutral";
@@ -146,4 +155,12 @@ function formatDateTime(value: string) {
     minute: "2-digit",
     timeZone: "America/Detroit",
   }).format(new Date(value));
+}
+
+function primaryAction(status: string) {
+  if (status === "availability_requested") return "Wait for resident";
+  if (status === "availability_submitted") return "Assign inspection";
+  if (status === "assigned") return "Confirm appointment";
+  if (status === "scheduled") return "Perform inspection";
+  return "Review findings";
 }

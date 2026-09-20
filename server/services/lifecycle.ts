@@ -12,7 +12,11 @@ import {
   repairNeeds,
   workOrders,
 } from "../db/schema.js";
-import { deriveCaseLifecycle, type ProgramApprovalStatus } from "../domain/lifecycle.js";
+import {
+  deriveCaseLifecycle,
+  type InspectionStatus,
+  type ProgramApprovalStatus,
+} from "../domain/lifecycle.js";
 
 export async function getCaseLifecycle(caseId: string) {
   const needs = await db
@@ -79,6 +83,7 @@ export async function getCaseLifecycle(caseId: string) {
       (matchingEvents.length > 0 || matches.length > 0),
     viablePathwayCount: matches.length,
     inspectionRequested: Boolean(inspection),
+    inspectionStatus: (inspection?.status as InspectionStatus | undefined) ?? null,
     inspectionCompleted: inspection?.status === "completed",
     scopeVerified:
       needs.length > 0 &&
@@ -96,11 +101,21 @@ export async function getCaseLifecycle(caseId: string) {
 }
 
 export async function syncCaseLifecycle(caseId: string) {
-  const lifecycle = await getCaseLifecycle(caseId);
+  let lifecycle = await getCaseLifecycle(caseId);
+  if (
+    lifecycle.stage === "potential_programs" &&
+    lifecycle.nextAction === "Submit availability for an on-site inspection."
+  ) {
+    await db
+      .insert(inspectionRequests)
+      .values({ repairCaseId: caseId, status: "availability_requested" })
+      .onConflictDoNothing({ target: inspectionRequests.repairCaseId });
+    lifecycle = await getCaseLifecycle(caseId);
+  }
   await db
     .update(repairCases)
     .set({
-      status: lifecycle.complete ? "completed" : lifecycle.stage,
+      status: lifecycle.complete ? "completed" : lifecycle.caseStatus,
       currentStep: lifecycle.stage,
       nextAction: lifecycle.nextAction,
       updatedAt: new Date(),

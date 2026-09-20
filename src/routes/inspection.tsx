@@ -220,17 +220,23 @@ function InspectionPage() {
         </section>
       ) : (
         <section className="mt-10">
-          {payload.inspection?.status === "availability_submitted" && (
+          {(payload.inspection?.status === "availability_submitted" ||
+            payload.inspection?.status === "assigned") && (
             <div
               className="mb-8 border-l-4 border-warning bg-warning/10 p-6"
               data-guide-target="inspection-submitted"
               role="status"
             >
-              <StatusBadge tone="warning">Awaiting inspection assignment</StatusBadge>
+              <StatusBadge tone="warning">
+                {payload.inspection.status === "assigned"
+                  ? "Inspector assigned"
+                  : "Awaiting inspector assignment"}
+              </StatusBadge>
               <h2 className="mt-4 text-3xl">Your application is submitted.</h2>
               <p className="mt-2 max-w-2xl text-muted-foreground">
-                Your inspection dates are on file. HomeFix is waiting for a partner to assign an
-                inspector and confirm one of your selected windows.
+                {payload.inspection.status === "assigned"
+                  ? `${payload.inspection.assignedWorkerName ?? "Your inspector"} from ${payload.inspection.providerOrganizationName ?? "a HomeFix provider"} is coordinating an appointment using your selected windows.`
+                  : "Your inspection dates are on file. HomeFix is waiting for a partner to assign an inspector."}
               </p>
             </div>
           )}

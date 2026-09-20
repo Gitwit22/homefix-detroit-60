@@ -54,6 +54,11 @@ export type PartnerInspectionQueueItem = {
   updatedAt: string;
   appointmentStart: string | null;
   appointmentEnd: string | null;
+  providerOrganizationId: string | null;
+  providerOrganizationName: string | null;
+  assignedWorkerName: string | null;
+  assignedWorkerPhone: string | null;
+  assignedAt: string | null;
   providerName: string | null;
   providerPhone: string | null;
   primaryContact: {
@@ -269,6 +274,12 @@ export type CaseAggregateResponse = {
     }>;
     confirmedStart: string | null;
     confirmedEnd: string | null;
+    providerOrganizationId: string | null;
+    providerOrganizationName: string | null;
+    assignedToAccountId: string | null;
+    assignedWorkerName: string | null;
+    assignedWorkerPhone: string | null;
+    assignedAt: string | null;
     providerName: string | null;
     providerPhone: string | null;
     confirmedByDisplayName: string | null;
@@ -773,7 +784,7 @@ export function submitInspectionAvailability(
 
 export function confirmInspectionAppointment(
   caseId: string,
-  input: { start: string; end: string; providerName: string; providerPhone?: string },
+  input: { start: string; end: string },
 ) {
   return postCaseAction<{
     inspection: CaseAggregateResponse["inspection"];
@@ -781,9 +792,24 @@ export function confirmInspectionAppointment(
   }>(caseId, "inspection/confirm", input, true);
 }
 
+export function assignInspectionProvider(
+  caseId: string,
+  input: {
+    providerOrganizationId?: string;
+    providerOrganizationName: string;
+    assignedWorkerName: string;
+    assignedWorkerPhone?: string;
+  },
+) {
+  return postCaseAction<{
+    inspection: CaseAggregateResponse["inspection"];
+    lifecycle: CaseLifecycle;
+  }>(caseId, "inspection/assign", input, true);
+}
+
 export function rescheduleInspectionAppointment(
   caseId: string,
-  input: { start: string; end: string; providerName: string; providerPhone?: string },
+  input: { start: string; end: string },
 ) {
   return postCaseAction<{
     inspection: CaseAggregateResponse["inspection"];

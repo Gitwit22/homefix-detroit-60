@@ -24,6 +24,7 @@ import {
 } from "../../server/services/contractorAccess.js";
 import { getCaseAggregate } from "../../server/services/case.js";
 import {
+  assignInspection,
   confirmInspection,
   listInspectionQueue,
   recordInspectionFindings,
@@ -168,6 +169,11 @@ async function withOverflowCaseState(caseId: string, source: PartnerDataSource) 
         availabilityWindows: aggregate.inspection.availabilityWindows,
         confirmedStart: aggregate.inspection.confirmedStart?.toISOString() ?? null,
         confirmedEnd: aggregate.inspection.confirmedEnd?.toISOString() ?? null,
+        providerOrganizationId: aggregate.inspection.providerOrganizationId,
+        providerOrganizationName: aggregate.inspection.providerOrganizationName,
+        assignedWorkerName: aggregate.inspection.assignedWorkerName,
+        assignedWorkerPhone: aggregate.inspection.assignedWorkerPhone,
+        assignedAt: aggregate.inspection.assignedAt?.toISOString() ?? null,
         providerName: aggregate.inspection.providerName,
         providerPhone: aggregate.inspection.providerPhone,
         confirmedByDisplayName: aggregate.inspection.confirmedByDisplayName,
@@ -1145,6 +1151,28 @@ const server = createServer(async (request, response) => {
   const inspectionConfirmMatch = requestUrl.pathname.match(
     /^\/api\/v1\/cases\/([0-9a-f-]+)\/inspection\/confirm$/i,
   );
+
+  const inspectionAssignMatch = requestUrl.pathname.match(
+    /^\/api\/v1\/cases\/([0-9a-f-]+)\/inspection\/assign$/i,
+  );
+  if (method === "POST" && inspectionAssignMatch) {
+    try {
+      if (!contractorAccess) throw new RequestError(401, "Partner access is required");
+      const payload = await assignInspection(
+        inspectionAssignMatch[1]!,
+        await readJson(request),
+        contractorAccess,
+      );
+      sendJson(response, 200, payload);
+    } catch (error) {
+      const status = error instanceof Error && error.name === "ZodError" ? 400 : 409;
+      sendJson(response, status, {
+        error: error instanceof Error ? error.message : "Unable to assign inspection",
+      });
+    }
+    return;
+  }
+
   if (method === "POST" && inspectionConfirmMatch) {
     try {
       if (!contractorAccess) throw new RequestError(401, "Partner access is required");

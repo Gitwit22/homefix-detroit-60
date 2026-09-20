@@ -24,6 +24,7 @@ const {
   findOfferedInspectionWindow,
   inspectionAvailabilitySchema,
   inspectionFindingsSchema,
+  requireInspectionAssignmentState,
   requireInspectionConfirmationState,
   requireInspectionRescheduleState,
 } = await import("./inspection.js");
@@ -340,8 +341,14 @@ test("inspection questions preserve repair ownership and require a complete resp
   );
 });
 
-test("inspection scheduling only confirms once and reschedules scheduled requests", () => {
-  assert.doesNotThrow(() => requireInspectionConfirmationState("availability_submitted"));
+test("inspection assignment precedes scheduling and scheduled requests can be rescheduled", () => {
+  assert.doesNotThrow(() => requireInspectionAssignmentState("availability_submitted"));
+  assert.throws(() => requireInspectionAssignmentState("assigned"), /already has/i);
+  assert.doesNotThrow(() => requireInspectionConfirmationState("assigned"));
+  assert.throws(
+    () => requireInspectionConfirmationState("availability_submitted"),
+    /current state/i,
+  );
   assert.throws(() => requireInspectionConfirmationState("scheduled"), /already scheduled/i);
   assert.doesNotThrow(() => requireInspectionRescheduleState("scheduled"));
   assert.throws(() => requireInspectionRescheduleState("availability_submitted"), /confirm/i);

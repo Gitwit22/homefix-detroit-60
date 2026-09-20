@@ -262,6 +262,11 @@ export type PartnerCaseDetail = PartnerCaseSummary & {
     availabilityWindows: Array<{ start: string; end: string }>;
     confirmedStart: string | null;
     confirmedEnd: string | null;
+    providerOrganizationId: string | null;
+    providerOrganizationName: string | null;
+    assignedWorkerName: string | null;
+    assignedWorkerPhone: string | null;
+    assignedAt: string | null;
     providerName: string | null;
     providerPhone: string | null;
     confirmedByDisplayName: string | null;

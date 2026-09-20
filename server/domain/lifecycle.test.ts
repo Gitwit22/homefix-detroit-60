@@ -8,6 +8,7 @@ const reportedFacts: CaseLifecycleFacts = {
   screeningComplete: false,
   viablePathwayCount: 0,
   inspectionRequested: false,
+  inspectionStatus: null,
   inspectionCompleted: false,
   scopeVerified: false,
   documentsVerified: false,
@@ -26,25 +27,35 @@ test("lifecycle stops at potential programs when screening finds no pathway", ()
   assert.equal(lifecycle.steps[3]?.status, "pending");
 });
 
-test("lifecycle requires inspection and verified scope before final review", () => {
-  const inspection = deriveCaseLifecycle({
+test("lifecycle exposes each inspection request state on the repair case", () => {
+  const baseInspectionFacts = {
     ...reportedFacts,
     screeningComplete: true,
     viablePathwayCount: 2,
     inspectionRequested: true,
-  });
+  };
+  const expected = [
+    ["availability_requested", "inspection_availability_needed", /submit availability/i],
+    ["availability_submitted", "awaiting_inspector_assignment", /assign a provider/i],
+    ["assigned", "inspector_assigned", /confirm an appointment/i],
+    ["scheduled", "inspection_scheduled", /perform the professional inspection/i],
+  ] as const;
+
+  for (const [inspectionStatus, caseStatus, nextAction] of expected) {
+    const lifecycle = deriveCaseLifecycle({ ...baseInspectionFacts, inspectionStatus });
+    assert.equal(lifecycle.stage, "inspection");
+    assert.equal(lifecycle.caseStatus, caseStatus);
+    assert.match(lifecycle.nextAction, nextAction);
+  }
+
   const scope = deriveCaseLifecycle({
-    ...reportedFacts,
-    screeningComplete: true,
-    viablePathwayCount: 2,
-    inspectionRequested: true,
+    ...baseInspectionFacts,
+    inspectionStatus: "completed",
     inspectionCompleted: true,
   });
 
-  assert.equal(inspection.stage, "inspection");
-  assert.match(inspection.nextAction, /await inspector assignment/i);
-  assert.equal(inspection.complete, false);
   assert.equal(scope.stage, "repair_scope");
+  assert.equal(scope.caseStatus, "inspection_completed");
 });
 
 test("lifecycle keeps non-approved final outcomes in program review", () => {

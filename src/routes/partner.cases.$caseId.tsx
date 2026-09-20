@@ -20,6 +20,7 @@ import {
 } from "@/components/homefix";
 import { PartnerRouteLoading } from "@/components/partner-route-state";
 import {
+  assignInspectionProvider,
   confirmInspectionAppointment,
   createOverflowJob,
   getPartnerCase,
@@ -456,8 +457,11 @@ function InspectionWorkspace({
   inspectionPackage: InspectionPackage | null;
   onUpdated: () => Promise<void>;
 }) {
-  const [providerName, setProviderName] = useState(inspectionPackage?.providerName ?? "");
-  const [providerPhone, setProviderPhone] = useState(inspectionPackage?.providerPhone ?? "");
+  const [organizationName, setOrganizationName] = useState(
+    inspectionPackage?.providerOrganizationName ?? "",
+  );
+  const [workerName, setWorkerName] = useState(inspectionPackage?.assignedWorkerName ?? "");
+  const [workerPhone, setWorkerPhone] = useState(inspectionPackage?.assignedWorkerPhone ?? "");
   const [selectedStart, setSelectedStart] = useState(
     inspectionPackage?.confirmedStart ?? inspectionPackage?.availabilityWindows[0]?.start ?? "",
   );
@@ -515,12 +519,33 @@ function InspectionWorkspace({
     );
   }
 
+  const saveAssignment = async () => {
+    if (organizationName.trim().length < 2 || workerName.trim().length < 2) {
+      setError("Enter the provider organization and assigned worker.");
+      return;
+    }
+    setIsSaving(true);
+    setError("");
+    try {
+      await assignInspectionProvider(caseId, {
+        providerOrganizationName: organizationName.trim(),
+        assignedWorkerName: workerName.trim(),
+        ...(workerPhone.trim() ? { assignedWorkerPhone: workerPhone.trim() } : {}),
+      });
+      await onUpdated();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Unable to assign inspector.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const saveAppointment = async () => {
     const window = inspectionPackage.availabilityWindows.find(
       (candidate) => candidate.start === selectedStart,
     );
-    if (!window || providerName.trim().length < 2) {
-      setError("Choose a resident-provided window and enter the inspector or provider name.");
+    if (!window) {
+      setError("Choose a resident-provided appointment window.");
       return;
     }
     setIsSaving(true);
@@ -530,8 +555,6 @@ function InspectionWorkspace({
       await save(caseId, {
         start: window.start,
         end: window.end,
-        providerName: providerName.trim(),
-        ...(providerPhone.trim() ? { providerPhone: providerPhone.trim() } : {}),
       });
       setIsRescheduling(false);
       await onUpdated();
@@ -605,7 +628,49 @@ function InspectionWorkspace({
     }
   };
 
-  if (inspectionPackage.status === "availability_submitted" || isRescheduling) {
+  if (inspectionPackage.status === "availability_submitted") {
+    return (
+      <div className="mt-5 border-y border-border py-6">
+        <StatusBadge tone="warning">Assignment required</StatusBadge>
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <label className="grid gap-2 text-sm font-semibold">
+            Provider organization
+            <input
+              className="min-h-11 border border-input bg-background px-3"
+              value={organizationName}
+              onChange={(event) => setOrganizationName(event.target.value)}
+              maxLength={160}
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-semibold">
+            Assigned worker
+            <input
+              className="min-h-11 border border-input bg-background px-3"
+              value={workerName}
+              onChange={(event) => setWorkerName(event.target.value)}
+              maxLength={120}
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-semibold">
+            Worker phone (optional)
+            <input
+              className="min-h-11 border border-input bg-background px-3"
+              value={workerPhone}
+              onChange={(event) => setWorkerPhone(event.target.value)}
+              maxLength={40}
+            />
+          </label>
+        </div>
+        {error && <p className="mt-4 text-sm font-semibold text-destructive">{error}</p>}
+        <Button className="mt-5 min-h-12 rounded-none" disabled={isSaving} onClick={saveAssignment}>
+          <ClipboardCheck />
+          {isSaving ? "Assigning..." : "Assign Inspector"}
+        </Button>
+      </div>
+    );
+  }
+
+  if (inspectionPackage.status === "assigned" || isRescheduling) {
     return (
       <div className="mt-5 border-y border-border py-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -631,24 +696,13 @@ function InspectionWorkspace({
               ))}
             </select>
           </label>
-          <label className="grid gap-2 text-sm font-semibold">
-            Inspector or provider
-            <input
-              className="min-h-11 border border-input bg-background px-3"
-              value={providerName}
-              onChange={(event) => setProviderName(event.target.value)}
-              maxLength={120}
-            />
-          </label>
-          <label className="grid gap-2 text-sm font-semibold">
-            Provider phone (optional)
-            <input
-              className="min-h-11 border border-input bg-background px-3"
-              value={providerPhone}
-              onChange={(event) => setProviderPhone(event.target.value)}
-              maxLength={40}
-            />
-          </label>
+          <div className="border-l-4 border-primary px-4 py-2 text-sm">
+            <span className="eyebrow">Assigned inspector</span>
+            <strong className="mt-1 block">{inspectionPackage.assignedWorkerName}</strong>
+            <span className="text-muted-foreground">
+              {inspectionPackage.providerOrganizationName}
+            </span>
+          </div>
         </div>
         {error && <p className="mt-4 text-sm font-semibold text-destructive">{error}</p>}
         <Button
@@ -676,8 +730,6 @@ function InspectionWorkspace({
                   inspectionPackage.availabilityWindows[0]?.start ??
                   "",
               );
-              setProviderName(inspectionPackage.providerName ?? "");
-              setProviderPhone(inspectionPackage.providerPhone ?? "");
               setError("");
               setIsRescheduling(false);
             }}
