@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowDown, ClipboardCheck, FileSearch, FolderCheck, Home, Wrench } from "lucide-react";
+import { ArrowDown, FileSearch, FolderCheck, Wrench } from "lucide-react";
 import {
   BlueprintButton,
   DemoFlag,
@@ -9,6 +9,8 @@ import {
   StatusBadge,
 } from "@/components/homefix";
 import { DemoSessionPanel } from "@/components/demo-session-panel";
+import { Button } from "@/components/ui/button";
+import { startGuideDemo } from "@/lib/homefix-guide";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -22,8 +24,7 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "HomeFix 313 — A path toward home repair" },
       {
         property: "og:description",
-        content:
-          "Snap the problem, build your Repair Passport, and find a path toward getting it fixed.",
+        content: "Snap the problem, build your Repair Passport, and find a path toward getting it fixed.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -35,9 +36,11 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   const [recentCaseId, setRecentCaseId] = useState("");
   const demoMode = import.meta.env["VITE_HOMEFIX_DEMO_MODE"] === "1";
+
   useEffect(() => {
     setRecentCaseId(localStorage.getItem("homefix:lastCaseId") ?? "");
   }, []);
+
   const benefits = [
     [
       FileSearch,
@@ -52,9 +55,12 @@ function HomePage() {
     [
       FolderCheck,
       "Keep everything together",
-      "Build a reusable Repair Passport with needs, documents, matches, and progress.",
+      "Build a reusable Repair Passport with needs, assessments, and matches.",
     ],
   ] as const;
+
+  const pitchSteps = ["Report", "Assess", "Organize", "Match", "Cover", "Learn"] as const;
+
   return (
     <div className="pb-20 lg:pb-0">
       <section className="blueprint-grid border-b border-border">
@@ -66,45 +72,62 @@ function HomePage() {
               <h1 className="mt-4 max-w-3xl font-display text-5xl leading-[.97] sm:text-6xl lg:text-8xl">
                 Your home has a story.
                 <br />
-                <em className="font-normal text-primary">
-                  HomeFix helps you figure out what happens next.
-                </em>
+                <em className="font-normal text-primary">HomeFix helps you figure out what happens next.</em>
               </h1>
               <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
-                Snap the problem, build your Repair Passport, and find a path toward getting it
-                fixed.
+                Snap the problem, build your Repair Passport, and find a path toward getting it fixed.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <BlueprintButton to="/intake" search={{ demo: "denise-carter-pitch-v1" }}>
-                  Start a Repair Assessment
-                </BlueprintButton>
                 {recentCaseId ? (
-                  <BlueprintButton
-                    to="/passport"
-                    search={{ caseId: recentCaseId }}
-                    variant="secondary"
-                  >
-                    Resume Recent Case
-                  </BlueprintButton>
+                  <>
+                    <div className="w-full sm:max-w-xs">
+                      <p className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        Welcome back
+                      </p>
+                      <BlueprintButton to="/passport" search={{ caseId: recentCaseId }}>
+                        Resume My Repair
+                      </BlueprintButton>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="min-h-12 rounded-none"
+                      onClick={() => startGuideDemo("resident")}
+                    >
+                      Take Guided Demo
+                    </Button>
+                  </>
                 ) : (
-                  <BlueprintButton
-                    to="/intake"
-                    search={{ demo: "denise-carter-pitch-v1" }}
-                    variant="secondary"
-                  >
-                    Explore the Guided Demo
-                  </BlueprintButton>
+                  <>
+                    <BlueprintButton
+                      to="/intake"
+                      search={{ demo: "denise-carter-pitch-v1" }}
+                      dataGuideTarget="resident-start-assessment"
+                    >
+                      Start Repair Assessment
+                    </BlueprintButton>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="min-h-12 rounded-none"
+                      onClick={() => startGuideDemo("resident")}
+                    >
+                      Take Guided Demo
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
             <ol className="mt-12 flex flex-wrap gap-6 border-t border-foreground pt-5 text-xs font-bold uppercase">
-              {["Report", "Assess", "Match", "Repair"].map((x, i) => (
-                <li key={x} className="flex items-center gap-2">
+              {pitchSteps.map((step, index) => (
+                <li key={step} className="flex items-center gap-2">
                   <b className="font-display text-xl font-normal text-rust">
-                    {String(i + 1).padStart(2, "0")}
+                    {String(index + 1).padStart(2, "0")}
                   </b>
-                  {x}
-                  {i < 3 && <ArrowDown className="size-3 -rotate-90 text-muted-foreground" />}
+                  {step}
+                  {index < pitchSteps.length - 1 && (
+                    <ArrowDown className="size-3 -rotate-90 text-muted-foreground" />
+                  )}
                 </li>
               ))}
             </ol>
@@ -160,26 +183,25 @@ function HomePage() {
       <section className="bg-navy text-primary-foreground">
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-10">
           <SectionLabel number="02">How HomeFix works</SectionLabel>
-          <div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             {[
-              "Tell us about your home",
-              "Describe or photograph the repair",
-              "Review possible assistance",
-              "Track your repair plan",
-            ].map((x, i) => (
-              <div key={x} className="border-t border-primary-foreground/30 pt-4">
-                <b className="font-display text-5xl font-normal text-warning">0{i + 1}</b>
-                <h3 className="mt-8 text-xl">{x}</h3>
+              ["Report", "Resident tells HomeFix what is wrong."],
+              ["Assess", "AI provides preliminary repair triage."],
+              ["Organize", "HomeFix builds the Repair Passport."],
+              ["Match", "Deterministic rules identify potential resources."],
+              ["Cover", "Coverage Plan shows what has a path and what does not."],
+              ["Learn", "Partner Intelligence aggregates gaps across the city."],
+            ].map(([title, text], index) => (
+              <div key={title} className="border-t border-primary-foreground/30 pt-4">
+                <b className="font-display text-5xl font-normal text-warning">0{index + 1}</b>
+                <h3 className="mt-8 text-xl">{title}</h3>
+                <p className="mt-3 text-sm text-primary-foreground/75">{text}</p>
               </div>
             ))}
           </div>
           <div className="mt-12">
-            <BlueprintButton
-              to="/intake"
-              search={{ demo: "denise-carter-pitch-v1" }}
-              variant="rust"
-            >
-              Start My Repair Assessment
+            <BlueprintButton to="/intake" search={{ demo: "denise-carter-pitch-v1" }} variant="rust">
+              Start Repair Assessment
             </BlueprintButton>
           </div>
         </div>

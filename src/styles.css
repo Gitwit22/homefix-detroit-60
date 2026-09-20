@@ -520,6 +520,25 @@
   .guide-subhead {
     @apply mt-2 text-sm text-muted-foreground;
   }
+  .guide-step-label {
+    @apply mt-3 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground;
+  }
+  .guide-demo-title {
+    @apply mt-2 text-2xl uppercase leading-tight;
+  }
+  .guide-demo-button {
+    @apply mt-4 min-h-11 w-full border border-foreground bg-background px-3 text-left text-sm font-semibold;
+  }
+  .guide-demo-actions {
+    @apply mt-3 grid gap-2 sm:grid-cols-2;
+  }
+  .guide-demo-actions button,
+  .guide-exit {
+    @apply min-h-11 border border-input bg-background px-3 text-sm font-semibold;
+  }
+  .guide-exit {
+    @apply mt-2 w-full;
+  }
   .guide-actions {
     @apply mt-4 grid gap-2;
   }

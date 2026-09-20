@@ -13,8 +13,12 @@ export const Route = createFileRoute("/status")({
       { title: "Repair Journey — HomeFix 313" },
       {
         name: "description",
-        content: "Track the current stage and next action for a HomeFix repair case.",
+        content: "Review the current HomeFix case stage and any items still awaiting verification.",
       },
+      { property: "og:title", content: "Repair Journey — HomeFix 313" },
+      { property: "og:description", content: "A timeline of the current HomeFix case stage." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: StatusPage,
@@ -24,11 +28,11 @@ const journeySteps = [
   "Assessment Created",
   "Repair Passport Created",
   "Potential Programs Identified",
-  "Documents Needed",
+  "Verification Review",
   "Program Referral",
   "Program Review",
-  "Repair Scheduled",
-  "Repair Completed",
+  "Partner Follow-up",
+  "Outcome Pending",
 ];
 
 function StatusPage() {
@@ -92,7 +96,7 @@ function StatusPage() {
       <PageIntro
         eyebrow={`Case ${payload.case.caseNumber}`}
         title="Repair Journey"
-        description="Follow the path from the first repair report through completion."
+        description="Review the current case stage and any items still awaiting verification."
       />
       <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_340px]">
         <ol className="border-l-2 border-foreground pl-7">
@@ -112,7 +116,7 @@ function StatusPage() {
                     <h2 className="mt-1 text-2xl">{step}</h2>
                   </div>
                   <StatusBadge tone={complete ? "positive" : current ? "warning" : "neutral"}>
-                    {complete ? "Complete" : current ? "Current step" : "Pending"}
+                    {complete ? "Complete" : current ? "Current stage" : "Pending"}
                   </StatusBadge>
                 </div>
               </li>
@@ -122,14 +126,14 @@ function StatusPage() {
         <aside className="h-fit bg-navy p-6 text-primary-foreground lg:sticky lg:top-28">
           <p className="eyebrow text-warning">Current next action</p>
           <h2 className="mt-3 text-3xl">
-            {payload.case.nextAction ?? "Review your Repair Passport"}
+            {payload.case.nextAction ?? "Review eligibility items and program fit"}
           </h2>
           <dl className="mt-8 space-y-5 text-sm">
             <Side k="Assigned program" v={assignedProgram} />
             <Side k="Last update" v={lastUpdate} />
             <Side
-              k="Documents outstanding"
-              v={`${missingDocuments} document${missingDocuments === 1 ? "" : "s"}`}
+              k="Verification items"
+              v={`${missingDocuments} item${missingDocuments === 1 ? "" : "s"} under review`}
             />
           </dl>
           <div className="mt-8">

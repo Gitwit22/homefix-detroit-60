@@ -47,11 +47,31 @@ export const residentLinks = [
 ] as const;
 
 export const partnerLinks = [
-  { to: "/partner", label: "Overview", icon: LayoutDashboard },
-  { to: "/partner/cases", label: "Repair Cases", icon: ClipboardList },
-  { to: "/partner/unmet-needs", label: "Unmet Needs", icon: AlertTriangle },
-  { to: "/partner/programs", label: "Programs", icon: Building2 },
-  { to: "/partner/overflow", label: "Overflow Jobs", icon: BriefcaseBusiness },
+  { to: "/partner", label: "Overview", icon: LayoutDashboard, guideTarget: "partner-nav-overview" },
+  {
+    to: "/partner/cases",
+    label: "Repair Cases",
+    icon: ClipboardList,
+    guideTarget: "partner-nav-cases",
+  },
+  {
+    to: "/partner/unmet-needs",
+    label: "Unmet Needs",
+    icon: AlertTriangle,
+    guideTarget: "partner-nav-unmet-needs",
+  },
+  {
+    to: "/partner/programs",
+    label: "Programs + Capacity",
+    icon: Building2,
+    guideTarget: "partner-nav-programs",
+  },
+  {
+    to: "/partner/overflow",
+    label: "Overflow Network",
+    icon: BriefcaseBusiness,
+    guideTarget: "partner-nav-overflow",
+  },
   { to: "/partner/analytics", label: "Analytics", icon: BarChart3 },
 ] as const;
 
@@ -148,12 +168,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </strong>
               </div>
               <nav aria-label="Partner navigation">
-                {partnerLinks.map(({ to, label, icon: Icon }) => (
+                {partnerLinks.map(({ to, label, icon: Icon, guideTarget }) => (
                   <Link
                     key={to}
                     to={to}
                     activeOptions={{ exact: to === "/partner" }}
                     activeProps={{ className: "is-active" }}
+                    data-guide-target={guideTarget}
                   >
                     <Icon aria-hidden="true" />
                     {label}
@@ -186,12 +207,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
         ) : (
           <nav className="partner-mobile-nav" aria-label="Partner mobile navigation">
-            {partnerLinks.map(({ to, label, icon: Icon }) => (
+            {partnerLinks.map(({ to, label, icon: Icon, guideTarget }) => (
               <Link
                 key={to}
                 to={to}
                 activeOptions={{ exact: to === "/partner" }}
                 activeProps={{ className: "is-active" }}
+                data-guide-target={guideTarget}
               >
                 <Icon aria-hidden="true" />
                 <span>{label}</span>
@@ -199,7 +221,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             ))}
           </nav>
         )}
-        {!partner && <HomeFixGuide />}
+        <HomeFixGuide />
       </div>
     </AccessibilitySettingsContext.Provider>
   );
@@ -405,9 +427,11 @@ export function RepairCategoryGrid({
 export function PhotoUploader({
   files,
   onChange,
+  dataGuideTarget,
 }: {
   files: File[];
   onChange: (files: File[]) => void;
+  dataGuideTarget?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const previews = useMemo(
@@ -434,7 +458,12 @@ export function PhotoUploader({
         onChange={(event) => onChange(Array.from(event.target.files ?? []).slice(0, 5))}
       />
       {files.length === 0 ? (
-        <button type="button" className="photo-drop" onClick={chooseFiles}>
+        <button
+          type="button"
+          className="photo-drop"
+          onClick={chooseFiles}
+          data-guide-target={dataGuideTarget}
+        >
           <Upload aria-hidden="true" />
           <strong>Add photos of the repair</strong>
           <span>Take a photo or choose images from your device</span>
@@ -463,7 +492,13 @@ export function PhotoUploader({
           })}
         </div>
       )}
-      <Button type="button" variant="outline" className="mt-4 min-h-12" onClick={chooseFiles}>
+      <Button
+        type="button"
+        variant="outline"
+        className="mt-4 min-h-12"
+        onClick={chooseFiles}
+        data-guide-target={dataGuideTarget}
+      >
         <Camera aria-hidden="true" />
         {files.length > 0 ? "Replace photos" : "Use camera"}
       </Button>

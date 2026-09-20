@@ -55,6 +55,7 @@ type RepairDraft = {
 };
 
 const demoDraftKey = "homefix:denise-carter-pitch-v1:draft";
+const intakeGuideEvent = "homefix-guide:intake-step";
 
 function createRepairDraft(index: number, useDemoDefaults = true): RepairDraft {
   if (!useDemoDefaults) {
@@ -192,6 +193,10 @@ function IntakePage() {
     applicantAge,
     repairs,
   ]);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent(intakeGuideEvent, { detail: { step } }));
+  }, [step]);
 
   const titles = [
     "Tell us about the property",
@@ -415,6 +420,7 @@ function IntakePage() {
               <div className="grid gap-6 sm:grid-cols-2">
                 <FormField label="Household size">
                   <input
+                    data-guide-target="intake-household-size"
                     type="number"
                     value={householdSize}
                     onChange={(event) => setHouseholdSize(event.target.value)}
@@ -493,6 +499,7 @@ function IntakePage() {
                     <div className="mt-6">
                       <FormField label="Describe the problem">
                         <textarea
+                          data-guide-target={index === 0 ? "intake-repair-description" : undefined}
                           rows={4}
                           value={repair.description}
                           onChange={(event) =>
@@ -557,6 +564,7 @@ function IntakePage() {
                     <PhotoUploader
                       files={repair.files}
                       onChange={(files) => updateRepair(repair.clientId, { files })}
+                      dataGuideTarget={index === 0 ? "intake-photo-upload" : undefined}
                     />
                   </section>
                 ))}
@@ -602,6 +610,7 @@ function IntakePage() {
                 setFormError("");
                 setStep(step - 1);
               }}
+              data-guide-target="intake-back"
             >
               <ArrowLeft />
               Back
@@ -610,6 +619,7 @@ function IntakePage() {
               className="min-h-12 rounded-none bg-primary px-6 text-primary-foreground"
               onClick={next}
               disabled={isSubmitting}
+              data-guide-target={step === 5 ? "intake-submit" : "intake-continue"}
             >
               {step === 4
                 ? "Continue"
