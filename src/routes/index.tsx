@@ -8,7 +8,7 @@ import {
   SectionLabel,
   StatusBadge,
 } from "@/components/homefix";
-import { startGuideDemo } from "@/components/homefix-guide";
+import { startGuideDemo } from "@/lib/homefix-guide";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
