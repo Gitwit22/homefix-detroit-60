@@ -9,7 +9,7 @@ import {
   SectionLabel,
   StatusBadge,
 } from "@/components/homefix";
-import { getPartnerAnalytics } from "@/lib/homefix-api";
+import { getPartnerAnalytics, type PartnerAnalytics } from "@/lib/homefix-api";
 import {
   capacityStatusLabels,
   caseStatusLabels,
@@ -40,7 +40,7 @@ export const Route = createFileRoute("/partner/")({
 });
 
 function PartnerDashboard() {
-  const analytics = Route.useLoaderData();
+  const analytics: PartnerAnalytics = Route.useLoaderData();
   const maximumDemand = Math.max(...analytics.byRepairType.map((metric) => metric.repairNeeds), 1);
   const maximumZipDemand = Math.max(...analytics.byZipCode.map((metric) => metric.repairNeeds), 1);
 
@@ -86,7 +86,7 @@ function PartnerDashboard() {
         </div>
         <div>
           <SectionLabel number="02">Demand by Detroit ZIP</SectionLabel>
-          <div className="blueprint-grid relative mt-6 grid min-h-[370px] grid-cols-2 place-items-center gap-4 border border-foreground bg-secondary/30 p-6 pb-16 sm:grid-cols-4">
+          <div className="blueprint-grid relative mt-6 grid min-h-92.5 grid-cols-2 place-items-center gap-4 border border-foreground bg-secondary/30 p-6 pb-16 sm:grid-cols-4">
             {analytics.byZipCode.map((metric) => {
               const size = 64 + Math.round((metric.repairNeeds / maximumZipDemand) * 54);
               return (

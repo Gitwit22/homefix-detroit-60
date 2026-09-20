@@ -11,6 +11,10 @@ import {
   repairCases,
   repairNeeds,
 } from "../db/schema.js";
+import {
+  DENISE_DEMO_SCENARIO,
+  loadSavedDemoMatch,
+} from "../demo/deniseScenario.js";
 import { evaluateProgramRules } from "./eligibility.js";
 import { normalizeRepairCategory } from "../domain/repair.js";
 
@@ -52,7 +56,10 @@ export async function runMatchingForCase(caseId: string) {
     return [];
   }
 
-  const activePrograms = await db.select().from(programs).where(eq(programs.active, true));
+  const activePrograms = await db
+    .select()
+    .from(programs)
+    .where(and(eq(programs.active, true), eq(programs.matchable, true)));
   const programIds = activePrograms.map((program) => program.id);
   const allRules =
     programIds.length > 0
@@ -78,6 +85,35 @@ export async function runMatchingForCase(caseId: string) {
 
   for (const need of needs) {
     const normalizedNeedCategory = normalizeRepairCategory(need.category);
+
+    if (foundCase.demoScenario === DENISE_DEMO_SCENARIO) {
+      const savedMatch = loadSavedDemoMatch(normalizedNeedCategory);
+      if (!savedMatch) continue;
+      const program = activePrograms.find((item) => item.slug === savedMatch.programSlug);
+      if (!program) {
+        throw new Error(`Demo program ${savedMatch.programSlug} is not available`);
+      }
+
+      await db.insert(programMatches).values({
+        repairNeedId: need.id,
+        programId: program.id,
+        matchStatus: savedMatch.matchStatus,
+        approvalStatus: savedMatch.approvalStatus,
+        approvedAt: savedMatch.approvalStatus === "approved" ? new Date() : null,
+        explanation:
+          savedMatch.matchStatus === "strong_match"
+            ? "Strong Match\nSaved synthetic demo eligibility decision"
+            : "Potential Match\nSaved synthetic demo eligibility decision",
+        missingRequirements: [],
+      });
+
+      createdMatches.push({
+        repairNeedId: need.id,
+        matchStatus: savedMatch.matchStatus,
+        programId: program.id,
+      });
+      continue;
+    }
 
     for (const program of activePrograms) {
       const supportedRepairs = allRepairTypes

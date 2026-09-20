@@ -3,6 +3,7 @@ import type { PartnerAnalytics, PartnerCaseDetail } from "../../server/domain/pa
 export type { PartnerAnalytics, PartnerCaseDetail };
 
 export type IntakePayload = {
+  demoScenario?: "denise-carter-pitch-v1";
   resident: {
     firstName: string;
     lastName: string;
@@ -133,14 +134,41 @@ export type ProgramDetailResponse = {
   slug: string | null;
   name: string;
   organization: string;
+  recordType: "resident_program" | "funding_layer";
+  governmentLevel: string | null;
+  fundingSource: string | null;
   description: string | null;
   sourceUrl: string | null;
+  applicationUrl: string | null;
+  phone: string | null;
   applicationStatus: string;
+  applicationOpenDate: string | null;
+  applicationCloseDate: string | null;
+  active: boolean;
+  matchable: boolean;
+  ownerOccupiedRequired: boolean;
+  rentersEligible: boolean;
+  landlordsEligible: boolean;
+  minimumAge: number | null;
+  childRequired: boolean;
+  disabilityRequired: boolean;
+  pregnancyQualifier: boolean;
+  incomeLimitType: string | null;
+  maxAmi: number | null;
+  taxesCurrentRequired: boolean;
+  paymentPlanAccepted: boolean;
+  geographicRestriction: string | null;
+  disasterTieBackRequired: boolean;
+  benefitType: string | null;
+  residentEntryPoint: string | null;
+  notes: string | null;
   lastVerifiedAt: string | null;
   requiredDocuments: string[];
   repairTypes: string[];
   rules: Array<{ ruleType: string; operator: string; value: unknown; required: boolean }>;
 };
+
+export type ProgramCatalogResponse = Omit<ProgramDetailResponse, "rules">[];
 
 export type OverflowBidResponse = {
   id: string;
@@ -190,7 +218,57 @@ export type OverflowJobDetailResponse = OverflowJobSummaryResponse & {
   bids: OverflowBidResponse[];
 };
 
-const apiUrl = import.meta.env.VITE_HOMEFIX_API_URL?.replace(/\/$/, "");
+export type OverflowCandidate = {
+  repairCaseId: string;
+  caseNumber: string;
+  repairNeedId: string;
+  category: string;
+  description: string;
+  priority: string;
+  streetAddress: string;
+  zipCode: string;
+  programId: string;
+  programName: string;
+  workOrderId: string | null;
+  approvalStatus: "approved";
+  capacity: {
+    status: string;
+    matchedNeeds: number;
+    simulatedCapacity: number;
+    excessDemand: number;
+  };
+  synthetic: true;
+};
+
+export type OverflowWorkOrder = {
+  id: string;
+  workOrderNumber: string;
+  repairCaseId: string;
+  repairNeedId: string;
+  scope: string;
+  priority: string;
+  status: string;
+  createdAt: string;
+  caseNumber: string;
+  category: string;
+  description: string;
+  streetAddress: string;
+  zipCode: string;
+  programName: string;
+  bids: Array<{
+    id: string;
+    contractorName: string;
+    estimatedPrice: number;
+    estimatedDurationDays: number;
+    notes: string;
+    status: string;
+    createdAt: string;
+    synthetic: true;
+  }>;
+  synthetic: true;
+};
+
+const apiUrl = import.meta.env["VITE_HOMEFIX_API_URL"]?.replace(/\/$/, "");
 
 export async function submitIntake(payload: IntakePayload): Promise<IntakeResponse> {
   if (!apiUrl) {
@@ -330,4 +408,62 @@ export async function getWorkOrderBids(jobId: string): Promise<OverflowBidRespon
   const response = await fetch(`${apiUrl}/api/v1/overflow-jobs/${encodeURIComponent(jobId)}/bids`);
   if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
   return response.json() as Promise<OverflowBidResponse[]>;
+}
+
+export async function getPrograms(): Promise<ProgramCatalogResponse> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetch(`${apiUrl}/api/v1/programs`);
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<ProgramCatalogResponse>;
+}
+
+export async function getOverflowCandidates(): Promise<OverflowCandidate[]> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetch(`${apiUrl}/api/v1/overflow/candidates`);
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<OverflowCandidate[]>;
+}
+
+export async function getOverflowWorkOrders(): Promise<OverflowWorkOrder[]> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetch(`${apiUrl}/api/v1/overflow/work-orders`);
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<OverflowWorkOrder[]>;
+}
+
+export async function getOverflowWorkOrder(workOrderId: string): Promise<OverflowWorkOrder> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetch(`${apiUrl}/api/v1/overflow/work-orders/${workOrderId}`);
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<OverflowWorkOrder>;
+}
+
+export async function createOverflowWorkOrder(repairNeedId: string): Promise<OverflowWorkOrder> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetch(`${apiUrl}/api/v1/overflow/work-orders`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ repairNeedId }),
+  });
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<OverflowWorkOrder>;
+}
+
+export async function submitOverflowBid(
+  workOrderId: string,
+  input: {
+    contractorName: string;
+    estimatedPrice: number;
+    estimatedDurationDays: number;
+    notes: string;
+  },
+): Promise<OverflowWorkOrder> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetch(`${apiUrl}/api/v1/overflow/work-orders/${workOrderId}/bids`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  return response.json() as Promise<OverflowWorkOrder>;
 }

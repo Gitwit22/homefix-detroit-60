@@ -1,7 +1,23 @@
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 
 import { db } from "../db/index.js";
 import { programRepairTypes, programRules, programs } from "../db/schema.js";
+
+export async function listProgramCatalog() {
+  const rows = await db.select().from(programs).orderBy(asc(programs.name));
+  const repairTypes = await db.select().from(programRepairTypes);
+  const typesByProgram = new Map<string, string[]>();
+  for (const item of repairTypes) {
+    const current = typesByProgram.get(item.programId) ?? [];
+    current.push(item.repairType);
+    typesByProgram.set(item.programId, current);
+  }
+
+  return rows.map((program) => ({
+    ...program,
+    repairTypes: typesByProgram.get(program.id) ?? [],
+  }));
+}
 
 export async function getProgramDetail(identifier: string) {
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -21,15 +37,7 @@ export async function getProgramDetail(identifier: string) {
   ]);
 
   return {
-    id: program.id,
-    slug: program.slug,
-    name: program.name,
-    organization: program.organization,
-    description: program.description,
-    sourceUrl: program.sourceUrl,
-    applicationStatus: program.applicationStatus,
-    lastVerifiedAt: program.lastVerifiedAt,
-    requiredDocuments: program.requiredDocuments,
+    ...program,
     repairTypes: repairTypes.map((item) => item.repairType),
     rules: rules.map((rule) => ({
       ruleType: rule.ruleType,

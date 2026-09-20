@@ -48,6 +48,7 @@ export const repairCases = pgTable("repair_cases", {
     .references(() => homes.id, { onDelete: "cascade" })
     .notNull(),
   caseNumber: text("case_number").unique().notNull(),
+  demoScenario: text("demo_scenario"),
   status: text("status").default("assessment_started").notNull(),
   currentStep: text("current_step").default("intake").notNull(),
   nextAction: text("next_action"),
@@ -107,12 +108,34 @@ export const programs = pgTable("programs", {
   slug: text("slug").unique(),
   name: text("name").notNull(),
   organization: text("organization").notNull(),
+  recordType: text("record_type").default("resident_program").notNull(),
+  governmentLevel: text("government_level"),
+  fundingSource: text("funding_source"),
   description: text("description"),
   sourceUrl: text("source_url"),
+  applicationUrl: text("application_url"),
+  phone: text("phone"),
   applicationStatus: text("application_status").default("unknown").notNull(),
   applicationOpenDate: timestamp("application_open_date", { withTimezone: true }),
   applicationCloseDate: timestamp("application_close_date", { withTimezone: true }),
   active: boolean("active").default(true).notNull(),
+  matchable: boolean("matchable").default(false).notNull(),
+  ownerOccupiedRequired: boolean("owner_occupied_required").default(false).notNull(),
+  rentersEligible: boolean("renters_eligible").default(false).notNull(),
+  landlordsEligible: boolean("landlords_eligible").default(false).notNull(),
+  minimumAge: integer("minimum_age"),
+  childRequired: boolean("child_required").default(false).notNull(),
+  disabilityRequired: boolean("disability_required").default(false).notNull(),
+  pregnancyQualifier: boolean("pregnancy_qualifier").default(false).notNull(),
+  incomeLimitType: text("income_limit_type"),
+  maxAmi: integer("max_ami"),
+  taxesCurrentRequired: boolean("taxes_current_required").default(false).notNull(),
+  paymentPlanAccepted: boolean("payment_plan_accepted").default(false).notNull(),
+  geographicRestriction: text("geographic_restriction"),
+  disasterTieBackRequired: boolean("disaster_tie_back_required").default(false).notNull(),
+  benefitType: text("benefit_type"),
+  residentEntryPoint: text("resident_entry_point"),
+  notes: text("notes"),
   lastVerifiedAt: timestamp("last_verified_at", { withTimezone: true }),
   requiredDocuments: jsonb("required_documents").$type<string[]>().default([]).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -146,6 +169,8 @@ export const programMatches = pgTable("program_matches", {
     .references(() => programs.id, { onDelete: "cascade" })
     .notNull(),
   matchStatus: text("match_status").notNull(),
+  approvalStatus: text("approval_status").default("pending").notNull(),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
   explanation: text("explanation"),
   missingRequirements: jsonb("missing_requirements"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -215,3 +240,38 @@ export const bids = pgTable(
   },
   (table) => [index("bids_work_order_id_created_at_idx").on(table.workOrderId, table.createdAt)],
 );
+
+export const overflowWorkOrders = pgTable("overflow_work_orders", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  repairCaseId: uuid("repair_case_id")
+    .references(() => repairCases.id, { onDelete: "cascade" })
+    .notNull(),
+  repairNeedId: uuid("repair_need_id")
+    .references(() => repairNeeds.id, { onDelete: "cascade" })
+    .unique()
+    .notNull(),
+  programId: uuid("program_id")
+    .references(() => programs.id, { onDelete: "restrict" })
+    .notNull(),
+  workOrderNumber: text("work_order_number").unique().notNull(),
+  scope: text("scope").notNull(),
+  priority: text("priority").notNull(),
+  status: text("status").default("open_for_bids").notNull(),
+  synthetic: boolean("synthetic").default(true).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const overflowBids = pgTable("overflow_bids", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  workOrderId: uuid("work_order_id")
+    .references(() => overflowWorkOrders.id, { onDelete: "cascade" })
+    .notNull(),
+  contractorName: text("contractor_name").notNull(),
+  estimatedPriceCents: integer("estimated_price_cents").notNull(),
+  estimatedDurationDays: integer("estimated_duration_days").notNull(),
+  notes: text("notes").notNull(),
+  status: text("status").default("submitted").notNull(),
+  synthetic: boolean("synthetic").default(true).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});

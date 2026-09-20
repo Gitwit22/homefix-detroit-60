@@ -1,1 +1,0 @@
-ALTER TABLE "work_orders" ADD CONSTRAINT "work_orders_repair_need_id_unique" UNIQUE("repair_need_id");

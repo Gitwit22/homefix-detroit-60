@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,9 @@ import { submitIntakeServer } from "@/lib/intake.server";
 import { processCase, uploadRepairPhotos } from "@/lib/homefix-api";
 
 export const Route = createFileRoute("/intake")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    demo: search["demo"] === "denise-carter-pitch-v1" ? "denise-carter-pitch-v1" : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Repair Assessment — HomeFix 313" },
@@ -51,6 +54,8 @@ type RepairDraft = {
   files: File[];
 };
 
+const demoDraftKey = "homefix:denise-carter-pitch-v1:draft";
+
 function createRepairDraft(index: number): RepairDraft {
   return {
     clientId: crypto.randomUUID(),
@@ -69,6 +74,7 @@ function createRepairDraft(index: number): RepairDraft {
 }
 
 function IntakePage() {
+  const { demo } = Route.useSearch();
   const navigate = useNavigate({ from: "/intake" });
   const [step, setStep] = useState(1);
   const [owner, setOwner] = useState("Owner");
@@ -101,6 +107,79 @@ function IntakePage() {
   const [incomeRange, setIncomeRange] = useState("$41,000-$60,000");
   const [applicantAge, setApplicantAge] = useState("68");
 
+  useEffect(() => {
+    if (!demo) return;
+    const saved = localStorage.getItem(demoDraftKey);
+    if (!saved) return;
+    try {
+      const draft = JSON.parse(saved) as {
+        step?: number;
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+        phone?: string;
+        streetAddress?: string;
+        zipCode?: string;
+        yearsAtProperty?: string;
+        householdSize?: string;
+        incomeRange?: string;
+        applicantAge?: string;
+        repairs?: Array<Omit<RepairDraft, "files">>;
+      };
+      if (draft.step && draft.step >= 1 && draft.step <= 5) setStep(draft.step);
+      if (draft.firstName) setFirstName(draft.firstName);
+      if (draft.lastName) setLastName(draft.lastName);
+      if (draft.email !== undefined) setEmail(draft.email);
+      if (draft.phone !== undefined) setPhone(draft.phone);
+      if (draft.streetAddress) setStreetAddress(draft.streetAddress);
+      if (draft.zipCode) setZipCode(draft.zipCode);
+      if (draft.yearsAtProperty) setYearsAtProperty(draft.yearsAtProperty);
+      if (draft.householdSize) setHouseholdSize(draft.householdSize);
+      if (draft.incomeRange) setIncomeRange(draft.incomeRange);
+      if (draft.applicantAge) setApplicantAge(draft.applicantAge);
+      if (draft.repairs?.length) {
+        setRepairs(draft.repairs.map((repair) => ({ ...repair, files: [] })));
+      }
+    } catch {
+      localStorage.removeItem(demoDraftKey);
+    }
+  }, [demo]);
+
+  useEffect(() => {
+    if (!demo) return;
+    localStorage.setItem(
+      demoDraftKey,
+      JSON.stringify({
+        step,
+        firstName,
+        lastName,
+        email,
+        phone,
+        streetAddress,
+        zipCode,
+        yearsAtProperty,
+        householdSize,
+        incomeRange,
+        applicantAge,
+        repairs: repairs.map(({ files: _files, ...repair }) => repair),
+      }),
+    );
+  }, [
+    demo,
+    step,
+    firstName,
+    lastName,
+    email,
+    phone,
+    streetAddress,
+    zipCode,
+    yearsAtProperty,
+    householdSize,
+    incomeRange,
+    applicantAge,
+    repairs,
+  ]);
+
   const titles = [
     "Tell us about the property",
     "Tell us about your household",
@@ -126,6 +205,7 @@ function IntakePage() {
       const response =
         createdCase ??
         (await submitIntakeServer({
+          demoScenario: demo,
           resident: { firstName, lastName, email, phone },
           property: {
             streetAddress,

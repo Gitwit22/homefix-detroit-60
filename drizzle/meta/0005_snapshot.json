@@ -1,111 +1,9 @@
 {
-  "id": "d1d6bf4c-69e0-4eca-b8f7-703f1d2b4efb",
-  "prevId": "43e5e287-2acc-47c1-bddb-fa6a18298a09",
+  "id": "b930c1f8-ba68-451a-9e84-32e167d62be1",
+  "prevId": "d3058c54-e4b2-4ee2-9efe-024745d933ab",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.bids": {
-      "name": "bids",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "work_order_id": {
-          "name": "work_order_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "contractor_name": {
-          "name": "contractor_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "company_name": {
-          "name": "company_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "estimated_price_cents": {
-          "name": "estimated_price_cents",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "estimated_duration_days": {
-          "name": "estimated_duration_days",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "notes": {
-          "name": "notes",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'submitted'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "bids_work_order_id_created_at_idx": {
-          "name": "bids_work_order_id_created_at_idx",
-          "columns": [
-            {
-              "expression": "work_order_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "bids_work_order_id_work_orders_id_fk": {
-          "name": "bids_work_order_id_work_orders_id_fk",
-          "tableFrom": "bids",
-          "tableTo": "work_orders",
-          "columnsFrom": ["work_order_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.case_events": {
       "name": "case_events",
       "schema": "",
@@ -161,8 +59,12 @@
           "name": "case_events_repair_case_id_repair_cases_id_fk",
           "tableFrom": "case_events",
           "tableTo": "repair_cases",
-          "columnsFrom": ["repair_case_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "repair_case_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -223,8 +125,12 @@
           "name": "documents_repair_case_id_repair_cases_id_fk",
           "tableFrom": "documents",
           "tableTo": "repair_cases",
-          "columnsFrom": ["repair_case_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "repair_case_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -357,14 +263,242 @@
           "name": "homes_resident_id_residents_id_fk",
           "tableFrom": "homes",
           "tableTo": "residents",
-          "columnsFrom": ["resident_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "resident_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.overflow_bids": {
+      "name": "overflow_bids",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "work_order_id": {
+          "name": "work_order_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contractor_name": {
+          "name": "contractor_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "estimated_price_cents": {
+          "name": "estimated_price_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "estimated_duration_days": {
+          "name": "estimated_duration_days",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'submitted'"
+        },
+        "synthetic": {
+          "name": "synthetic",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "overflow_bids_work_order_id_overflow_work_orders_id_fk": {
+          "name": "overflow_bids_work_order_id_overflow_work_orders_id_fk",
+          "tableFrom": "overflow_bids",
+          "tableTo": "overflow_work_orders",
+          "columnsFrom": [
+            "work_order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.overflow_work_orders": {
+      "name": "overflow_work_orders",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "repair_case_id": {
+          "name": "repair_case_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "repair_need_id": {
+          "name": "repair_need_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "program_id": {
+          "name": "program_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "work_order_number": {
+          "name": "work_order_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "priority": {
+          "name": "priority",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'open_for_bids'"
+        },
+        "synthetic": {
+          "name": "synthetic",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "overflow_work_orders_repair_case_id_repair_cases_id_fk": {
+          "name": "overflow_work_orders_repair_case_id_repair_cases_id_fk",
+          "tableFrom": "overflow_work_orders",
+          "tableTo": "repair_cases",
+          "columnsFrom": [
+            "repair_case_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "overflow_work_orders_repair_need_id_repair_needs_id_fk": {
+          "name": "overflow_work_orders_repair_need_id_repair_needs_id_fk",
+          "tableFrom": "overflow_work_orders",
+          "tableTo": "repair_needs",
+          "columnsFrom": [
+            "repair_need_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "overflow_work_orders_program_id_programs_id_fk": {
+          "name": "overflow_work_orders_program_id_programs_id_fk",
+          "tableFrom": "overflow_work_orders",
+          "tableTo": "programs",
+          "columnsFrom": [
+            "program_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "overflow_work_orders_repair_need_id_unique": {
+          "name": "overflow_work_orders_repair_need_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "repair_need_id"
+          ]
+        },
+        "overflow_work_orders_work_order_number_unique": {
+          "name": "overflow_work_orders_work_order_number_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "work_order_number"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -398,6 +532,19 @@
           "primaryKey": false,
           "notNull": true
         },
+        "approval_status": {
+          "name": "approval_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "approved_at": {
+          "name": "approved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "explanation": {
           "name": "explanation",
           "type": "text",
@@ -424,8 +571,12 @@
           "name": "program_matches_repair_need_id_repair_needs_id_fk",
           "tableFrom": "program_matches",
           "tableTo": "repair_needs",
-          "columnsFrom": ["repair_need_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "repair_need_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -433,8 +584,12 @@
           "name": "program_matches_program_id_programs_id_fk",
           "tableFrom": "program_matches",
           "tableTo": "programs",
-          "columnsFrom": ["program_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "program_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -475,8 +630,12 @@
           "name": "program_repair_types_program_id_programs_id_fk",
           "tableFrom": "program_repair_types",
           "tableTo": "programs",
-          "columnsFrom": ["program_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "program_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -536,8 +695,12 @@
           "name": "program_rules_program_id_programs_id_fk",
           "tableFrom": "program_rules",
           "tableTo": "programs",
-          "columnsFrom": ["program_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "program_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -577,6 +740,25 @@
           "primaryKey": false,
           "notNull": true
         },
+        "record_type": {
+          "name": "record_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'resident_program'"
+        },
+        "government_level": {
+          "name": "government_level",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "funding_source": {
+          "name": "funding_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "description": {
           "name": "description",
           "type": "text",
@@ -585,6 +767,18 @@
         },
         "source_url": {
           "name": "source_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "application_url": {
+          "name": "application_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone": {
+          "name": "phone",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -615,6 +809,118 @@
           "notNull": true,
           "default": true
         },
+        "matchable": {
+          "name": "matchable",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "owner_occupied_required": {
+          "name": "owner_occupied_required",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "renters_eligible": {
+          "name": "renters_eligible",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "landlords_eligible": {
+          "name": "landlords_eligible",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "minimum_age": {
+          "name": "minimum_age",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "child_required": {
+          "name": "child_required",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "disability_required": {
+          "name": "disability_required",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "pregnancy_qualifier": {
+          "name": "pregnancy_qualifier",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "income_limit_type": {
+          "name": "income_limit_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "max_ami": {
+          "name": "max_ami",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "taxes_current_required": {
+          "name": "taxes_current_required",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "payment_plan_accepted": {
+          "name": "payment_plan_accepted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "geographic_restriction": {
+          "name": "geographic_restriction",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "disaster_tie_back_required": {
+          "name": "disaster_tie_back_required",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "benefit_type": {
+          "name": "benefit_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resident_entry_point": {
+          "name": "resident_entry_point",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "last_verified_at": {
           "name": "last_verified_at",
           "type": "timestamp with time zone",
@@ -643,7 +949,9 @@
         "programs_slug_unique": {
           "name": "programs_slug_unique",
           "nullsNotDistinct": false,
-          "columns": ["slug"]
+          "columns": [
+            "slug"
+          ]
         }
       },
       "policies": {},
@@ -729,8 +1037,12 @@
           "name": "repair_assessments_repair_need_id_repair_needs_id_fk",
           "tableFrom": "repair_assessments",
           "tableTo": "repair_needs",
-          "columnsFrom": ["repair_need_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "repair_need_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -763,6 +1075,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "demo_scenario": {
+          "name": "demo_scenario",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "status": {
           "name": "status",
@@ -812,8 +1130,12 @@
           "name": "repair_cases_home_id_homes_id_fk",
           "tableFrom": "repair_cases",
           "tableTo": "homes",
-          "columnsFrom": ["home_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "home_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -823,7 +1145,9 @@
         "repair_cases_case_number_unique": {
           "name": "repair_cases_case_number_unique",
           "nullsNotDistinct": false,
-          "columns": ["case_number"]
+          "columns": [
+            "case_number"
+          ]
         }
       },
       "policies": {},
@@ -907,8 +1231,12 @@
           "name": "repair_needs_repair_case_id_repair_cases_id_fk",
           "tableFrom": "repair_needs",
           "tableTo": "repair_cases",
-          "columnsFrom": ["repair_case_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "repair_case_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -992,8 +1320,12 @@
           "name": "repair_photos_repair_need_id_repair_needs_id_fk",
           "tableFrom": "repair_photos",
           "tableTo": "repair_needs",
-          "columnsFrom": ["repair_need_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "repair_need_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1003,7 +1335,9 @@
         "repair_photos_public_id_unique": {
           "name": "repair_photos_public_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["public_id"]
+          "columns": [
+            "public_id"
+          ]
         }
       },
       "policies": {},
@@ -1064,149 +1398,6 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.work_orders": {
-      "name": "work_orders",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "repair_case_id": {
-          "name": "repair_case_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "repair_need_id": {
-          "name": "repair_need_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "program_id": {
-          "name": "program_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "work_order_number": {
-          "name": "work_order_number",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "repair_type": {
-          "name": "repair_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "scope": {
-          "name": "scope",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "priority": {
-          "name": "priority",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "funding_status": {
-          "name": "funding_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'program_approved'"
-        },
-        "capacity_status": {
-          "name": "capacity_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'overflow'"
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'open'"
-        },
-        "is_synthetic": {
-          "name": "is_synthetic",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "work_orders_repair_case_id_repair_cases_id_fk": {
-          "name": "work_orders_repair_case_id_repair_cases_id_fk",
-          "tableFrom": "work_orders",
-          "tableTo": "repair_cases",
-          "columnsFrom": ["repair_case_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "work_orders_repair_need_id_repair_needs_id_fk": {
-          "name": "work_orders_repair_need_id_repair_needs_id_fk",
-          "tableFrom": "work_orders",
-          "tableTo": "repair_needs",
-          "columnsFrom": ["repair_need_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "work_orders_program_id_programs_id_fk": {
-          "name": "work_orders_program_id_programs_id_fk",
-          "tableFrom": "work_orders",
-          "tableTo": "programs",
-          "columnsFrom": ["program_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "work_orders_repair_need_id_unique": {
-          "name": "work_orders_repair_need_id_unique",
-          "nullsNotDistinct": false,
-          "columns": ["repair_need_id"]
-        },
-        "work_orders_work_order_number_unique": {
-          "name": "work_orders_work_order_number_unique",
-          "nullsNotDistinct": false,
-          "columns": ["work_order_number"]
-        }
-      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
