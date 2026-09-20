@@ -405,7 +405,7 @@ Create a Pages project from this repository with:
 - Node version: `22.12.0`
 
 Set `VITE_HOMEFIX_API_URL` as a Pages build variable using the Render service
-origin, for example `https://homefix-api.onrender.com`. Set
+origin, `https://homefix-api-n869.onrender.com`. Set
 `VITE_HOMEFIX_DEMO_MODE=1` to show the optional session and wipe controls on the
 home page. These values are public by design; do not add `DATABASE_URL` or any
 private credential to Cloudflare. Pages injects `VITE_HOMEFIX_API_URL` at build
@@ -420,10 +420,10 @@ data for `homefix-erd.pages.dev` is the immediate workaround.
 
 For a partner deployment smoke test, verify these in order:
 
-1. `GET https://homefix-api.onrender.com/health` returns `200`.
-2. `GET https://homefix-api.onrender.com/api/v1/partner-analytics` returns
+1. `GET https://homefix-api-n869.onrender.com/health` returns `200`.
+2. `GET https://homefix-api-n869.onrender.com/api/v1/partner-analytics` returns
    valid JSON.
-3. `GET https://homefix-api.onrender.com/api/v1/partner-cases/:caseId` returns
+3. `GET https://homefix-api-n869.onrender.com/api/v1/partner-cases/:caseId` returns
    the expected case or a deliberate `404`.
 4. Open `/partner`, `/partner/cases`, and a known case on Cloudflare Pages.
 
