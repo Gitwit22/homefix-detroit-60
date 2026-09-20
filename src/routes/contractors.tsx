@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, BriefcaseBusiness, KeyRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, BriefcaseBusiness, Eye, KeyRound } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { DemoFlag } from "@/components/homefix";
@@ -133,6 +133,21 @@ function ContractorAccessPage() {
                 <ArrowRight aria-hidden="true" />
               </Button>
             </form>
+            <div className="my-5 flex items-center gap-3 text-xs font-bold uppercase text-muted-foreground">
+              <span className="h-px flex-1 bg-border" />
+              Or
+              <span className="h-px flex-1 bg-border" />
+            </div>
+            <Button asChild variant="outline" className="min-h-12 w-full rounded-none">
+              <Link to="/contractor-jobs">
+                <Eye aria-hidden="true" />
+                Browse Jobs as Guest
+              </Link>
+            </Button>
+            <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+              Preview available work without an account. Resident names, contact details, and
+              street addresses stay hidden.
+            </p>
             <p className="mt-5 text-xs leading-relaxed text-muted-foreground">
               Buildathon access only. This is not contractor verification or official government
               procurement.

@@ -1,6 +1,13 @@
 import type { PartnerAnalytics, PartnerCaseDetail } from "../../server/domain/partnerAnalytics";
 import type { CaseLifecycle } from "../../server/domain/lifecycle";
 import {
+  DEFAULT_PARTNER_DEMO_SEED,
+  PARTNER_DEMO_GENERATED_AT,
+  generateSyntheticPartnerDataset,
+  syntheticProgramCapacities,
+} from "../../server/demo/partnerDataset";
+import { calculatePartnerAnalytics } from "../../server/services/partnerAnalytics";
+import {
   HomeFixApiError,
   homeFixApiError,
   requestJsonWithOptionalSession,
@@ -433,6 +440,13 @@ async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
   return requestWithTimeout((signal) => fetch(input, { ...init, signal }), requestTimeoutMs);
 }
 
+function isApiUnavailable(error: unknown) {
+  return (
+    error instanceof TypeError ||
+    (error instanceof DOMException && error.name === "AbortError")
+  );
+}
+
 async function partnerFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   const session = getStoredContractorSession();
   const headers = new Headers(init.headers);
@@ -458,9 +472,15 @@ export async function openContractorAccess(
 
 export async function validateContractorAccess(): Promise<ContractorSession> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await partnerFetch(`${apiUrl}/api/v1/contractor-access`);
-  if (!response.ok) throw await homeFixApiError(response);
-  return response.json() as Promise<ContractorSession>;
+  try {
+    const response = await partnerFetch(`${apiUrl}/api/v1/contractor-access`);
+    if (!response.ok) throw await homeFixApiError(response);
+    return response.json() as Promise<ContractorSession>;
+  } catch (error) {
+    const session = getStoredContractorSession();
+    if (session && isApiUnavailable(error)) return session;
+    throw error;
+  }
 }
 
 export async function getPublicOpportunities(filters: {
@@ -760,9 +780,23 @@ export async function getPartnerAnalytics(
 ): Promise<PartnerAnalytics> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
   const query = source === "combined" ? "" : `?source=${source}`;
-  const response = await partnerFetch(`${apiUrl}/api/v1/partner-analytics${query}`);
-  if (!response.ok) throw await homeFixApiError(response);
-  return response.json() as Promise<PartnerAnalytics>;
+  try {
+    const response = await partnerFetch(`${apiUrl}/api/v1/partner-analytics${query}`);
+    if (!response.ok) throw await homeFixApiError(response);
+    return response.json() as Promise<PartnerAnalytics>;
+  } catch (error) {
+    if (!isApiUnavailable(error)) throw error;
+    return {
+      ...calculatePartnerAnalytics(
+        generateSyntheticPartnerDataset(),
+        syntheticProgramCapacities,
+        DEFAULT_PARTNER_DEMO_SEED,
+        PARTNER_DEMO_GENERATED_AT,
+      ),
+      degraded: true,
+      warning: "The live partner service is unavailable; showing baseline planning data.",
+    };
+  }
 }
 
 export async function getPartnerCase(

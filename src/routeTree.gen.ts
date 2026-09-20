@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AssessmentRouteImport } from './routes/assessment'
+import { Route as ContractorJobsRouteImport } from './routes/contractor-jobs'
 import { Route as ContractorsRouteImport } from './routes/contractors'
 import { Route as CoverageRouteImport } from './routes/coverage'
 import { Route as InspectionRouteImport } from './routes/inspection'
@@ -40,6 +41,11 @@ const IndexRoute = IndexRouteImport.update({
 const AssessmentRoute = AssessmentRouteImport.update({
   id: '/assessment',
   path: '/assessment',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContractorJobsRoute = ContractorJobsRouteImport.update({
+  id: '/contractor-jobs',
+  path: '/contractor-jobs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContractorsRoute = ContractorsRouteImport.update({
@@ -146,6 +152,7 @@ const PartnerOverflowJobIdRoute = PartnerOverflowJobIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/assessment': typeof AssessmentRoute
+  '/contractor-jobs': typeof ContractorJobsRoute
   '/contractors': typeof ContractorsRoute
   '/coverage': typeof CoverageRoute
   '/inspection': typeof InspectionRoute
@@ -170,6 +177,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/assessment': typeof AssessmentRoute
+  '/contractor-jobs': typeof ContractorJobsRoute
   '/contractors': typeof ContractorsRoute
   '/coverage': typeof CoverageRoute
   '/inspection': typeof InspectionRoute
@@ -192,6 +200,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/assessment': typeof AssessmentRoute
+  '/contractor-jobs': typeof ContractorJobsRoute
   '/contractors': typeof ContractorsRoute
   '/coverage': typeof CoverageRoute
   '/inspection': typeof InspectionRoute
@@ -218,6 +227,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/assessment'
+    | '/contractor-jobs'
     | '/contractors'
     | '/coverage'
     | '/inspection'
@@ -242,6 +252,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/assessment'
+    | '/contractor-jobs'
     | '/contractors'
     | '/coverage'
     | '/inspection'
@@ -263,6 +274,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/assessment'
+    | '/contractor-jobs'
     | '/contractors'
     | '/coverage'
     | '/inspection'
@@ -288,6 +300,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AssessmentRoute: typeof AssessmentRoute
+  ContractorJobsRoute: typeof ContractorJobsRoute
   ContractorsRoute: typeof ContractorsRoute
   CoverageRoute: typeof CoverageRoute
   InspectionRoute: typeof InspectionRoute
@@ -312,6 +325,13 @@ declare module '@tanstack/react-router' {
       path: '/assessment'
       fullPath: '/assessment'
       preLoaderRoute: typeof AssessmentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contractor-jobs': {
+      id: '/contractor-jobs'
+      path: '/contractor-jobs'
+      fullPath: '/contractor-jobs'
+      preLoaderRoute: typeof ContractorJobsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contractors': {
@@ -513,6 +533,7 @@ const PartnerRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AssessmentRoute: AssessmentRoute,
+  ContractorJobsRoute: ContractorJobsRoute,
   ContractorsRoute: ContractorsRoute,
   CoverageRoute: CoverageRoute,
   InspectionRoute: InspectionRoute,
