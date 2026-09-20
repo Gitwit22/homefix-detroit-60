@@ -19,6 +19,15 @@ import {
   calculatePartnerAnalytics,
   getPartnerCaseDetail,
 } from "../../server/services/partnerAnalytics.js";
+import {
+  createOverflowWorkOrder,
+  createOverflowWorkOrderSchema,
+  getOverflowWorkOrder,
+  listOverflowCandidates,
+  listOverflowWorkOrders,
+  submitOverflowBid,
+  submitOverflowBidSchema,
+} from "../../server/services/overflow.js";
 
 const port = parsePort(process.env.PORT);
 const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGINS);
@@ -136,6 +145,71 @@ const server = createServer(async (request, response) => {
 
   if (method === "GET" && requestUrl.pathname === "/api/v1/partner-analytics") {
     sendJson(response, 200, partnerAnalytics);
+    return;
+  }
+
+  if (method === "GET" && requestUrl.pathname === "/api/v1/overflow/candidates") {
+    try {
+      sendJson(response, 200, await listOverflowCandidates());
+    } catch (error) {
+      console.error(error);
+      sendJson(response, 500, { error: "Unable to load overflow candidates" });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === "/api/v1/overflow/work-orders") {
+    try {
+      if (method === "GET") {
+        sendJson(response, 200, await listOverflowWorkOrders());
+        return;
+      }
+      if (method === "POST") {
+        const input = createOverflowWorkOrderSchema.parse(await readJson(request));
+        sendJson(response, 201, await createOverflowWorkOrder(input));
+        return;
+      }
+    } catch (error) {
+      console.error(error);
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Unable to create overflow work order",
+      });
+      return;
+    }
+  }
+
+  const overflowBidMatch = requestUrl.pathname.match(
+    /^\/api\/v1\/overflow\/work-orders\/([0-9a-f-]+)\/bids$/i,
+  );
+  if (method === "POST" && overflowBidMatch) {
+    try {
+      const input = submitOverflowBidSchema.parse(await readJson(request));
+      const payload = await submitOverflowBid(overflowBidMatch[1]!, input);
+      sendJson(response, 201, payload);
+    } catch (error) {
+      console.error(error);
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Unable to submit overflow bid",
+      });
+    }
+    return;
+  }
+
+  const overflowWorkOrderMatch = requestUrl.pathname.match(
+    /^\/api\/v1\/overflow\/work-orders\/([0-9a-f-]+)$/i,
+  );
+  if (method === "GET" && overflowWorkOrderMatch) {
+    try {
+      const payload = await getOverflowWorkOrder(overflowWorkOrderMatch[1]!);
+      if (!payload) {
+        sendJson(response, 404, { error: "Overflow work order not found" });
+        return;
+      }
+      sendJson(response, 200, payload);
+    } catch (error) {
+      console.error(error);
+      sendJson(response, 500, { error: "Unable to load overflow work order" });
+    }
     return;
   }
 

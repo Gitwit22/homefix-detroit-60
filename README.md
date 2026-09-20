@@ -344,6 +344,9 @@ Create a Render Blueprint from `render.yaml`, then set:
 - `DATABASE_URL` to the HomeFix Postgres connection string.
 - `CORS_ORIGINS` to the comma-separated frontend origins allowed to submit
   intake data, such as `https://homefix-detroit-60.pages.dev`.
+- `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, and
+   `R2_BUCKET_NAME` to a private Cloudflare R2 bucket and an object read/write
+   API token.
 
 Render supplies `PORT`; do not set it manually. The service health check is
 `/health` and intake submissions use `POST /api/v1/intakes`.
@@ -386,7 +389,7 @@ npm run dev
 
 ### Sprint 2–3 local setup
 
-Copy `.env.example` to `.env.local` and configure Neon, Cloudinary, and the public API URL. Then initialize the database before starting the API:
+Copy `.env.example` to `.env.local` and configure Neon, Cloudflare R2, and the public API URL. Then initialize the database before starting the API:
 
 ```sh
 npm run db:deploy
@@ -396,7 +399,7 @@ npm run dev
 
 `db:deploy` applies additive Drizzle migrations and idempotently seeds 18 managed Detroit-area records: nine current resident-facing programs, seven closed or transitioning programs, and two non-application funding layers. Program application windows change frequently: verify every official `sourceUrl`, `applicationStatus`, rule threshold, and `lastVerifiedAt` value before a public demonstration. Only records explicitly marked `matchable` enter eligibility and coverage; closed programs, inquiry-only programs, and funding layers remain visible without producing matches.
 
-Repair photos are uploaded through the Render API to authenticated Cloudinary assets. Accepted formats are JPEG, PNG, and WebP, with a maximum of five files per repair and 10 MB per file. Cloudinary credentials belong only on Render or in the local API environment; never expose them through `VITE_*` variables.
+Repair photos are uploaded through the Render API to a private Cloudflare R2 bucket. Accepted formats are JPEG, PNG, and WebP, with a maximum of five files per repair and 10 MB per file. The API returns short-lived signed image URLs; R2 credentials belong only on Render or in the local API environment and must never use a `VITE_*` prefix. Existing Cloudinary-backed database records continue using their stored URLs, but new uploads are written only to R2.
 
 Import `n8n/homefix-triage.workflow.json` into n8n, set `N8N_HOMEFIX_SECRET`, `OPENAI_API_KEY`, and optionally `HOMEFIX_AI_MODEL`, then set the production webhook URL as `N8N_TRIAGE_WEBHOOK_URL` on Render. HomeFix validates the structured response and uses a conservative category-specific saved assessment if n8n is unavailable, times out, or returns invalid JSON. Eligibility and coverage remain deterministic database services and never depend on AI output.
 

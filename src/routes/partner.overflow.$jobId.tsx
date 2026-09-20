@@ -1,7 +1,175 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Calendar, Camera, MapPin, ShieldCheck, Wrench } from "lucide-react";
+import { Send } from "lucide-react";
+import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { DemoFlag, PageIntro, PriorityBadge, SectionLabel, StatusBadge } from "@/components/homefix";
-import { overflowJobs } from "@/lib/demo-data";
-export const Route=createFileRoute("/partner/overflow/$jobId")({head:({params})=>({meta:[{title:`Overflow Job ${params.jobId} — HomeFix 313`},{name:"description",content:"Future demo job package for home repair capacity coordination."},{property:"og:title",content:`Overflow Job ${params.jobId} — HomeFix 313`},{property:"og:description",content:"A future HomeFix Overflow Network job package."},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary_large_image"}]}),component:Job});
-function Job(){const {jobId}=Route.useParams();const j=overflowJobs.find(x=>x.id===jobId)??overflowJobs[0];return <><DemoFlag/><PageIntro eyebrow="HomeFix Overflow Network · Future / Demo Feature" title={`HF Job ${j.id}`} description={`${j.repair} · ${j.zip}`} action={<PriorityBadge priority={j.priority}/>}/><div className="mt-8 grid gap-10 xl:grid-cols-[1fr_360px]"><div><div className="mock-damage-photo min-h-80"><div className="water-mark"/><span>Repair documentation photo</span></div><section className="mt-10"><SectionLabel number="01">Repair information</SectionLabel><div className="mt-5 divide-y divide-border border-y border-border"><Row k="Repair category" v={j.repair}/><Row k="Priority" v={j.priority}/><Row k="Neighborhood / ZIP" v={`East Side · ${j.zip}`}/><Row k="Preliminary assessment" v="Visible ceiling water damage may indicate active roof or exterior water intrusion."/><Row k="Proposed scope" v="Site assessment, roof-envelope evaluation, moisture review, and repair estimate."/><Row k="Desired completion period" v="Within 30–45 days after authorization"/></div></section></div><aside className="space-y-6"><div className="bg-secondary p-6"><p className="eyebrow">Program information</p><h2 className="mt-3 text-2xl">{j.program}</h2><dl className="mt-5 space-y-4"><Side k="Administrator" v="HomeFix demo partner"/><Side k="Procurement status" v="Concept review only"/><Side k="Job status" v={j.status}/></dl></div><div className="grid gap-2"><Button className="min-h-12 rounded-none bg-primary"><Camera/>Request Site Assessment</Button><Button variant="outline" className="min-h-12 rounded-none"><Wrench/>Submit Estimate / Bid</Button></div><div className="border-l-4 border-warning bg-warning/15 p-4 text-xs leading-relaxed">Contractor participation would be limited to organizations meeting applicable program and procurement requirements.</div></aside></div></>};function Row({k,v}:{k:string;v:string}){return <div className="grid gap-2 py-5 sm:grid-cols-[190px_1fr]"><dt className="text-xs font-bold uppercase text-muted-foreground">{k}</dt><dd>{v}</dd></div>};function Side({k,v}:{k:string;v:string}){return <div><dt className="text-[10px] uppercase text-muted-foreground">{k}</dt><dd className="mt-1 font-semibold">{v}</dd></div>}
+import {
+  DemoFlag,
+  PageIntro,
+  PriorityBadge,
+  SectionLabel,
+  StatusBadge,
+} from "@/components/homefix";
+import {
+  getOverflowWorkOrder,
+  submitOverflowBid,
+  type OverflowWorkOrder,
+} from "@/lib/homefix-api";
+import { toRepairCategoryLabel } from "@/lib/repair-categories";
+export const Route = createFileRoute("/partner/overflow/$jobId")({
+  loader: ({ params }) => getOverflowWorkOrder(params.jobId),
+  head: ({ params }) => ({
+    meta: [
+      { title: `Overflow Job ${params.jobId} — HomeFix 313` },
+      {
+        name: "description",
+        content: "Future demo job package for home repair capacity coordination.",
+      },
+      { property: "og:title", content: `Overflow Job ${params.jobId} — HomeFix 313` },
+      { property: "og:description", content: "A future HomeFix Overflow Network job package." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
+  component: Job,
+});
+function Job() {
+  const initial = Route.useLoaderData();
+  const [workOrder, setWorkOrder] = useState<OverflowWorkOrder>(initial);
+  const [contractorName, setContractorName] = useState("Detroit Roofing Cooperative");
+  const [estimatedPrice, setEstimatedPrice] = useState("18500");
+  const [estimatedDurationDays, setEstimatedDurationDays] = useState("14");
+  const [notes, setNotes] = useState("Can begin site assessment within five business days.");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSubmitting(true);
+    setError("");
+    try {
+      const updated = await submitOverflowBid(workOrder.id, {
+        contractorName,
+        estimatedPrice: Number(estimatedPrice),
+        estimatedDurationDays: Number(estimatedDurationDays),
+        notes,
+      });
+      setWorkOrder(updated);
+    } catch (caught) {
+      console.error(caught);
+      setError("Unable to submit this bid. Check the fields and retry.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <>
+      <DemoFlag />
+      <PageIntro
+        eyebrow={`Overflow Job ${workOrder.workOrderNumber}`}
+        title={workOrder.streetAddress}
+        description={`${toRepairCategoryLabel(workOrder.category)} · ${workOrder.zipCode}`}
+        action={<PriorityBadge priority="High" />}
+      />
+      <div className="mt-8 grid gap-10 xl:grid-cols-[1fr_380px]">
+        <div>
+          <div className="mock-damage-photo min-h-80">
+            <span>Roof repair documentation</span>
+          </div>
+          <section className="mt-10">
+            <SectionLabel number="01">Approved job package</SectionLabel>
+            <dl className="mt-5 divide-y divide-border border-y border-border">
+              <Row label="Case" value={workOrder.caseNumber} />
+              <Row label="Program" value={workOrder.programName} />
+              <Row label="Approval" value="Program Approved" />
+              <Row label="Scope" value={workOrder.scope} />
+              <Row label="Status" value={workOrder.status.replaceAll("_", " ")} />
+            </dl>
+          </section>
+          <section className="mt-10">
+            <SectionLabel number="02">Submitted bids</SectionLabel>
+            <div className="mt-5 divide-y divide-border border-y border-border">
+              {workOrder.bids.length === 0 ? (
+                <p className="py-6 text-muted-foreground">No contractor bids submitted yet.</p>
+              ) : (
+                workOrder.bids.map((bid) => (
+                  <article key={bid.id} className="py-6">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <h2 className="text-2xl">{bid.contractorName}</h2>
+                      <StatusBadge tone="positive">Submitted</StatusBadge>
+                    </div>
+                    <p className="mt-3 font-semibold">
+                      ${bid.estimatedPrice.toLocaleString()} · {bid.estimatedDurationDays} days
+                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">{bid.notes}</p>
+                  </article>
+                ))
+              )}
+            </div>
+          </section>
+        </div>
+        <aside>
+          <form onSubmit={submit} className="border border-foreground p-6">
+            <p className="eyebrow">Contractor demo view</p>
+            <h2 className="mt-2 text-3xl">Submit Estimate / Bid</h2>
+            <Field label="Contractor name">
+              <input
+                required
+                value={contractorName}
+                onChange={(event) => setContractorName(event.target.value)}
+              />
+            </Field>
+            <Field label="Estimated price">
+              <input
+                required
+                min="1"
+                step="0.01"
+                type="number"
+                value={estimatedPrice}
+                onChange={(event) => setEstimatedPrice(event.target.value)}
+              />
+            </Field>
+            <Field label="Estimated duration in days">
+              <input
+                required
+                min="1"
+                type="number"
+                value={estimatedDurationDays}
+                onChange={(event) => setEstimatedDurationDays(event.target.value)}
+              />
+            </Field>
+            <Field label="Notes">
+              <textarea
+                required
+                rows={4}
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+              />
+            </Field>
+            {error && <p className="mt-4 text-sm font-semibold text-rust">{error}</p>}
+            <Button className="mt-6 min-h-12 w-full rounded-none" disabled={isSubmitting}>
+              <Send /> {isSubmitting ? "Submitting..." : "Submit Bid"}
+            </Button>
+          </form>
+        </aside>
+      </div>
+    </>
+  );
+}
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid gap-2 py-5 sm:grid-cols-[190px_1fr]">
+      <dt className="text-xs font-bold uppercase text-muted-foreground">{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="mt-5 block text-sm font-bold">
+      {label}
+      <span className="mt-2 block">{children}</span>
+    </label>
+  );
+}

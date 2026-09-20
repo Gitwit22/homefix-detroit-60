@@ -29,6 +29,20 @@
       "when": 1789858850697,
       "tag": "0003_absurd_the_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789869485713,
+      "tag": "0004_awesome_firestar",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789869579950,
+      "tag": "0005_nice_typhoid_mary",
+      "breakpoints": true
     }
   ]
 }

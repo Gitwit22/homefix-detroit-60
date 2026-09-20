@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { db } from "../db/index.js";
 import { homes, repairCases, repairNeeds, residents } from "../db/schema.js";
+import { DENISE_DEMO_SCENARIO } from "../demo/deniseScenario.js";
 import { normalizeRepairCategory } from "../domain/repair.js";
 
 export const intakeSchema = z.object({
+  demoScenario: z.literal(DENISE_DEMO_SCENARIO).optional(),
   resident: z.object({
     firstName: z.string().min(1),
     lastName: z.string().min(1),
@@ -96,6 +98,7 @@ export async function createIntakeCase(payload: z.infer<typeof intakeSchema>) {
     .values({
       homeId,
       caseNumber,
+      demoScenario: payload.demoScenario ?? null,
       status: "assessment_started",
       currentStep: "intake",
       nextAction: "Preliminary review pending",

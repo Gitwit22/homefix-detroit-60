@@ -1,0 +1,1 @@
+ALTER TABLE "repair_cases" ADD COLUMN "demo_scenario" text;

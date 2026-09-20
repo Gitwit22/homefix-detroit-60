@@ -7,6 +7,62 @@ process.env.DATABASE_URL ||= "postgresql://test:test@localhost/test";
 
 const { fallbackTriage } = await import("./triage.js");
 const { evaluateProgramRules } = await import("./eligibility.js");
+const { createOverflowWorkOrderSchema, submitOverflowBidSchema } = await import("./overflow.js");
+const { loadSavedDemoAssessment, loadSavedDemoMatch } = await import(
+  "../demo/deniseScenario.js"
+);
+
+test("saved Denise assessments are deterministic and isolated per call", () => {
+  const first = loadSavedDemoAssessment("roof_water_intrusion");
+  const second = loadSavedDemoAssessment("roof_water_intrusion");
+
+  assert.ok(first);
+  assert.deepEqual(first, second);
+  assert.notEqual(first, second);
+  assert.equal(first.repairCategory, "roof_water_intrusion");
+  assert.equal(first.urgency, "high");
+  assert.ok(first.observations.some((observation) => /water/i.test(observation)));
+  assert.equal(loadSavedDemoAssessment("plumbing"), null);
+});
+
+test("saved Denise matches produce two covered needs and an electrical funding gap", () => {
+  const categories = ["roof_water_intrusion", "hvac", "electrical"] as const;
+  const matches = categories.map((category) => loadSavedDemoMatch(category));
+
+  assert.equal(matches.filter(Boolean).length, 2);
+  assert.equal(Math.round((matches.filter(Boolean).length / categories.length) * 100), 67);
+  assert.deepEqual(matches[0], {
+    programSlug: "critical-home-repair",
+    matchStatus: "strong_match",
+    approvalStatus: "approved",
+  });
+  assert.equal(matches[2], null);
+});
+
+test("Overflow requests enforce the minimal job and bid contract", () => {
+  assert.equal(
+    createOverflowWorkOrderSchema.safeParse({ repairNeedId: "not-a-uuid" }).success,
+    false,
+  );
+  assert.equal(
+    submitOverflowBidSchema.safeParse({
+      contractorName: "Detroit Roofing Cooperative",
+      estimatedPrice: 18_500,
+      estimatedDurationDays: 14,
+      notes: "Can begin within five business days.",
+    }).success,
+    true,
+  );
+  assert.equal(
+    submitOverflowBidSchema.safeParse({
+      contractorName: "D",
+      estimatedPrice: -1,
+      estimatedDurationDays: 0,
+      notes: "",
+    }).success,
+    false,
+  );
+});
 
 test("fallback triage remains conservative and honors resident safety answers", () => {
   const result = fallbackTriage({

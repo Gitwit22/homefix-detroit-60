@@ -14,6 +14,16 @@ import {
 } from "../db/schema.js";
 import { signedPhotoUrl } from "./photos.js";
 
+async function displayPhotoUrl(photo: { publicId: string | null; imageUrl: string }) {
+  if (!photo.publicId || !photo.imageUrl.startsWith("r2://")) return photo.imageUrl;
+  try {
+    return await signedPhotoUrl(photo.publicId);
+  } catch (error) {
+    console.error("Unable to sign repair photo URL", error);
+    return photo.imageUrl;
+  }
+}
+
 export async function getCaseAggregate(caseId: string) {
   const caseRow = await db.select().from(repairCases).where(eq(repairCases.id, caseId)).limit(1);
   const foundCase = caseRow[0];
@@ -70,14 +80,16 @@ export async function getCaseAggregate(caseId: string) {
     resident,
     home,
     repairNeeds: needs,
-    photos: photos.map((photo) => ({
-      id: photo.id,
-      repairNeedId: photo.repairNeedId,
-      imageUrl: photo.publicId ? signedPhotoUrl(photo.publicId) : photo.imageUrl,
-      originalFilename: photo.originalFilename,
-      width: photo.width,
-      height: photo.height,
-    })),
+    photos: await Promise.all(
+      photos.map(async (photo) => ({
+        id: photo.id,
+        repairNeedId: photo.repairNeedId,
+        imageUrl: await displayPhotoUrl(photo),
+        originalFilename: photo.originalFilename,
+        width: photo.width,
+        height: photo.height,
+      })),
+    ),
     assessments,
     matches: matchRows.map(({ match, program }) => ({ ...match, program })),
     documents: caseDocuments,

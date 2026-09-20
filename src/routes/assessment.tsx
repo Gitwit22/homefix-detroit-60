@@ -1,7 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle, CheckCircle2, Droplets, HelpCircle } from "lucide-react";
-import { DemoFlag, Disclaimer, PriorityBadge, SectionLabel } from "@/components/homefix";
+import {
+  DemoFlag,
+  Disclaimer,
+  PriorityBadge,
+  SectionLabel,
+  StatusBadge,
+} from "@/components/homefix";
 import { getCase } from "@/lib/homefix-api";
 import { runTriageServer } from "@/lib/triage.server";
 import { toRepairCategoryLabel } from "@/lib/repair-categories";
@@ -158,7 +164,14 @@ function AssessmentPage() {
                 : "Preliminary"
             }
           />
-          <Result label="Model" value={assessment?.model ?? "homefix-triage-v1"} />
+          <Result
+            label="Analysis source"
+            value={
+              assessment?.model === "homefix-saved-demo-v1"
+                ? "Saved demo fallback"
+                : "Live AI analysis"
+            }
+          />
         </div>
       </section>
       <section className="py-12">
@@ -194,14 +207,42 @@ function AssessmentPage() {
           </Finding>
         </div>
       </section>
+      <section className="border-t border-foreground py-10">
+        <SectionLabel number="02">Potential programs found</SectionLabel>
+        <div className="mt-6 divide-y divide-border border-y border-border">
+          {payload.matches.length === 0 ? (
+            <p className="py-5 text-muted-foreground">No current program paths identified.</p>
+          ) : (
+            payload.matches.map((match) => (
+              <div
+                key={match.id}
+                className="grid gap-3 py-5 sm:grid-cols-[1fr_auto] sm:items-center"
+              >
+                <div>
+                  <h2 className="text-xl">{match.program.name}</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {toRepairCategoryLabel(
+                      payload.repairNeeds.find((need) => need.id === match.repairNeedId)?.category ??
+                        "other",
+                    )}
+                  </p>
+                </div>
+                <StatusBadge tone={match.matchStatus === "strong_match" ? "positive" : "info"}>
+                  {match.matchStatus === "strong_match" ? "Strong Match" : "Potential Match"}
+                </StatusBadge>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
       <Disclaimer />
       <div className="mt-8">
         <Link
           className="blueprint-button button-primary inline-flex items-center"
-          to="/coverage"
+          to="/passport"
           search={{ caseId }}
         >
-          View Coverage Plan
+          Open Repair Passport
         </Link>
       </div>
     </div>

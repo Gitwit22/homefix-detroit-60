@@ -47,6 +47,7 @@ export const repairCases = pgTable("repair_cases", {
     .references(() => homes.id, { onDelete: "cascade" })
     .notNull(),
   caseNumber: text("case_number").unique().notNull(),
+  demoScenario: text("demo_scenario"),
   status: text("status").default("assessment_started").notNull(),
   currentStep: text("current_step").default("intake").notNull(),
   nextAction: text("next_action"),
@@ -167,6 +168,8 @@ export const programMatches = pgTable("program_matches", {
     .references(() => programs.id, { onDelete: "cascade" })
     .notNull(),
   matchStatus: text("match_status").notNull(),
+  approvalStatus: text("approval_status").default("pending").notNull(),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
   explanation: text("explanation"),
   missingRequirements: jsonb("missing_requirements"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -192,5 +195,40 @@ export const caseEvents = pgTable("case_events", {
   title: text("title").notNull(),
   description: text("description"),
   metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const overflowWorkOrders = pgTable("overflow_work_orders", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  repairCaseId: uuid("repair_case_id")
+    .references(() => repairCases.id, { onDelete: "cascade" })
+    .notNull(),
+  repairNeedId: uuid("repair_need_id")
+    .references(() => repairNeeds.id, { onDelete: "cascade" })
+    .unique()
+    .notNull(),
+  programId: uuid("program_id")
+    .references(() => programs.id, { onDelete: "restrict" })
+    .notNull(),
+  workOrderNumber: text("work_order_number").unique().notNull(),
+  scope: text("scope").notNull(),
+  priority: text("priority").notNull(),
+  status: text("status").default("open_for_bids").notNull(),
+  synthetic: boolean("synthetic").default(true).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const overflowBids = pgTable("overflow_bids", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  workOrderId: uuid("work_order_id")
+    .references(() => overflowWorkOrders.id, { onDelete: "cascade" })
+    .notNull(),
+  contractorName: text("contractor_name").notNull(),
+  estimatedPriceCents: integer("estimated_price_cents").notNull(),
+  estimatedDurationDays: integer("estimated_duration_days").notNull(),
+  notes: text("notes").notNull(),
+  status: text("status").default("submitted").notNull(),
+  synthetic: boolean("synthetic").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
