@@ -81,6 +81,7 @@ export async function uploadRepairPhoto(input: {
   filepath: string;
   originalFilename: string;
   mimeType: string;
+  evidenceStage?: "resident_report" | "inspection" | "completion";
 }) {
   if (!allowedMimeTypes.has(input.mimeType)) {
     throw new Error("Only JPEG, PNG, and WebP repair photos are supported");
@@ -113,6 +114,7 @@ export async function uploadRepairPhoto(input: {
       .insert(repairPhotos)
       .values({
         repairNeedId: need.id,
+        evidenceStage: input.evidenceStage ?? "resident_report",
         imageUrl: `r2://${config.bucket}/${objectKey}`,
         publicId: objectKey,
         originalFilename: input.originalFilename,

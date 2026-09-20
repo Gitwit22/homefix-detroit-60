@@ -96,11 +96,13 @@ export async function runMatchingForCase(caseId: string) {
         programId: program.id,
         matchStatus: savedMatch.matchStatus,
         approvalStatus: savedMatch.approvalStatus,
-        approvedAt: savedMatch.approvalStatus === "approved" ? new Date() : null,
+        approvedAt: null,
+        screeningResults: [],
+        screenedAt: new Date(),
         explanation:
           savedMatch.matchStatus === "strong_match"
-            ? "Strong Match\nSaved synthetic demo eligibility decision"
-            : "Potential Match\nSaved synthetic demo eligibility decision",
+            ? "Strong Match\nSaved synthetic preliminary screening result"
+            : "Potential Match\nSaved synthetic preliminary screening result",
         missingRequirements: [],
       });
 
@@ -145,6 +147,8 @@ export async function runMatchingForCase(caseId: string) {
         repairNeedId: need.id,
         programId: program.id,
         matchStatus: evaluation.status,
+        screeningResults: evaluation.evaluations,
+        screenedAt: new Date(),
         explanation,
         missingRequirements: missing,
       });

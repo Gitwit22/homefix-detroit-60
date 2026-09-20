@@ -71,7 +71,7 @@ async function buildCoveragePlan(caseId: string): Promise<CoveragePlan> {
   if (repairs.some((item) => item.status === "verification_needed")) {
     nextBestAction = {
       type: "document_required",
-      message: "Upload missing eligibility documents to complete verification.",
+      message: "Prepare the required documents for partner review and final verification.",
     };
   } else if (fundingGaps > 0) {
     nextBestAction = {

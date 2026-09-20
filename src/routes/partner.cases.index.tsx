@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { DataTable, DemoFlag, PageIntro, PriorityBadge, StatusBadge } from "@/components/homefix";
 import { PartnerRouteError, PartnerRouteLoading } from "@/components/partner-route-state";
 import { getPartnerAnalytics } from "@/lib/homefix-api";
-import { parsePartnerCaseFilters } from "@/lib/partner-filters";
+import { matchesPartnerPriority, parsePartnerCaseFilters } from "@/lib/partner-filters";
 import {
   caseStatusLabels,
   coverageStatusLabels,
@@ -65,7 +65,7 @@ function Cases() {
       if (!matchesQuery) return false;
     }
     if (search.zip && item.zipCode !== search.zip) return false;
-    if (search.priority && item.priority !== search.priority) return false;
+    if (!matchesPartnerPriority(item.priority, search)) return false;
     if (search.coverage && item.coverageStatus !== search.coverage) return false;
     if (search.repairType && !item.repairTypes.includes(search.repairType)) return false;
     return true;
@@ -128,13 +128,19 @@ function Cases() {
           ))}
         </select>
         <select
-          value={search.priority ?? "all"}
-          onChange={(event) =>
-            updateSearch({ priority: event.target.value === "all" ? undefined : event.target.value })
-          }
+          value={search.priorityGroup ?? search.priority ?? "all"}
+          onChange={(event) => {
+            const priority = event.target.value;
+            updateSearch({
+              priority:
+                priority === "all" || priority === "high_priority" ? undefined : priority,
+              priorityGroup: priority === "high_priority" ? "high_priority" : undefined,
+            });
+          }}
           className="h-12 border border-border px-3"
         >
           <option value="all">All Priorities</option>
+          <option value="high_priority">High + Critical</option>
           {priorityOptions.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}

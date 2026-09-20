@@ -47,9 +47,9 @@ const guideContent: Record<string, GuidePageContent> = {
     intro: "This page summarizes preliminary findings from your repair report and photos.",
     nextStep: "Review the preliminary repair assessment.",
     whyAsk:
-      "The assessment helps prioritize safety, identify follow-up questions, and prepare your case for matching.",
+      "The assessment helps prioritize safety, prepare questions for the professional inspection, and match your case with possible programs.",
     simpleWords:
-      "This is a first review of your repair issue. Check what looks right and what needs updates.",
+      "This is a first review of your repair issue. HomeFix will send the prepared questions to the inspector.",
     readAloud:
       "Assessment shows likely issue type, urgency, and recommended next steps before final matching.",
     showSelector: "[data-guide-target='assessment-next']",
@@ -102,7 +102,7 @@ function resolveResidentStep(pathname: string, intakeStep: number): DemoStep | n
   if (pathname === "/") {
     return {
       step: 1,
-      total: 6,
+      total: 7,
       title: "Start with your repair",
       intro: "HomeFix helps organize your repair problem and identify possible next steps.",
       showSelector: "[data-guide-target='resident-start-assessment']",
@@ -114,10 +114,10 @@ function resolveResidentStep(pathname: string, intakeStep: number): DemoStep | n
     if (intakeStep >= 3) {
       return {
         step: 3,
-        total: 6,
+        total: 7,
         title: "Show us the problem",
         intro:
-          "Add a description and photos when available. HomeFix uses them for a preliminary assessment.",
+          "Add a description and photos when available. HomeFix normalizes the report before checking program rules.",
         showSelector:
           intakeStep >= 5
             ? "[data-guide-target='intake-submit']"
@@ -131,7 +131,7 @@ function resolveResidentStep(pathname: string, intakeStep: number): DemoStep | n
 
     return {
       step: 2,
-      total: 6,
+      total: 7,
       title: "Tell us about your home",
       intro:
         "Add basic property, household, and repair information so HomeFix can organize the case.",
@@ -147,19 +147,30 @@ function resolveResidentStep(pathname: string, intakeStep: number): DemoStep | n
   if (pathname === "/assessment") {
     return {
       step: 4,
-      total: 6,
-      title: "Review what HomeFix noticed",
+      total: 7,
+      title: "Review initial program pathways",
       intro:
-        "This is a preliminary review of the repair problem. A professional inspection may still be needed.",
+        "HomeFix compares the normalized repair report with deterministic program requirements. Results remain preliminary until verification.",
       showSelector: "[data-guide-target='assessment-next']",
       nextSelector: "[data-guide-target='assessment-next']",
     };
   }
 
-  if (pathname === "/passport") {
+  if (pathname === "/inspection") {
     return {
       step: 5,
-      total: 6,
+      total: 7,
+      title: "Choose inspection availability",
+      intro:
+        "Submit several acceptable windows so a partner can confirm an on-site inspection of the repair condition and scope.",
+      showSelector: "main button",
+    };
+  }
+
+  if (pathname === "/passport") {
+    return {
+      step: 6,
+      total: 7,
       title: "Your repair information stays together",
       intro:
         "The Repair Passport combines your home, household, repairs, assessments, and potential program matches.",
@@ -170,11 +181,11 @@ function resolveResidentStep(pathname: string, intakeStep: number): DemoStep | n
 
   if (pathname === "/coverage") {
     return {
-      step: 6,
-      total: 6,
+      step: 7,
+      total: 7,
       title: "Guided Demo Complete",
       intro:
-        "You’ve seen the resident journey from repair report to assessment, Repair Passport, and Coverage Plan.",
+        "You’ve seen the resident journey from repair report through initial matching and inspection scheduling.",
       showSelector: "[data-guide-target='next-action-continue']",
       completeLabel: "Finish",
       alternateActionLabel: "Switch to Partner View",

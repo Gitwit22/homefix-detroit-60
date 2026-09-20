@@ -1,10 +1,11 @@
 {
-  "name": "HomeFix Structured Repair Triage",
+  "name": "HomeFix Repair Report Normalization",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "homefix-triage",
+        "authentication": "headerAuth",
         "responseMode": "responseNode",
         "options": {}
       },
@@ -17,7 +18,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const auth = $json.headers?.authorization; if (auth !== `Bearer ${$env.N8N_HOMEFIX_SECRET}`) throw new Error('Unauthorized'); const body = $json.body ?? {}; if (!body.repairNeedId || !body.description) throw new Error('Invalid HomeFix payload'); return [{ json: body }];"
+        "jsCode": "const body = $json.body ?? {}; const expectedKeys = ['caseId','repairNeedId','reportedCategory','description','gettingWorse','safeToOccupy','imageUrls']; const categories = ['roof_water_intrusion','hvac','plumbing','electrical','windows_doors','accessibility','lead_environmental','structural','other']; const exactShape = Object.keys(body).length === expectedKeys.length && expectedKeys.every(key => Object.hasOwn(body, key)); const valid = exactShape && typeof body.caseId === 'string' && body.caseId.length > 0 && typeof body.repairNeedId === 'string' && body.repairNeedId.length > 0 && categories.includes(body.reportedCategory) && typeof body.description === 'string' && body.description.trim().length > 0 && typeof body.gettingWorse === 'boolean' && typeof body.safeToOccupy === 'boolean' && Array.isArray(body.imageUrls) && body.imageUrls.every(url => typeof url === 'string' && url.length > 0); if (!valid) throw new Error('Invalid HomeFix payload'); return [{ json: body }];"
       },
       "id": "validate-request",
       "name": "Validate Request",
@@ -38,18 +39,18 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { model: $env.HOMEFIX_AI_MODEL || 'gpt-4.1-mini', messages: [{ role: 'system', content: 'You provide conservative preliminary home-repair triage, never a diagnosis. Return only JSON with repairCategory, urgency, summary, observations, safetyFlags, followUpQuestions, confidence.' }, { role: 'user', content: [{ type: 'text', text: JSON.stringify({ description: $json.description, reportedCategory: $json.reportedCategory, gettingWorse: $json.gettingWorse, safeToOccupy: $json.safeToOccupy }) }, ...($json.imageUrls || []).map(url => ({ type: 'image_url', image_url: { url } }))] }], response_format: { type: 'json_object' }, temperature: 0.1 } }}",
-        "options": { "timeout": 12000 }
+        "jsonBody": "={{ { model: $env.HOMEFIX_AI_MODEL || 'gpt-4.1-mini', messages: [{ role: 'system', content: 'Normalize a resident home-repair report conservatively. Allowed repairCategory values: roof_water_intrusion, hvac, plumbing, electrical, windows_doors, accessibility, lead_environmental, structural, other. Allowed urgency values: low, moderate, high, critical. Never diagnose a condition or decide program eligibility, inspection eligibility, matching, coverage, funding, approval, or training approval. Generate 1–5 concise questions an on-site inspector should verify. Return only top-level JSON with repairCategory, urgency, summary, observations, safetyFlags, followUpQuestions, confidence, and trainingOpportunity. trainingOpportunity must contain status (not_suitable, potential, or requires_inspection), a non-empty reason, and possibleSkills (at most 8 strings). This is only a preliminary workforce-development signal pending professional inspection.' }, { role: 'user', content: [{ type: 'text', text: JSON.stringify({ description: $json.description, reportedCategory: $json.reportedCategory, gettingWorse: $json.gettingWorse, safeToOccupy: $json.safeToOccupy }) }, ...$json.imageUrls.map(url => ({ type: 'image_url', image_url: { url } }))] }], response_format: { type: 'json_object' }, temperature: 0.1 } }}",
+        "options": { "timeout": 20000 }
       },
       "id": "structured-triage",
-      "name": "Structured Triage",
+      "name": "Normalize Repair Report",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [500, 0]
     },
     {
       "parameters": {
-        "jsCode": "const content = $json.choices?.[0]?.message?.content; if (!content) throw new Error('AI response missing content'); const value = JSON.parse(content); const allowedCategories = ['roof_water_intrusion','hvac','plumbing','electrical','windows_doors','accessibility','lead_environmental','structural','other']; const allowedUrgencies = ['low','moderate','high','critical']; if (!allowedCategories.includes(value.repairCategory) || !allowedUrgencies.includes(value.urgency) || typeof value.summary !== 'string' || !Array.isArray(value.observations) || !Array.isArray(value.safetyFlags) || !Array.isArray(value.followUpQuestions) || typeof value.confidence !== 'number') throw new Error('AI response failed HomeFix contract'); return [{ json: value }];"
+        "jsCode": "const content = $json.choices?.[0]?.message?.content; if (!content) throw new Error('AI response missing content'); const value = JSON.parse(content); const expectedKeys = ['repairCategory','urgency','summary','observations','safetyFlags','followUpQuestions','confidence','trainingOpportunity']; const allowedCategories = ['roof_water_intrusion','hvac','plumbing','electrical','windows_doors','accessibility','lead_environmental','structural','other']; const allowedUrgencies = ['low','moderate','high','critical']; const allowedTrainingStatuses = ['not_suitable','potential','requires_inspection']; const strings = (items, max) => Array.isArray(items) && items.length <= max && items.every(item => typeof item === 'string' && item.trim().length > 0); const training = value.trainingOpportunity; const exactShape = value && typeof value === 'object' && Object.keys(value).length === expectedKeys.length && expectedKeys.every(key => Object.hasOwn(value, key)); const validTraining = training && typeof training === 'object' && Object.keys(training).length === 3 && allowedTrainingStatuses.includes(training.status) && typeof training.reason === 'string' && training.reason.trim().length > 0 && Array.isArray(training.possibleSkills) && training.possibleSkills.length <= 8 && training.possibleSkills.every(skill => typeof skill === 'string'); const valid = exactShape && allowedCategories.includes(value.repairCategory) && allowedUrgencies.includes(value.urgency) && typeof value.summary === 'string' && value.summary.trim().length > 0 && strings(value.observations, 6) && strings(value.safetyFlags, 6) && strings(value.followUpQuestions, 5) && value.followUpQuestions.length >= 1 && typeof value.confidence === 'number' && value.confidence >= 0 && value.confidence <= 1 && validTraining; if (!valid) throw new Error('AI response failed HomeFix contract'); return [{ json: value }];"
       },
       "id": "validate-response",
       "name": "Validate Response",
@@ -72,8 +73,10 @@
   ],
   "connections": {
     "HomeFix Webhook": { "main": [[{ "node": "Validate Request", "type": "main", "index": 0 }]] },
-    "Validate Request": { "main": [[{ "node": "Structured Triage", "type": "main", "index": 0 }]] },
-    "Structured Triage": {
+    "Validate Request": {
+      "main": [[{ "node": "Normalize Repair Report", "type": "main", "index": 0 }]]
+    },
+    "Normalize Repair Report": {
       "main": [[{ "node": "Validate Response", "type": "main", "index": 0 }]]
     },
     "Validate Response": {

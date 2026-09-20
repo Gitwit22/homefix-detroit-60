@@ -450,7 +450,7 @@ export async function ensureOverflowDemoData() {
         description: entry.repairDescription,
         startedWhen: entry.startedWhen,
         gettingWorse: true,
-        safeToOccupy: entry.urgency !== "critical",
+        safetyStatus: entry.urgency === "critical" ? ("unsafe" as const) : ("safe" as const),
         urgency: entry.urgency,
         status: "reported",
         createdAt: new Date(entry.createdAt),

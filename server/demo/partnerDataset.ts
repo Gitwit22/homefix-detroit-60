@@ -41,24 +41,20 @@ const priorityWeights: Array<{ value: Priority; weight: number }> = [
   { value: "low", weight: 15 },
 ];
 
-const caseStatusWeights: Array<{ value: CaseStatus; weight: number }> = [
-  { value: "assessment_complete", weight: 17 },
-  { value: "documents_needed", weight: 23 },
-  { value: "program_review", weight: 22 },
-  { value: "referred", weight: 15 },
-  { value: "waitlisted", weight: 13 },
-  { value: "repair_scheduled", weight: 10 },
-];
-
 const programByRepairType: Record<RepairType, string[]> = {
   roof_water_intrusion: ["critical-home-repair"],
-  hvac: ["weatherization", "critical-home-repair"],
+  hvac: ["wayne-metro-weatherization", "critical-home-repair"],
   plumbing: ["critical-home-repair"],
   electrical: ["critical-home-repair"],
   accessibility: ["critical-home-repair"],
   structural: ["critical-home-repair"],
-  lead_environmental: ["leadsafe"],
-  windows_doors: ["weatherization"],
+  lead_environmental: ["detroit-leadsafe-housing"],
+  windows_doors: ["wayne-metro-weatherization"],
+  carpentry: [],
+  drywall_plaster: [],
+  concrete_masonry: [],
+  flooring: [],
+  painting_finishing: [],
   other: ["critical-home-repair"],
 };
 
@@ -80,6 +76,36 @@ function coverageForMatch(matchStatus: MatchStatus): CoverageStatus {
   return "funding_gap";
 }
 
+function caseStatusForFacts(
+  random: ReturnType<typeof createSeededRandom>,
+  facts: Array<{ matchStatus: MatchStatus; coverageStatus: CoverageStatus }>,
+): CaseStatus {
+  if (facts.some((fact) => fact.coverageStatus === "funding_gap")) {
+    return weightedChoice(random, [
+      { value: "assessment_complete", weight: 45 },
+      { value: "program_review", weight: 35 },
+      { value: "waitlisted", weight: 20 },
+    ] satisfies Array<{ value: CaseStatus; weight: number }>);
+  }
+  if (
+    facts.some(
+      (fact) =>
+        fact.matchStatus === "verification_needed" || fact.coverageStatus === "verification_needed",
+    )
+  ) {
+    return weightedChoice(random, [
+      { value: "documents_needed", weight: 65 },
+      { value: "program_review", weight: 35 },
+    ] satisfies Array<{ value: CaseStatus; weight: number }>);
+  }
+  return weightedChoice(random, [
+    { value: "program_review", weight: 35 },
+    { value: "referred", weight: 30 },
+    { value: "waitlisted", weight: 20 },
+    { value: "repair_scheduled", weight: 15 },
+  ] satisfies Array<{ value: CaseStatus; weight: number }>);
+}
+
 export function generateSyntheticPartnerDataset(
   seed = DEFAULT_PARTNER_DEMO_SEED,
 ): SyntheticRepairFact[] {
@@ -97,12 +123,12 @@ export function generateSyntheticPartnerDataset(
     const paddedHome = String(homeNumber).padStart(4, "0");
     const caseId = `HF-DEMO-${paddedHome}`;
     const zipCode = weightedChoice(random, zipCodes);
-    const caseStatus = weightedChoice(random, caseStatusWeights);
     const createdDaysAgo = randomInteger(random, 8, 180);
     const createdAt = new Date(
       Date.parse(PARTNER_DEMO_GENERATED_AT) - createdDaysAgo * 86_400_000,
     ).toISOString();
     const needCount = additionalNeedHomes.has(homeNumber) ? 2 : 1;
+    const homeFacts: Array<Omit<SyntheticRepairFact, "caseStatus">> = [];
 
     for (let needIndex = 0; needIndex < needCount; needIndex += 1) {
       const repairType = weightedChoice(random, repairTypeWeights);
@@ -113,7 +139,7 @@ export function generateSyntheticPartnerDataset(
         coverageStatus === "funding_gap"
           ? undefined
           : programs[randomInteger(random, 0, programs.length - 1)];
-      const fact: SyntheticRepairFact = {
+      const fact: Omit<SyntheticRepairFact, "caseStatus"> = {
         homeId: `HOME-DEMO-${paddedHome}`,
         caseId,
         caseNumber: caseId,
@@ -124,14 +150,16 @@ export function generateSyntheticPartnerDataset(
         priority: weightedChoice(random, priorityWeights),
         matchStatus,
         coverageStatus,
-        caseStatus,
         createdAt,
         synthetic: true,
       };
       if (programId) fact.programId = programId;
-      facts.push(fact);
+      homeFacts.push(fact);
       repairNeedNumber += 1;
     }
+
+    const caseStatus = caseStatusForFacts(random, homeFacts);
+    facts.push(...homeFacts.map((fact) => ({ ...fact, caseStatus })));
   }
 
   const specialCaseFacts = facts.filter((fact) => fact.homeId === "HOME-DEMO-0001");
@@ -141,6 +169,7 @@ export function generateSyntheticPartnerDataset(
     fact.propertyLabel = "123 Main Street";
     fact.zipCode = "48205";
     fact.createdAt = PARTNER_DEMO_GENERATED_AT;
+    fact.caseStatus = "program_review";
   }
 
   const primaryFact = specialCaseFacts[0];
@@ -165,14 +194,14 @@ export const syntheticProgramCapacities: SyntheticProgramCapacity[] = [
     synthetic: true,
   },
   {
-    programId: "weatherization",
+    programId: "wayne-metro-weatherization",
     name: "Wayne Metro Weatherization",
     status: "open",
     simulatedCapacity: 38,
     synthetic: true,
   },
   {
-    programId: "leadsafe",
+    programId: "detroit-leadsafe-housing",
     name: "Detroit LeadSafe Housing",
     status: "waitlist",
     simulatedCapacity: 8,

@@ -26,6 +26,8 @@ services:
       - key: R2_SIGNED_URL_TTL_SECONDS
         value: 3600
       - key: N8N_TRIAGE_WEBHOOK_URL
-        sync: false
+        value: https://nxtlvl.app.n8n.cloud/webhook/homefix-triage
       - key: N8N_HOMEFIX_SECRET
         sync: false
+      - key: HOMEFIX_TRIAGE_TIMEOUT_MS
+        value: 25000

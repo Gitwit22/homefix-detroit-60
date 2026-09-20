@@ -337,7 +337,7 @@ Create a Render Blueprint from `render.yaml`, then set:
 
 - `DATABASE_URL` to the HomeFix Postgres connection string.
 - `CORS_ORIGINS` to the comma-separated frontend origins allowed to submit
-  intake data, such as `https://homefix-detroit-60.pages.dev`.
+  intake data, including the production origin `https://homefix-erd.pages.dev`.
 - `HOMEFIX_DEMO_MODE=1` to enable optional name-only demo sessions and the
   session-scoped resident demo wipe endpoint. This is presentation convenience,
   not authentication and must not be used to protect real resident data.
@@ -348,16 +348,18 @@ Create a Render Blueprint from `render.yaml`, then set:
 Render supplies `PORT`; do not set it manually. The service health check is
 `/health` and intake submissions use `POST /api/v1/intakes`.
 
-Partner intelligence uses deterministic synthetic demonstration data:
+Partner intelligence reads normalized resident-case facts from Postgres and
+combines them with modeled program-capacity data:
 
 - `GET /api/v1/partner-analytics` returns calculated demand, coverage, gap,
   case, ZIP, and modeled-capacity metrics.
-- `GET /api/v1/partner-cases/:caseId` returns a generated synthetic case
-  dossier or `404` when the ID is outside the current dataset.
+- `GET /api/v1/partner-cases/:caseId` returns a persisted case dossier,
+  inspection state, and overflow-work-order state, or `404` when the case is
+  not present in the configured database.
 
-These endpoints use `HOMEFIX_DEMO_SEED` (default `3132026`) and do not read
-from or write to Neon. Replacing the synthetic fact loader with normalized
-resident-case facts does not require changing the dashboard response shape.
+The partner routes depend on `DATABASE_URL` and the deployed migrations and
+seed data. The frontend applies a 30-second request deadline so an unavailable
+API displays a retryable error instead of remaining on its loading state.
 
 ### Cloudflare Pages
 
@@ -372,7 +374,28 @@ Set `VITE_HOMEFIX_API_URL` as a Pages build variable using the Render service
 origin, for example `https://homefix-api.onrender.com`. Set
 `VITE_HOMEFIX_DEMO_MODE=1` to show the optional session and wipe controls on the
 home page. These values are public by design; do not add `DATABASE_URL` or any
-private credential to Cloudflare.
+private credential to Cloudflare. Pages injects `VITE_HOMEFIX_API_URL` at build
+time, so redeploy the site after changing it.
+
+If production intake submission fails, first open the Render service `/health`
+endpoint and confirm `CORS_ORIGINS` contains the exact Pages origin. A browser
+may also retain a demo-session token after its database record has been removed.
+The client clears a rejected token and retries intake once without the optional
+session. Until that client version is deployed, signing out or clearing site
+data for `homefix-erd.pages.dev` is the immediate workaround.
+
+For a partner deployment smoke test, verify these in order:
+
+1. `GET https://homefix-api.onrender.com/health` returns `200`.
+2. `GET https://homefix-api.onrender.com/api/v1/partner-analytics` returns
+   valid JSON.
+3. `GET https://homefix-api.onrender.com/api/v1/partner-cases/:caseId` returns
+   the expected case or a deliberate `404`.
+4. Open `/partner`, `/partner/cases`, and a known case on Cloudflare Pages.
+
+If `/health` returns `503`, inspect the Render deploy and startup logs before
+debugging the frontend. After changing `VITE_HOMEFIX_API_URL`, rebuild the
+Cloudflare Pages deployment because Vite embeds the value at build time.
 
 ```sh
 npm ci
@@ -400,7 +423,9 @@ npm run dev
 
 Repair photos are uploaded through the Render API to a private Cloudflare R2 bucket. Accepted formats are JPEG, PNG, and WebP, with a maximum of five files per repair and 10 MB per file. The API returns short-lived signed image URLs; R2 credentials belong only on Render or in the local API environment and must never use a `VITE_*` prefix. Existing Cloudinary-backed database records continue using their stored URLs, but new uploads are written only to R2.
 
-Import `n8n/homefix-triage.workflow.json` into n8n, set `N8N_HOMEFIX_SECRET`, `OPENAI_API_KEY`, and optionally `HOMEFIX_AI_MODEL`, then set the production webhook URL as `N8N_TRIAGE_WEBHOOK_URL` on Render. HomeFix validates the structured response and uses a conservative category-specific saved assessment if n8n is unavailable, times out, or returns invalid JSON. Eligibility and coverage remain deterministic database services and never depend on AI output.
+Import `n8n/homefix-triage.workflow.json` into n8n, attach a Header Auth credential to the webhook with header name `Authorization` and value `Bearer YOUR_SECRET`, then set `OPENAI_API_KEY` and optionally `HOMEFIX_AI_MODEL`. Configure Render with the same secret as `N8N_HOMEFIX_SECRET=YOUR_SECRET`, `N8N_TRIAGE_WEBHOOK_URL=https://nxtlvl.app.n8n.cloud/webhook/homefix-triage`, and `HOMEFIX_TRIAGE_TIMEOUT_MS=25000`. HomeFix sends the exact top-level fields `caseId`, `repairNeedId`, `reportedCategory`, `description`, `gettingWorse`, `safeToOccupy`, and `imageUrls`; n8n returns unwrapped JSON containing `repairCategory`, `urgency`, `summary`, `observations`, `safetyFlags`, `followUpQuestions`, `confidence`, and `trainingOpportunity`.
+
+n8n performs repair normalization, urgency and safety assessment, inspector follow-up generation, and a preliminary workforce-development flag. It does not determine eligibility, match programs, calculate coverage, or write to Neon. HomeFix validates the response, runs deterministic eligibility/matching/coverage services, and persists the assessment. If n8n is unavailable, times out, or returns invalid JSON, HomeFix persists a saved Denise assessment or conservative fallback instead.
 
 Run the Sprint 2–3 verification gate with:
 

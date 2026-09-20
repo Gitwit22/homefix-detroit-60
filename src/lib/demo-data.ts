@@ -3,8 +3,8 @@ export type MatchStatus = "Strong Match" | "Potential Match" | "Verification Nee
 export const resident = {
   name: "Denise Carter",
   address: "123 Main Street",
-  city: "Detroit, MI 48224",
-  passportId: "HF-48221-00128",
+  city: "Detroit, MI 48205",
+  passportId: "HF-313-0842",
   caseId: "HF-313-0842",
   household: "3 residents",
   senior: true,
@@ -14,7 +14,7 @@ export const resident = {
 
 export const repairNeeds = [
   { name: "Roof / Water Intrusion", priority: "High", status: "Strong Match", program: "City of Detroit Critical Home Repair", action: "Review eligibility requirements" },
-  { name: "Furnace / HVAC", priority: "Moderate", status: "Potential Match", program: "Wayne Metro Weatherization", action: "Upload income verification" },
+  { name: "Furnace / HVAC", priority: "Moderate", status: "Potential Match", program: "Wayne Metro Weatherization", action: "Prepare income verification for partner review" },
   { name: "Lead / Environmental", priority: "Moderate", status: "Verification Needed", program: "Detroit LeadSafe Housing", action: "Complete household questions" },
   { name: "Electrical", priority: "Moderate", status: "Funding Gap", program: "No current resource", action: "Notify me when assistance opens" },
 ] as const;
@@ -36,7 +36,7 @@ export const programs = [
     match: "Strong Match",
   },
   {
-    id: "leadsafe",
+    id: "detroit-leadsafe-housing",
     name: "Detroit LeadSafe Housing",
     organization: "City of Detroit",
     status: "Open now · Deadline September 22, 2026 at 5 PM",
@@ -51,7 +51,7 @@ export const programs = [
     match: "Verification Needed",
   },
   {
-    id: "weatherization",
+    id: "wayne-metro-weatherization",
     name: "Wayne Metro Weatherization Assistance",
     organization: "Wayne Metropolitan Community Action Agency",
     status: "Open · Accepting applications",
@@ -68,7 +68,7 @@ export const programs = [
 ] as const;
 
 export const overflowJobs = [
-  { id: "00182", property: "123 Main St", zip: "48224", repair: "Roof / Water Intrusion", priority: "High", program: "Critical Home Repair", status: "Open", responses: 3 },
+  { id: "00182", property: "123 Main Street", zip: "48205", repair: "Roof / Water Intrusion", priority: "High", program: "Critical Home Repair", status: "Open", responses: 3 },
   { id: "00191", property: "456 Dexter Ave", zip: "48206", repair: "Furnace", priority: "Critical", program: "Weatherization", status: "Assessment Needed", responses: 1 },
   { id: "00204", property: "789 Grandmont Ave", zip: "48227", repair: "Electrical", priority: "High", program: "Critical Home Repair", status: "Open", responses: 0 },
 ] as const;

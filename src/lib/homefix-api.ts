@@ -1,7 +1,29 @@
 import type { PartnerAnalytics, PartnerCaseDetail } from "../../server/domain/partnerAnalytics";
-import { getStoredDemoSession, type DemoSession } from "./demo-session";
+import type { CaseLifecycle } from "../../server/domain/lifecycle";
+import {
+  HomeFixApiError,
+  homeFixApiError,
+  requestJsonWithOptionalSession,
+  requestWithTimeout,
+} from "./api-request";
+import { clearDemoSession, getStoredDemoSession, type DemoSession } from "./demo-session";
 
 export type { PartnerAnalytics, PartnerCaseDetail };
+export { HomeFixApiError };
+
+const validAssessmentModels = new Set([
+  "homefix-triage-v1",
+  "homefix-saved-demo-v1",
+  "homefix-triage-fallback-v1",
+]);
+
+export function isValidAssessment(
+  assessment: { model: string | null; summary: string | null } | null | undefined,
+) {
+  return Boolean(
+    assessment?.model && assessment.summary?.trim() && validAssessmentModels.has(assessment.model),
+  );
+}
 
 export type IntakePayload = {
   demoScenario?: "denise-carter-pitch-v1";
@@ -34,7 +56,7 @@ export type IntakePayload = {
     description: string;
     startedWhen?: string;
     gettingWorse: boolean;
-    safeToOccupy: boolean;
+    safetyStatus: "safe" | "unsafe" | "unsure";
     urgency: string;
   }>;
 };
@@ -52,6 +74,7 @@ export type CaseAggregateResponse = {
     id: string;
     caseNumber: string;
     status: string;
+    currentStep: string;
     coveragePercentage: number;
     nextAction: string | null;
   };
@@ -78,6 +101,8 @@ export type CaseAggregateResponse = {
   } | null;
   repairNeeds: Array<{
     id: string;
+    repairRole: "PRIMARY" | "ACCESS" | "RESTORATION";
+    parentRepairNeedId: string | null;
     category: string;
     description: string;
     urgency: string;
@@ -86,6 +111,7 @@ export type CaseAggregateResponse = {
   photos: Array<{
     id: string;
     repairNeedId: string;
+    evidenceStage: string;
     imageUrl: string;
     originalFilename: string | null;
     width: number | null;
@@ -101,12 +127,25 @@ export type CaseAggregateResponse = {
     safetyFlags: unknown;
     followUpQuestions: unknown;
     confidence: string | null;
+    trainingOpportunity: {
+      status: "not_suitable" | "potential" | "requires_inspection";
+      reason: string;
+      possibleSkills: string[];
+    } | null;
     model: string | null;
   }>;
   matches: Array<{
     id: string;
     repairNeedId: string;
     matchStatus: string;
+    approvalStatus: string;
+    screeningResults: Array<{
+      ruleType: string;
+      required: boolean;
+      passed: boolean | null;
+      reason: string;
+    }>;
+    screenedAt: string | null;
     explanation: string | null;
     missingRequirements: unknown;
     program: { id: string; name: string };
@@ -119,6 +158,46 @@ export type CaseAggregateResponse = {
     description: string | null;
     createdAt: string;
   }>;
+  inspection: {
+    id: string;
+    status: string;
+    availabilityWindows: Array<{ start: string; end: string }>;
+    inspectionQuestions: Array<{
+      id: string;
+      repairNeedId: string;
+      question: string;
+      answer: string | null;
+      unableToVerify: boolean;
+    }>;
+    confirmedStart: string | null;
+    confirmedEnd: string | null;
+    providerName: string | null;
+    providerPhone: string | null;
+  } | null;
+  inspectionFindings: Array<{
+    id: string;
+    inspectionId: string;
+    repairNeedId: string;
+    confirmedCategory: string;
+    urgency: string;
+    condition: string;
+    notes: string | null;
+    verifiedScope: string;
+    estimatedCostCents: number | null;
+    completedAt: string;
+  }>;
+  workOrders: Array<{
+    id: string;
+    repairNeedId: string;
+    programId: string;
+    workOrderNumber: string;
+    scope: string;
+    status: string;
+    verificationStatus: string;
+    completedAt: string | null;
+    completionNotes: string | null;
+  }>;
+  lifecycle: CaseLifecycle;
 };
 
 export type CoveragePlanResponse = {
@@ -279,13 +358,7 @@ const apiUrl = import.meta.env["VITE_HOMEFIX_API_URL"]?.replace(/\/$/, "");
 const requestTimeoutMs = 30_000;
 
 async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), requestTimeoutMs);
-  try {
-    return await fetch(input, { ...init, signal: controller.signal });
-  } finally {
-    window.clearTimeout(timeoutId);
-  }
+  return requestWithTimeout((signal) => fetch(input, { ...init, signal }), requestTimeoutMs);
 }
 
 export type DemoSessionCase = {
@@ -302,20 +375,21 @@ export async function submitIntake(payload: IntakePayload): Promise<IntakeRespon
   }
 
   const demoSession = getStoredDemoSession();
-  const response = await fetchWithTimeout(`${apiUrl}/api/v1/intakes`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      ...(demoSession ? { "x-homefix-demo-session": demoSession.token } : {}),
-    },
-    body: JSON.stringify(payload),
+  const send = (sessionToken?: string) =>
+    fetchWithTimeout(`${apiUrl}/api/v1/intakes`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(sessionToken ? { "x-homefix-demo-session": sessionToken } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+
+  return requestJsonWithOptionalSession<IntakeResponse>({
+    request: send,
+    ...(demoSession ? { sessionToken: demoSession.token } : {}),
+    onInvalidSession: clearDemoSession,
   });
-
-  if (!response.ok) {
-    throw new Error(`HomeFix API returned ${response.status}`);
-  }
-
-  return response.json() as Promise<IntakeResponse>;
 }
 
 export async function openDemoSession(displayName: string, pin: string): Promise<DemoSession> {
@@ -325,7 +399,12 @@ export async function openDemoSession(displayName: string, pin: string): Promise
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ displayName, pin }),
   });
-  if (!response.ok) throw new Error(response.status === 401 ? "INVALID_SESSION_CREDENTIALS" : `HomeFix API returned ${response.status}`);
+  if (!response.ok)
+    throw new Error(
+      response.status === 401
+        ? "INVALID_SESSION_CREDENTIALS"
+        : `HomeFix API returned ${response.status}`,
+    );
   return response.json() as Promise<DemoSession>;
 }
 
@@ -345,7 +424,7 @@ export async function getDemoSessionCases(token: string): Promise<DemoSessionCas
   const response = await fetch(`${apiUrl}/api/v1/demo-session/cases`, {
     headers: { "x-homefix-demo-session": token },
   });
-  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  if (!response.ok) throw await homeFixApiError(response);
   return response.json() as Promise<DemoSessionCase[]>;
 }
 
@@ -366,6 +445,68 @@ export async function getCase(caseId: string): Promise<CaseAggregateResponse> {
   return response.json() as Promise<CaseAggregateResponse>;
 }
 
+async function postCaseAction<T>(caseId: string, path: string, body: unknown): Promise<T> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const demoSession = getStoredDemoSession();
+  const response = await fetchWithTimeout(`${apiUrl}/api/v1/cases/${caseId}/${path}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(demoSession ? { "x-homefix-demo-session": demoSession.token } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(payload?.error ?? `HomeFix API returned ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+export function submitInspectionAvailability(
+  caseId: string,
+  windows: Array<{ start: string; end: string }>,
+) {
+  return postCaseAction<{
+    inspection: CaseAggregateResponse["inspection"];
+    lifecycle: CaseLifecycle;
+  }>(caseId, "inspection/availability", { windows });
+}
+
+export function confirmInspectionAppointment(
+  caseId: string,
+  input: { start: string; end: string; providerName: string; providerPhone?: string },
+) {
+  return postCaseAction<{
+    inspection: CaseAggregateResponse["inspection"];
+    lifecycle: CaseLifecycle;
+  }>(caseId, "inspection/confirm", input);
+}
+
+export function saveInspectionFindings(
+  caseId: string,
+  findings: Array<{
+    repairNeedId: string;
+    confirmedCategory: string;
+    urgency: string;
+    condition: string;
+    notes?: string;
+    verifiedScope: string;
+    estimatedCostCents?: number;
+  }>,
+  questionResponses: Array<{
+    id: string;
+    repairNeedId: string;
+    answer: string | null;
+    unableToVerify: boolean;
+  }>,
+) {
+  return postCaseAction<{ lifecycle: CaseLifecycle }>(caseId, "inspection/findings", {
+    findings,
+    questionResponses,
+  });
+}
+
 export async function processRepair(repairNeedId: string) {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
   const response = await fetchWithTimeout(`${apiUrl}/api/v1/repairs/${repairNeedId}/process`, {
@@ -379,14 +520,18 @@ export async function processRepair(repairNeedId: string) {
   }>;
 }
 
-export async function uploadRepairPhotos(repairNeedId: string, files: File[]) {
+export async function uploadRepairPhotos(
+  repairNeedId: string,
+  files: File[],
+  evidenceStage: "resident_report" | "inspection" | "completion" = "resident_report",
+) {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
   const body = new FormData();
   files.forEach((file) => body.append("photos", file));
-  const response = await fetchWithTimeout(`${apiUrl}/api/v1/repairs/${repairNeedId}/photos`, {
-    method: "POST",
-    body,
-  });
+  const response = await fetchWithTimeout(
+    `${apiUrl}/api/v1/repairs/${repairNeedId}/photos?stage=${evidenceStage}`,
+    { method: "POST", body },
+  );
   if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
   return response.json() as Promise<{ photos: Array<{ id: string; imageUrl: string }> }>;
 }
@@ -409,15 +554,17 @@ export async function getCoverage(caseId: string): Promise<CoveragePlanResponse>
 
 export async function getPartnerAnalytics(): Promise<PartnerAnalytics> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetch(`${apiUrl}/api/v1/partner-analytics`);
-  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  const response = await fetchWithTimeout(`${apiUrl}/api/v1/partner-analytics`);
+  if (!response.ok) throw await homeFixApiError(response);
   return response.json() as Promise<PartnerAnalytics>;
 }
 
 export async function getPartnerCase(caseId: string): Promise<PartnerCaseDetail> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetch(`${apiUrl}/api/v1/partner-cases/${encodeURIComponent(caseId)}`);
-  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  const response = await fetchWithTimeout(
+    `${apiUrl}/api/v1/partner-cases/${encodeURIComponent(caseId)}`,
+  );
+  if (!response.ok) throw await homeFixApiError(response);
   return response.json() as Promise<PartnerCaseDetail>;
 }
 
@@ -444,15 +591,17 @@ export async function createOverflowJob(caseId: string, repairNeedId?: string) {
 
 export async function getOverflowJobs(): Promise<OverflowJobSummaryResponse[]> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetch(`${apiUrl}/api/v1/overflow-jobs`);
-  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  const response = await fetchWithTimeout(`${apiUrl}/api/v1/overflow-jobs`);
+  if (!response.ok) throw await homeFixApiError(response);
   return response.json() as Promise<OverflowJobSummaryResponse[]>;
 }
 
 export async function getOverflowJob(jobId: string): Promise<OverflowJobDetailResponse> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetch(`${apiUrl}/api/v1/overflow-jobs/${encodeURIComponent(jobId)}`);
-  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  const response = await fetchWithTimeout(
+    `${apiUrl}/api/v1/overflow-jobs/${encodeURIComponent(jobId)}`,
+  );
+  if (!response.ok) throw await homeFixApiError(response);
   return response.json() as Promise<OverflowJobDetailResponse>;
 }
 
@@ -485,8 +634,8 @@ export async function getWorkOrderBids(jobId: string): Promise<OverflowBidRespon
 
 export async function getPrograms(): Promise<ProgramCatalogResponse> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetch(`${apiUrl}/api/v1/programs`);
-  if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
+  const response = await fetchWithTimeout(`${apiUrl}/api/v1/programs`);
+  if (!response.ok) throw await homeFixApiError(response);
   return response.json() as Promise<ProgramCatalogResponse>;
 }
 

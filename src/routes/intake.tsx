@@ -11,7 +11,7 @@ import {
   RepairCategoryGrid,
 } from "@/components/homefix";
 import { submitIntakeServer } from "@/lib/intake.server";
-import { uploadRepairPhotos } from "@/lib/homefix-api";
+import { HomeFixApiError, uploadRepairPhotos } from "@/lib/homefix-api";
 import { lastCaseStorageKey } from "@/lib/resident-case";
 
 export const Route = createFileRoute("/intake")({
@@ -20,9 +20,9 @@ export const Route = createFileRoute("/intake")({
   }),
   head: () => ({
     meta: [
-      { title: "Repair Assessment — HomeFix 313" },
-      { name: "description", content: "Complete a guided property and repair assessment." },
-      { property: "og:title", content: "Repair Assessment — HomeFix 313" },
+      { title: "Report a Repair — HomeFix 313" },
+      { name: "description", content: "Complete a guided property and repair report." },
+      { property: "og:title", content: "Report a Repair — HomeFix 313" },
       {
         property: "og:description",
         content: "Tell HomeFix about your property, household, and repair needs.",
@@ -42,6 +42,11 @@ const categoryMap: Record<string, string> = {
   Accessibility: "accessibility",
   Structural: "structural",
   Environmental: "lead_environmental",
+  Carpentry: "carpentry",
+  "Drywall / Plaster": "drywall_plaster",
+  "Concrete / Masonry": "concrete_masonry",
+  Flooring: "flooring",
+  "Painting / Finishing": "painting_finishing",
   Other: "other",
 };
 
@@ -57,6 +62,22 @@ type RepairDraft = {
 
 const demoDraftKey = "homefix:denise-carter-pitch-v1:draft";
 const intakeGuideEvent = "homefix-guide:intake-step";
+
+function intakeErrorMessage(error: unknown) {
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return "Saving took too long. Check your connection and try again.";
+  }
+  if (error instanceof HomeFixApiError) {
+    if (error.status === 400)
+      return "Some intake details were not accepted. Review them and try again.";
+    if (error.status >= 500)
+      return "The intake service is temporarily unavailable. Please try again.";
+  }
+  if (error instanceof TypeError) {
+    return "We could not reach the intake service. Check your connection and try again.";
+  }
+  return "We could not save this intake yet. Please try again.";
+}
 
 function createRepairDraft(index: number, useDemoDefaults = true): RepairDraft {
   if (!useDemoDefaults) {
@@ -115,7 +136,7 @@ function IntakePage() {
   const [email, setEmail] = useState(demo ? "denise@example.com" : "");
   const [phone, setPhone] = useState(demo ? "3135550100" : "");
   const [streetAddress, setStreetAddress] = useState(demo ? "123 Main Street" : "");
-  const [zipCode, setZipCode] = useState(demo ? "48224" : "");
+  const [zipCode, setZipCode] = useState(demo ? "48205" : "");
   const [yearsAtProperty, setYearsAtProperty] = useState(demo ? "12" : "");
 
   const [householdSize, setHouseholdSize] = useState(demo ? "3" : "");
@@ -299,7 +320,8 @@ function IntakePage() {
             description: repair.description,
             startedWhen: repair.startedWhen,
             gettingWorse: repair.worse === "Yes",
-            safeToOccupy: repair.safe !== "No",
+            safetyStatus:
+              repair.safe === "Yes" ? "safe" : repair.safe === "No" ? "unsafe" : "unsure",
             urgency: repair.safe === "No" ? "high" : repair.worse === "Yes" ? "high" : "moderate",
           })),
         }));
@@ -336,7 +358,8 @@ function IntakePage() {
       });
     } catch (error) {
       console.error(error);
-      window.alert("We couldn’t save this intake yet. Please try again.");
+      setFormError(intakeErrorMessage(error));
+      requestAnimationFrame(() => errorRef.current?.focus());
     } finally {
       setIsSubmitting(false);
     }
@@ -352,7 +375,7 @@ function IntakePage() {
           </div>
         </aside>
         <section>
-          <p className="eyebrow">Guided property assessment · Step {step} of 5</p>
+          <p className="eyebrow">Guided repair report · Step {step} of 5</p>
           <h1 className="mt-3 max-w-3xl text-4xl leading-tight sm:text-6xl">{titles[step - 1]}</h1>
           <p className="mt-4 max-w-2xl text-muted-foreground">
             Your answers help organize your Repair Passport and identify possible next steps.
@@ -567,7 +590,7 @@ function IntakePage() {
                     <PhotoUploader
                       files={repair.files}
                       onChange={(files) => updateRepair(repair.clientId, { files })}
-                      dataGuideTarget={index === 0 ? "intake-photo-upload" : undefined}
+                      {...(index === 0 ? { dataGuideTarget: "intake-photo-upload" } : {})}
                     />
                   </section>
                 ))}
@@ -597,7 +620,8 @@ function IntakePage() {
                     <strong>Ready for preliminary review.</strong>
                     <br />
                     <span className="text-muted-foreground">
-                      This submission saves real intake values and starts analysis for this case.
+                      This submission creates the Repair Passport and checks the report against
+                      current programs.
                     </span>
                   </p>
                 </div>
@@ -629,7 +653,7 @@ function IntakePage() {
                 : step === 5
                   ? isSubmitting
                     ? "Saving..."
-                    : "View Assessment"
+                    : "Check Initial Eligibility"
                   : "Continue"}
               <ArrowRight />
             </Button>

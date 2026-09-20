@@ -7,6 +7,11 @@ const categoryLabels: Record<string, string> = {
   accessibility: "Accessibility",
   lead_environmental: "Lead / Environmental",
   structural: "Structural",
+  carpentry: "Carpentry",
+  drywall_plaster: "Drywall / Plaster",
+  concrete_masonry: "Concrete / Masonry",
+  flooring: "Flooring",
+  painting_finishing: "Painting / Finishing",
   other: "Other",
 };
 

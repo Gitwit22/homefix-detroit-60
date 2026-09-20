@@ -1,7 +1,14 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "../db/index.js";
-import { homes, programMatches, programs, repairCases, repairNeeds } from "../db/schema.js";
+import {
+  homes,
+  programMatches,
+  programs,
+  repairAssessments,
+  repairCases,
+  repairNeeds,
+} from "../db/schema.js";
 import type {
   CaseStatus,
   CoverageStatus,
@@ -64,12 +71,14 @@ export async function listPersistedPartnerFacts(): Promise<PartnerRepairFact[]> 
       repairNeedId: repairNeeds.id,
       category: repairNeeds.category,
       urgency: repairNeeds.urgency,
+      trainingOpportunity: repairAssessments.trainingOpportunity,
       matchStatus: programMatches.matchStatus,
       programSlug: programs.slug,
     })
     .from(repairNeeds)
     .innerJoin(repairCases, eq(repairCases.id, repairNeeds.repairCaseId))
     .innerJoin(homes, eq(homes.id, repairCases.homeId))
+    .leftJoin(repairAssessments, eq(repairAssessments.repairNeedId, repairNeeds.id))
     .leftJoin(programMatches, eq(programMatches.repairNeedId, repairNeeds.id))
     .leftJoin(programs, eq(programs.id, programMatches.programId));
 
@@ -95,6 +104,7 @@ export async function listPersistedPartnerFacts(): Promise<PartnerRepairFact[]> 
       matchStatus: best.status,
       coverageStatus: toCoverageStatus(best.status),
       caseStatus: toCaseStatus(first.caseStatus),
+      trainingOpportunity: first.trainingOpportunity,
       createdAt: first.createdAt.toISOString(),
       synthetic: false,
     };

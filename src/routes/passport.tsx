@@ -4,13 +4,13 @@ import { Check, FileText } from "lucide-react";
 import { DemoSessionPanel } from "@/components/demo-session-panel";
 import { DemoFlag, PriorityBadge, SectionLabel, StatusBadge } from "@/components/homefix";
 import { ResidentCaseRequired } from "@/components/resident-case-required";
-import { getCase } from "@/lib/homefix-api";
+import { getCase, isValidAssessment } from "@/lib/homefix-api";
 import { toRepairCategoryLabel } from "@/lib/repair-categories";
 import { resolveResidentCaseId } from "@/lib/resident-case";
 
 export const Route = createFileRoute("/passport")({
   validateSearch: (search: Record<string, unknown>) => ({
-    caseId: typeof search.caseId === "string" ? search.caseId : "",
+    caseId: typeof search["caseId"] === "string" ? search["caseId"] : "",
   }),
   head: () => ({
     meta: [
@@ -72,9 +72,16 @@ function PassportPage() {
   const readiness =
     totalDocuments === 0 ? 0 : Math.round((completedDocuments / totalDocuments) * 100);
   const assessedNeedCount = useMemo(() => {
-    const ids = new Set((payload?.assessments ?? []).map((assessment) => assessment.repairNeedId));
+    const ids = new Set(
+      (payload?.assessments ?? [])
+        .filter(isValidAssessment)
+        .map((assessment) => assessment.repairNeedId),
+    );
     return ids.size;
   }, [payload]);
+  const passportReady = Boolean(
+    payload?.repairNeeds.length && assessedNeedCount === payload.repairNeeds.length,
+  );
 
   if (!caseId) return <ResidentCaseRequired pageName="Repair Passport" />;
   if (isLoading) return <div className="mx-auto max-w-7xl px-4 py-10">Loading passport...</div>;
@@ -88,7 +95,7 @@ function PassportPage() {
           <div>
             <DemoFlag />
             <p className="mt-8 text-xs font-bold uppercase text-rust">
-              Your Repair Passport is ready
+              {passportReady ? "Your Repair Passport is ready" : "Repair Passport in progress"}
             </p>
             <h1 className="mt-3 text-5xl uppercase leading-none sm:text-7xl">
               {payload.home.streetAddress}
@@ -105,7 +112,12 @@ function PassportPage() {
             <div>
               <span className="eyebrow">Status</span>
               <div className="mt-2">
-                <StatusBadge tone="positive">{payload.case.status}</StatusBadge>
+                <StatusBadge tone={payload.lifecycle.complete ? "positive" : "warning"}>
+                  {
+                    payload.lifecycle.steps.find((step) => step.stage === payload.lifecycle.stage)
+                      ?.label
+                  }
+                </StatusBadge>
               </div>
             </div>
           </div>
@@ -166,8 +178,8 @@ function PassportPage() {
         <section className="border-t border-foreground p-6 sm:p-8">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <span className="eyebrow">Document readiness</span>
-              <h2 className="mt-2 text-4xl">{readiness}% Ready</h2>
+              <span className="eyebrow">Documents required before final verification</span>
+              <h2 className="mt-2 text-4xl">Prepare these documents for partner review</h2>
             </div>
             <div className="w-full max-w-md">
               <div className="h-4 bg-muted">
@@ -186,7 +198,7 @@ function PassportPage() {
                   <span>
                     {doc.documentType}
                     <small className="block text-muted-foreground">
-                      {done ? "Ready" : "Needed"}
+                      {done ? "Available for review" : "Verification pending"}
                     </small>
                   </span>
                 </div>
@@ -201,8 +213,33 @@ function PassportPage() {
           <Stat value={String(payload.case.coveragePercentage) + "%"} label="Potential Coverage" />
         </section>
 
+        <section className="border-t border-foreground p-6 sm:p-8">
+          <SectionLabel number="04">Repair Passport Progress</SectionLabel>
+          <ol className="mt-6 grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
+            {payload.lifecycle.steps.map((step) => (
+              <li key={step.stage} className="flex min-h-24 items-center gap-3 bg-paper p-4">
+                <span
+                  className={`grid size-7 shrink-0 place-items-center ${step.status === "complete" ? "bg-primary text-primary-foreground" : step.status === "current" ? "bg-warning text-foreground" : "border border-border"}`}
+                >
+                  {step.status === "complete" ? <Check className="size-4" /> : null}
+                </span>
+                <span>
+                  <strong className="block">{step.label}</strong>
+                  <small className="text-muted-foreground">
+                    {step.status === "complete"
+                      ? "Complete"
+                      : step.status === "current"
+                        ? "Current"
+                        : "Pending"}
+                  </small>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
+
         <footer className="flex flex-col justify-between gap-5 border-t border-foreground p-6 sm:flex-row sm:items-center sm:p-8">
-          <div className="text-xs text-muted-foreground">Case status: {payload.case.status}</div>
+          <div className="text-xs text-muted-foreground">Next: {payload.lifecycle.nextAction}</div>
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
               className="blueprint-button button-primary inline-flex items-center"
@@ -215,7 +252,7 @@ function PassportPage() {
             <Link
               className="blueprint-button button-secondary inline-flex items-center"
               to="/intake"
-              search={{ demo: "denise-carter-pitch-v1" }}
+              search={{}}
             >
               Start New Assessment
             </Link>

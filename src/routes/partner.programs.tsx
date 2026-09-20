@@ -62,12 +62,6 @@ const groups = [
   },
 ] as const;
 
-const capacityAliases: Record<string, string> = {
-  "critical-home-repair": "critical-home-repair",
-  "detroit-leadsafe-housing": "leadsafe",
-  "wayne-metro-weatherization": "weatherization",
-};
-
 function Programs() {
   const { catalog, analytics } = Route.useLoaderData();
   const search = Route.useSearch();
@@ -167,8 +161,7 @@ function Programs() {
               </div>
               <div className="divide-y divide-border">
                 {items.map((program) => {
-                  const capacityId = program.slug ? capacityAliases[program.slug] : undefined;
-                  const capacity = capacityId ? capacityByProgram.get(capacityId) : undefined;
+                  const capacity = program.slug ? capacityByProgram.get(program.slug) : undefined;
                   return (
                     <article
                       key={program.id}

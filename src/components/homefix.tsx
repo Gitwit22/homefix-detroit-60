@@ -391,6 +391,11 @@ export const repairCategories = [
   ["Accessibility", Users],
   ["Structural", Building2],
   ["Environmental", ShieldCheck],
+  ["Carpentry", Hammer],
+  ["Drywall / Plaster", FileText],
+  ["Concrete / Masonry", Building2],
+  ["Flooring", Home],
+  ["Painting / Finishing", CircleDot],
   ["Other", Menu],
 ] as const;
 

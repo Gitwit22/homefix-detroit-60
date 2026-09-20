@@ -8,12 +8,32 @@ import {
   repairPhotos,
 } from "../db/schema.js";
 import { DENISE_DEMO_SCENARIO, loadSavedDemoAssessment } from "../demo/deniseScenario.js";
-import { normalizeRepairCategory } from "../domain/repair.js";
+import { normalizeRepairCategory, normalizeTriageRepairCategory } from "../domain/repair.js";
 import { triageResponseSchema, type TriageResponse } from "../validation/triage.js";
 import { signedPhotoUrl } from "./photos.js";
 
 const triageWebhookUrl = process.env.N8N_TRIAGE_WEBHOOK_URL;
 const triageSecret = process.env.N8N_HOMEFIX_SECRET;
+
+export function buildTriageWebhookPayload(input: {
+  caseId: string;
+  repairNeedId: string;
+  category: string;
+  description: string;
+  gettingWorse: boolean;
+  safetyStatus: "safe" | "unsafe" | "unsure";
+  imageUrls: string[];
+}) {
+  return {
+    caseId: input.caseId,
+    repairNeedId: input.repairNeedId,
+    reportedCategory: normalizeTriageRepairCategory(input.category),
+    description: input.description,
+    gettingWorse: input.gettingWorse,
+    safeToOccupy: input.safetyStatus === "safe",
+    imageUrls: input.imageUrls,
+  };
+}
 
 async function callTriageWebhook(payload: unknown): Promise<TriageResponse> {
   if (process.env.HOMEFIX_FORCE_AI_FAILURE === "1") {
@@ -30,7 +50,7 @@ async function callTriageWebhook(payload: unknown): Promise<TriageResponse> {
       Authorization: "Bearer " + triageSecret,
     },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(Number(process.env.HOMEFIX_TRIAGE_TIMEOUT_MS ?? 15_000)),
+    signal: AbortSignal.timeout(Number(process.env.HOMEFIX_TRIAGE_TIMEOUT_MS ?? 25_000)),
   });
 
   if (!response.ok) {
@@ -44,39 +64,48 @@ async function callTriageWebhook(payload: unknown): Promise<TriageResponse> {
 const fallbackDetails: Record<string, { observation: string; question: string }> = {
   roof_water_intrusion: {
     observation: "The resident report appears consistent with possible water intrusion.",
-    question: "Does water enter during rainfall or is any ceiling area sagging?",
+    question: "Verify whether water enters during rainfall or any ceiling area is sagging.",
   },
   hvac: {
     observation: "The resident report indicates unreliable or unavailable home heating.",
-    question: "Is the system producing any heat, unusual odors, or visible smoke?",
+    question: "Verify whether the system produces heat, unusual odors, or visible smoke.",
   },
   electrical: {
     observation: "The resident report indicates a possible electrical safety concern.",
-    question: "Are there sparks, burning odors, warm outlets, or repeated breaker trips?",
+    question: "Verify any sparks, burning odors, warm outlets, or repeated breaker trips.",
   },
 };
 
 export function fallbackTriage(input: {
   category: string;
   gettingWorse: boolean;
-  safeToOccupy: boolean;
+  safetyStatus: "safe" | "unsafe" | "unsure";
 }): TriageResponse {
-  const normalized = normalizeRepairCategory(input.category);
+  const normalized = normalizeTriageRepairCategory(input.category);
   const details = fallbackDetails[normalized] ?? {
     observation: "The resident-reported condition requires professional evaluation.",
-    question: "Has the condition changed recently or created an immediate safety concern?",
+    question: "Verify whether the condition has changed or created an immediate safety concern.",
   };
   return {
     repairCategory: normalized,
-    urgency: !input.safeToOccupy || input.gettingWorse ? "high" : "moderate",
+    urgency: input.safetyStatus !== "safe" || input.gettingWorse ? "high" : "moderate",
     summary:
       "The reported conditions appear consistent with a possible repair issue that warrants professional evaluation.",
     observations: [details.observation, "Photo and description require professional review."],
-    safetyFlags: input.safeToOccupy
-      ? []
-      : ["Resident reported that the home may not be safe to occupy."],
-    followUpQuestions: [details.question, "Has the condition changed recently?"],
+    safetyFlags:
+      input.safetyStatus === "safe"
+        ? []
+        : input.safetyStatus === "unsafe"
+          ? ["Resident reported that the home may not be safe to occupy."]
+          : ["Resident is unsure whether the home is safe to occupy; partner review is required."],
+    followUpQuestions: [details.question, "Verify whether the condition has changed recently."],
     confidence: 0.35,
+    trainingOpportunity: {
+      status: "requires_inspection",
+      reason:
+        "Training suitability cannot be determined from the available information and requires professional inspection.",
+      possibleSkills: [],
+    },
   };
 }
 
@@ -120,15 +149,15 @@ export async function runRepairTriage(input: { caseId: string; repairNeedId: str
           : photo.imageUrl,
       ),
     );
-    const webhookPayload = {
+    const webhookPayload = buildTriageWebhookPayload({
       caseId,
       repairNeedId,
+      category: need.category,
       description: need.description,
-      reportedCategory: normalizeRepairCategory(need.category),
       gettingWorse: need.gettingWorse,
-      safeToOccupy: need.safeToOccupy,
+      safetyStatus: need.safetyStatus,
       imageUrls,
-    };
+    });
     triage = await callTriageWebhook(webhookPayload);
   } catch (error) {
     const savedAssessment =
@@ -140,7 +169,7 @@ export async function runRepairTriage(input: { caseId: string; repairNeedId: str
       fallbackTriage({
         category: need.category,
         gettingWorse: need.gettingWorse,
-        safeToOccupy: need.safeToOccupy,
+        safetyStatus: need.safetyStatus,
       });
     model = savedAssessment ? "homefix-saved-demo-v1" : "homefix-triage-fallback-v1";
     failureCode = "AI_REQUEST_FAILED";
@@ -159,6 +188,7 @@ export async function runRepairTriage(input: { caseId: string; repairNeedId: str
         safetyFlags: triage.safetyFlags,
         followUpQuestions: triage.followUpQuestions,
         confidence: String(triage.confidence),
+        trainingOpportunity: triage.trainingOpportunity,
         model,
       })
       .onConflictDoUpdate({
@@ -171,6 +201,7 @@ export async function runRepairTriage(input: { caseId: string; repairNeedId: str
           safetyFlags: triage.safetyFlags,
           followUpQuestions: triage.followUpQuestions,
           confidence: String(triage.confidence),
+          trainingOpportunity: triage.trainingOpportunity,
           model,
         },
       });
@@ -196,7 +227,7 @@ export async function runRepairTriage(input: { caseId: string; repairNeedId: str
     await transaction.insert(caseEvents).values({
       repairCaseId: caseId,
       eventType: `repair_assessed:${repairNeedId}`,
-      title: "Preliminary repair assessment completed",
+      title: "Repair report normalized",
       description: triage.summary,
       metadata: {
         urgency: triage.urgency,
@@ -210,9 +241,9 @@ export async function runRepairTriage(input: { caseId: string; repairNeedId: str
     await transaction
       .update(repairCases)
       .set({
-        status: "assessment_completed",
-        currentStep: "assessment",
-        nextAction: "Review potential program matches",
+        status: "initial_eligibility",
+        currentStep: "initial_eligibility",
+        nextAction: "Check the report against current program requirements.",
       })
       .where(eq(repairCases.id, caseId));
   });

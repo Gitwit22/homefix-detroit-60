@@ -7,6 +7,11 @@ export const repairTypes = [
   "structural",
   "lead_environmental",
   "windows_doors",
+  "carpentry",
+  "drywall_plaster",
+  "concrete_masonry",
+  "flooring",
+  "painting_finishing",
   "other",
 ] as const;
 
@@ -23,6 +28,22 @@ export type CaseStatus =
   | "waitlisted"
   | "repair_scheduled";
 export type CapacityStatus = "open" | "limited" | "waitlist" | "closed";
+export const workforceDisciplines = [
+  "painting_finish",
+  "weatherization",
+  "basic_carpentry",
+  "accessibility_work",
+  "needs_review",
+] as const;
+export type WorkforceDiscipline = (typeof workforceDisciplines)[number];
+
+export const workforceDisciplineLabels: Record<WorkforceDiscipline, string> = {
+  painting_finish: "Painting / Finish",
+  weatherization: "Weatherization",
+  basic_carpentry: "Basic Carpentry",
+  accessibility_work: "Accessibility Work",
+  needs_review: "Other / Needs Review",
+};
 
 export const repairTypeLabels: Record<RepairType, string> = {
   roof_water_intrusion: "Roof / Water",
@@ -33,6 +54,11 @@ export const repairTypeLabels: Record<RepairType, string> = {
   structural: "Structural",
   lead_environmental: "Lead / Environmental",
   windows_doors: "Windows / Doors",
+  carpentry: "Carpentry",
+  drywall_plaster: "Drywall / Plaster",
+  concrete_masonry: "Concrete / Masonry",
+  flooring: "Flooring",
+  painting_finishing: "Painting / Finishing",
   other: "Other",
 };
 
@@ -86,6 +112,11 @@ export type PartnerRepairFact = {
   coverageStatus: CoverageStatus;
   caseStatus: CaseStatus;
   programId?: string;
+  trainingOpportunity?: {
+    status: "not_suitable" | "potential" | "requires_inspection";
+    reason: string;
+    possibleSkills: string[];
+  } | null;
   createdAt: string;
   synthetic: boolean;
 };
@@ -167,6 +198,47 @@ export type PartnerCaseDetail = PartnerCaseSummary & {
     coverageStatus: CoverageStatus;
     programId?: string;
   }>;
+  inspectionPackage?: {
+    status: string;
+    availabilityWindows: Array<{ start: string; end: string }>;
+    confirmedStart: string | null;
+    confirmedEnd: string | null;
+    providerName: string | null;
+    providerPhone: string | null;
+    questions: Array<{
+      id: string;
+      repairNeedId: string;
+      question: string;
+      answer: string | null;
+      unableToVerify: boolean;
+    }>;
+    needs: Array<{
+      repairNeedId: string;
+      description: string;
+      reportedCategory: string;
+      urgency: string;
+      photos: Array<{ id: string; imageUrl: string }>;
+      assessment: {
+        summary: string | null;
+        urgency: string | null;
+        confidence: string | null;
+        safetyFlags: string[];
+        trainingOpportunity: {
+          status: "not_suitable" | "potential" | "requires_inspection";
+          reason: string;
+          possibleSkills: string[];
+        } | null;
+      } | null;
+      finding: {
+        confirmedCategory: string;
+        urgency: string;
+        condition: string;
+        notes: string | null;
+        verifiedScope: string;
+        estimatedCostCents: number | null;
+      } | null;
+    }>;
+  } | null;
   overflow?: {
     eligible: boolean;
     programId?: string;
@@ -189,6 +261,20 @@ export type ProgramCapacityMetric = ProgramCapacityModel & {
   excessDemand: number;
 };
 
+export type WorkforceOpportunity = {
+  caseId: string;
+  caseNumber: string;
+  repairNeedId: string;
+  zipCode: string;
+  repairType: RepairType;
+  repairLabel: string;
+  status: "potential" | "requires_inspection";
+  reason: string;
+  possibleSkills: string[];
+  discipline: WorkforceDiscipline;
+  createdAt: string;
+};
+
 export type PartnerAnalytics = {
   generatedAt: string;
   seed: number;
@@ -207,6 +293,15 @@ export type PartnerAnalytics = {
   highPriorityCases: HighPriorityCase[];
   cases: PartnerCaseSummary[];
   programCapacity: ProgramCapacityMetric[];
+  workforceOpportunities: {
+    total: number;
+    byDiscipline: Array<{
+      discipline: WorkforceDiscipline;
+      label: string;
+      count: number;
+    }>;
+    opportunities: WorkforceOpportunity[];
+  };
   coverage: {
     potentiallyCoveredPercentage: number;
     unmatchedPercentage: number;

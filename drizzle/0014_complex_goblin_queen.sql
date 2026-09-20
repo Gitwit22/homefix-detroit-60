@@ -1,0 +1,3 @@
+ALTER TABLE "repair_needs" ADD COLUMN "repair_role" text DEFAULT 'PRIMARY' NOT NULL;--> statement-breakpoint
+ALTER TABLE "repair_needs" ADD COLUMN "parent_repair_need_id" uuid;--> statement-breakpoint
+ALTER TABLE "repair_needs" ADD CONSTRAINT "repair_needs_parent_repair_need_id_repair_needs_id_fk" FOREIGN KEY ("parent_repair_need_id") REFERENCES "public"."repair_needs"("id") ON DELETE cascade ON UPDATE no action;

@@ -5,6 +5,7 @@ import { ResidentCaseRequired } from "@/components/resident-case-required";
 import { getCase, getCoverage } from "@/lib/homefix-api";
 import { toRepairCategoryLabel } from "@/lib/repair-categories";
 import { resolveResidentCaseId } from "@/lib/resident-case";
+import { toMatchStatusLabel } from "../../server/domain/eligibility";
 
 export const Route = createFileRoute("/coverage")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -151,7 +152,8 @@ function CoveragePage() {
 }
 
 function helperText(status: string) {
-  if (status === "strong_match") return "All required deterministic checks currently pass.";
+  if (status === "strong_match")
+    return "All required deterministic checks currently pass for this initial screening.";
   if (status === "potential_match") return "Likely fit; manual review or optional checks remain.";
   if (status === "verification_needed")
     return "At least one required eligibility rule needs verification.";
@@ -176,13 +178,7 @@ function MatchLink({
           ? "warning"
           : "info";
   const label =
-    status === "strong_match"
-      ? "Strong Match"
-      : status === "potential_match"
-        ? "Potential Match"
-        : status === "verification_needed"
-          ? "Verification Needed"
-          : "Funding Gap";
+    status === "funding_gap" ? "Funding Gap" : toMatchStatusLabel(status);
 
   const badge = <StatusBadge tone={tone}>{label}</StatusBadge>;
 

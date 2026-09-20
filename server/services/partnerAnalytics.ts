@@ -13,7 +13,11 @@ import {
   type PartnerRepairFact,
   type ProgramCapacityModel,
   type UnmetNeedMetric,
+  type WorkforceDiscipline,
+  type WorkforceOpportunity,
   type ZipMetric,
+  workforceDisciplineLabels,
+  workforceDisciplines,
 } from "../domain/partnerAnalytics.js";
 
 const priorityRank: Record<Priority, number> = { low: 0, moderate: 1, high: 2, critical: 3 };
@@ -130,6 +134,57 @@ function highPrioritySort(left: HighPriorityCase, right: HighPriorityCase): numb
   );
 }
 
+export function classifyWorkforceDiscipline(fact: PartnerRepairFact): WorkforceDiscipline {
+  const searchable = fact.trainingOpportunity?.possibleSkills.join(" ").toLowerCase() ?? "";
+  if (/accessib|ramp|handrail|grab bar/.test(searchable) || fact.repairType === "accessibility") {
+    return "accessibility_work";
+  }
+  if (/weather|seal|caulk|insulat|air leak/.test(searchable)) return "weatherization";
+  if (/paint|finish|drywall|plaster/.test(searchable)) return "painting_finish";
+  if (/carpentry|trim|framing|wood|cabinet|door/.test(searchable)) return "basic_carpentry";
+  return "needs_review";
+}
+
+function buildWorkforceOpportunities(facts: PartnerRepairFact[]) {
+  const opportunities: WorkforceOpportunity[] = facts
+    .filter(
+      (fact) =>
+        fact.trainingOpportunity?.status === "potential" ||
+        fact.trainingOpportunity?.status === "requires_inspection",
+    )
+    .map((fact) => ({
+      caseId: fact.caseId,
+      caseNumber: fact.caseNumber,
+      repairNeedId: fact.repairNeedId,
+      zipCode: fact.zipCode,
+      repairType: fact.repairType,
+      repairLabel: repairTypeLabels[fact.repairType],
+      status: fact.trainingOpportunity!.status as "potential" | "requires_inspection",
+      reason: fact.trainingOpportunity!.reason,
+      possibleSkills: fact.trainingOpportunity!.possibleSkills,
+      discipline: classifyWorkforceDiscipline(fact),
+      createdAt: fact.createdAt,
+    }))
+    .sort(
+      (left, right) =>
+        right.createdAt.localeCompare(left.createdAt) ||
+        left.caseNumber.localeCompare(right.caseNumber) ||
+        left.repairNeedId.localeCompare(right.repairNeedId),
+    );
+
+  return {
+    total: opportunities.length,
+    byDiscipline: workforceDisciplines
+      .map((discipline) => ({
+        discipline,
+        label: workforceDisciplineLabels[discipline],
+        count: opportunities.filter((item) => item.discipline === discipline).length,
+      }))
+      .filter((metric) => metric.discipline !== "needs_review" || metric.count > 0),
+    opportunities,
+  };
+}
+
 export function calculatePartnerAnalytics(
   facts: PartnerRepairFact[],
   capacities: ProgramCapacityModel[],
@@ -216,6 +271,7 @@ export function calculatePartnerAnalytics(
     };
   });
   const { summaries } = buildCases(facts);
+  const workforceOpportunities = buildWorkforceOpportunities(facts);
 
   return {
     generatedAt,
@@ -235,6 +291,7 @@ export function calculatePartnerAnalytics(
     highPriorityCases,
     cases: summaries,
     programCapacity,
+    workforceOpportunities,
     coverage: {
       potentiallyCoveredPercentage: percentage(totalsMetric.potentiallyCovered, facts.length),
       unmatchedPercentage: percentage(totalsMetric.unmatched, facts.length),

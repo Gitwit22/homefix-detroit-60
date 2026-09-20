@@ -15,6 +15,11 @@ import {
   wipeDemoSessionData,
 } from "../../server/services/demoSession.js";
 import { getCaseAggregate } from "../../server/services/case.js";
+import {
+  confirmInspection,
+  recordInspectionFindings,
+  submitInspectionAvailability,
+} from "../../server/services/inspection.js";
 import { processCase, processRepair } from "../../server/services/processRepair.js";
 import { rollbackRepairPhoto, uploadRepairPhoto } from "../../server/services/photos.js";
 import { getProgramDetail, listProgramCatalog } from "../../server/services/program.js";
@@ -48,6 +53,7 @@ import {
   submitOverflowBid,
   submitOverflowBidSchema,
 } from "../../server/services/overflow.js";
+import { trainingOpportunitySchema } from "../../server/validation/triage.js";
 
 const port = parsePort(process.env.PORT);
 const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGINS);
@@ -58,10 +64,68 @@ async function withOverflowCaseState(caseId: string) {
   const partnerCase = getPartnerCaseDetail(partnerFacts, caseId);
   if (!partnerCase) return null;
 
-  const existingWorkOrder = await findExistingOverflowWorkOrderByCaseNumber(partnerCase.caseNumber);
+  const [existingWorkOrder, aggregate] = await Promise.all([
+    findExistingOverflowWorkOrderByCaseNumber(partnerCase.caseNumber),
+    getCaseAggregate(caseId),
+  ]);
+  const inspectionPackage = aggregate?.inspection
+    ? {
+        status: aggregate.inspection.status,
+        availabilityWindows: aggregate.inspection.availabilityWindows,
+        confirmedStart: aggregate.inspection.confirmedStart?.toISOString() ?? null,
+        confirmedEnd: aggregate.inspection.confirmedEnd?.toISOString() ?? null,
+        providerName: aggregate.inspection.providerName,
+        providerPhone: aggregate.inspection.providerPhone,
+        questions: aggregate.inspection.inspectionQuestions,
+        needs: aggregate.repairNeeds.map((need) => {
+          const assessment = aggregate.assessments.find((item) => item.repairNeedId === need.id);
+          const finding = aggregate.inspectionFindings.find(
+            (item) => item.repairNeedId === need.id,
+          );
+          return {
+            repairNeedId: need.id,
+            description: need.description,
+            reportedCategory: need.category,
+            urgency: need.urgency,
+            photos: aggregate.photos
+              .filter(
+                (photo) =>
+                  photo.repairNeedId === need.id && photo.evidenceStage === "resident_report",
+              )
+              .map((photo) => ({ id: photo.id, imageUrl: photo.imageUrl })),
+            assessment: assessment
+              ? {
+                  summary: assessment.summary,
+                  urgency: assessment.urgency,
+                  confidence: assessment.confidence,
+                  safetyFlags: Array.isArray(assessment.safetyFlags)
+                    ? assessment.safetyFlags.filter(
+                        (flag): flag is string => typeof flag === "string",
+                      )
+                    : [],
+                  trainingOpportunity:
+                    trainingOpportunitySchema.safeParse(assessment.trainingOpportunity).data ??
+                    null,
+                }
+              : null,
+            finding: finding
+              ? {
+                  confirmedCategory: finding.confirmedCategory,
+                  urgency: finding.urgency,
+                  condition: finding.condition,
+                  notes: finding.notes,
+                  verifiedScope: finding.verifiedScope,
+                  estimatedCostCents: finding.estimatedCostCents,
+                }
+              : null,
+          };
+        }),
+      }
+    : null;
 
   return {
     ...partnerCase,
+    inspectionPackage,
     overflow: {
       eligible: false,
       existingWorkOrder: existingWorkOrder
@@ -115,7 +179,7 @@ function applyCors(request: IncomingMessage, response: ServerResponse): boolean 
   if (!allowedOrigins.has(origin) && !isDevelopmentLoopback) return false;
 
   response.setHeader("access-control-allow-origin", origin);
-  response.setHeader("access-control-allow-methods", "GET, POST, DELETE, OPTIONS");
+  response.setHeader("access-control-allow-methods", "GET, POST, PATCH, DELETE, OPTIONS");
   response.setHeader("access-control-allow-headers", "content-type, x-homefix-demo-session");
   response.setHeader("vary", "Origin");
   return true;
@@ -272,7 +336,12 @@ const server = createServer(async (request, response) => {
                 ? 400
                 : 500;
       if (status === 500) console.error(error);
-      sendJson(response, status, { error: status === 409 ? "Passport already belongs to another session" : "Unable to save Passport" });
+      sendJson(response, status, {
+        error:
+          status === 409
+            ? "Passport already belongs to another session"
+            : "Unable to save Passport",
+      });
       return;
     }
   }
@@ -543,6 +612,11 @@ const server = createServer(async (request, response) => {
     const uploadedPhotoIds: string[] = [];
     try {
       const repairNeedId = repairPhotoMatch[1]!;
+      const evidenceStage = requestUrl.searchParams.get("stage") ?? "resident_report";
+      if (!["resident_report", "inspection", "completion"].includes(evidenceStage)) {
+        sendJson(response, 400, { error: "Invalid photo evidence stage" });
+        return;
+      }
       files = await readPhotoFiles(request);
       if (files.length === 0) {
         sendJson(response, 400, { error: "At least one valid image is required" });
@@ -555,6 +629,7 @@ const server = createServer(async (request, response) => {
           filepath: file.filepath,
           originalFilename: file.originalFilename ?? "repair-photo",
           mimeType: file.mimetype ?? "application/octet-stream",
+          evidenceStage: evidenceStage as "resident_report" | "inspection" | "completion",
         });
         photos.push(photo);
         uploadedPhotoIds.push(photo.id);
@@ -591,6 +666,60 @@ const server = createServer(async (request, response) => {
     } catch (error) {
       console.error(error);
       sendJson(response, 500, { error: "Unable to load case" });
+    }
+    return;
+  }
+
+  const inspectionAvailabilityMatch = requestUrl.pathname.match(
+    /^\/api\/v1\/cases\/([0-9a-f-]+)\/inspection\/availability$/i,
+  );
+  if (method === "POST" && inspectionAvailabilityMatch) {
+    try {
+      const payload = await submitInspectionAvailability(
+        inspectionAvailabilityMatch[1]!,
+        await readJson(request),
+      );
+      sendJson(response, 200, payload);
+    } catch (error) {
+      const status = error instanceof Error && error.name === "ZodError" ? 400 : 409;
+      sendJson(response, status, {
+        error: error instanceof Error ? error.message : "Unable to submit inspection availability",
+      });
+    }
+    return;
+  }
+
+  const inspectionConfirmMatch = requestUrl.pathname.match(
+    /^\/api\/v1\/cases\/([0-9a-f-]+)\/inspection\/confirm$/i,
+  );
+  if (method === "POST" && inspectionConfirmMatch) {
+    try {
+      const payload = await confirmInspection(inspectionConfirmMatch[1]!, await readJson(request));
+      sendJson(response, 200, payload);
+    } catch (error) {
+      const status = error instanceof Error && error.name === "ZodError" ? 400 : 409;
+      sendJson(response, status, {
+        error: error instanceof Error ? error.message : "Unable to confirm inspection",
+      });
+    }
+    return;
+  }
+
+  const inspectionFindingsMatch = requestUrl.pathname.match(
+    /^\/api\/v1\/cases\/([0-9a-f-]+)\/inspection\/findings$/i,
+  );
+  if (method === "POST" && inspectionFindingsMatch) {
+    try {
+      const payload = await recordInspectionFindings(
+        inspectionFindingsMatch[1]!,
+        await readJson(request),
+      );
+      sendJson(response, 200, payload);
+    } catch (error) {
+      const status = error instanceof Error && error.name === "ZodError" ? 400 : 409;
+      sendJson(response, status, {
+        error: error instanceof Error ? error.message : "Unable to record inspection findings",
+      });
     }
     return;
   }

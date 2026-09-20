@@ -13,7 +13,7 @@ const savedMatches: Partial<Record<RepairCategory, DeniseMatch>> = {
   roof_water_intrusion: {
     programSlug: "critical-home-repair",
     matchStatus: "strong_match",
-    approvalStatus: "approved",
+    approvalStatus: "pending",
   },
   hvac: {
     programSlug: "wayne-metro-weatherization",
@@ -32,12 +32,20 @@ const savedAssessments: Record<"roof_water_intrusion" | "hvac" | "electrical", T
       "Ceiling staining and damp material are consistent with water entering from above.",
       "The reported spread after heavy rain suggests the roof envelope should be inspected promptly.",
     ],
-    safetyFlags: ["Keep people and belongings away from any sagging or actively dripping ceiling area."],
+    safetyFlags: [
+      "Keep people and belongings away from any sagging or actively dripping ceiling area.",
+    ],
     followUpQuestions: [
-      "Does water enter only during rainfall?",
-      "Is any part of the ceiling sagging or soft?",
+      "Verify whether water enters only during rainfall.",
+      "Verify whether any part of the ceiling is sagging or soft.",
     ],
     confidence: 0.91,
+    trainingOpportunity: {
+      status: "potential",
+      reason:
+        "Repairing the leak may create supervised weather-sealing and interior finish-restoration tasks.",
+      possibleSkills: ["weather sealing", "drywall repair", "painting and finishing"],
+    },
   },
   hvac: {
     repairCategory: "hvac",
@@ -50,10 +58,16 @@ const savedAssessments: Record<"roof_water_intrusion" | "hvac" | "electrical", T
     ],
     safetyFlags: ["Stop using the system and leave the home if smoke or a gas odor is present."],
     followUpQuestions: [
-      "Does the thermostat remain powered when heat stops?",
-      "Are there unusual odors, sounds, or visible smoke?",
+      "Verify whether the thermostat remains powered when heat stops.",
+      "Verify any unusual odors, sounds, or visible smoke.",
     ],
     confidence: 0.86,
+    trainingOpportunity: {
+      status: "requires_inspection",
+      reason:
+        "The licensed HVAC repair is not training work, but inspection may identify supervised weatherization tasks.",
+      possibleSkills: ["weather sealing", "basic insulation work"],
+    },
   },
   electrical: {
     repairCategory: "electrical",
@@ -64,12 +78,19 @@ const savedAssessments: Record<"roof_water_intrusion" | "hvac" | "electrical", T
       "The resident reports outlets that spark or stop working.",
       "The affected circuit should not be used until it is evaluated by a licensed electrician.",
     ],
-    safetyFlags: ["Do not use an outlet that sparks, feels warm, smells burned, or shows discoloration."],
+    safetyFlags: [
+      "Do not use an outlet that sparks, feels warm, smells burned, or shows discoloration.",
+    ],
     followUpQuestions: [
-      "Do breakers trip when the affected outlets are used?",
-      "Are there burning odors, warm cover plates, or visible discoloration?",
+      "Verify whether breakers trip when the affected outlets are used.",
+      "Verify any burning odors, warm cover plates, or visible discoloration.",
     ],
     confidence: 0.94,
+    trainingOpportunity: {
+      status: "not_suitable",
+      reason: "The reported electrical hazard requires a licensed professional.",
+      possibleSkills: [],
+    },
   },
 };
 

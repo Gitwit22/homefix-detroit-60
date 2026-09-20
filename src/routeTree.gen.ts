@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AssessmentRouteImport } from './routes/assessment'
 import { Route as CoverageRouteImport } from './routes/coverage'
+import { Route as InspectionRouteImport } from './routes/inspection'
 import { Route as IntakeRouteImport } from './routes/intake'
 import { Route as PartnerRouteImport } from './routes/partner'
 import { Route as PassportRouteImport } from './routes/passport'
@@ -41,6 +42,11 @@ const AssessmentRoute = AssessmentRouteImport.update({
 const CoverageRoute = CoverageRouteImport.update({
   id: '/coverage',
   path: '/coverage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InspectionRoute = InspectionRouteImport.update({
+  id: '/inspection',
+  path: '/inspection',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IntakeRoute = IntakeRouteImport.update({
@@ -123,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/assessment': typeof AssessmentRoute
   '/coverage': typeof CoverageRoute
+  '/inspection': typeof InspectionRoute
   '/intake': typeof IntakeRoute
   '/partner': typeof PartnerRouteWithChildren
   '/passport': typeof PassportRoute
@@ -143,6 +150,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/assessment': typeof AssessmentRoute
   '/coverage': typeof CoverageRoute
+  '/inspection': typeof InspectionRoute
   '/intake': typeof IntakeRoute
   '/passport': typeof PassportRoute
   '/status': typeof StatusRoute
@@ -161,6 +169,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/assessment': typeof AssessmentRoute
   '/coverage': typeof CoverageRoute
+  '/inspection': typeof InspectionRoute
   '/intake': typeof IntakeRoute
   '/partner': typeof PartnerRouteWithChildren
   '/passport': typeof PassportRoute
@@ -183,6 +192,7 @@ export interface FileRouteTypes {
     | '/'
     | '/assessment'
     | '/coverage'
+    | '/inspection'
     | '/intake'
     | '/partner'
     | '/passport'
@@ -203,6 +213,7 @@ export interface FileRouteTypes {
     | '/'
     | '/assessment'
     | '/coverage'
+    | '/inspection'
     | '/intake'
     | '/passport'
     | '/status'
@@ -220,6 +231,7 @@ export interface FileRouteTypes {
     | '/'
     | '/assessment'
     | '/coverage'
+    | '/inspection'
     | '/intake'
     | '/partner'
     | '/passport'
@@ -241,6 +253,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AssessmentRoute: typeof AssessmentRoute
   CoverageRoute: typeof CoverageRoute
+  InspectionRoute: typeof InspectionRoute
   IntakeRoute: typeof IntakeRoute
   PartnerRoute: typeof PartnerRouteWithChildren
   PassportRoute: typeof PassportRoute
@@ -269,6 +282,13 @@ declare module '@tanstack/react-router' {
       path: '/coverage'
       fullPath: '/coverage'
       preLoaderRoute: typeof CoverageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inspection': {
+      id: '/inspection'
+      path: '/inspection'
+      fullPath: '/inspection'
+      preLoaderRoute: typeof InspectionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/intake': {
@@ -432,6 +452,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AssessmentRoute: AssessmentRoute,
   CoverageRoute: CoverageRoute,
+  InspectionRoute: InspectionRoute,
   IntakeRoute: IntakeRoute,
   PartnerRoute: PartnerRouteWithChildren,
   PassportRoute: PassportRoute,

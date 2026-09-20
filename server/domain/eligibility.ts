@@ -29,6 +29,17 @@ export const matchStatuses = [
 ] as const;
 export type MatchStatus = (typeof matchStatuses)[number];
 
+export const matchStatusLabels: Record<MatchStatus, string> = {
+  strong_match: "Strong Match",
+  potential_match: "Potential Match",
+  verification_needed: "Verification Needed",
+  not_eligible: "Not Eligible",
+};
+
+export function toMatchStatusLabel(status: string): string {
+  return matchStatusLabels[status as MatchStatus] ?? "Not Eligible";
+}
+
 export type RuleResult = {
   passed: boolean | null;
   ruleType: ProgramRuleType;

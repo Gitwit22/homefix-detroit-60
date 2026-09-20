@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Circle } from "lucide-react";
 import { BlueprintButton, DemoFlag, PageIntro, StatusBadge } from "@/components/homefix";
 import { ResidentCaseRequired } from "@/components/resident-case-required";
@@ -25,17 +25,6 @@ export const Route = createFileRoute("/status")({
   }),
   component: StatusPage,
 });
-
-const journeySteps = [
-  "Assessment Created",
-  "Repair Passport Created",
-  "Potential Programs Identified",
-  "Verification Review",
-  "Program Referral",
-  "Program Review",
-  "Partner Follow-up",
-  "Outcome Pending",
-];
 
 function StatusPage() {
   const { caseId: searchCaseId } = Route.useSearch();
@@ -68,14 +57,6 @@ function StatusPage() {
     };
   }, [caseId]);
 
-  const progress = useMemo(() => {
-    if (!payload) return 0;
-    if (payload.matches.length > 0)
-      return payload.documents.some((item) => item.status === "missing") ? 3 : 4;
-    if (payload.assessments.length > 0) return 2;
-    return 0;
-  }, [payload]);
-
   if (!caseId) {
     return <ResidentCaseRequired pageName="Case Status" />;
   }
@@ -106,11 +87,11 @@ function StatusPage() {
       />
       <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_340px]">
         <ol className="border-l-2 border-foreground pl-7">
-          {journeySteps.map((step, index) => {
-            const complete = index < progress;
-            const current = index === progress;
+          {payload.lifecycle.steps.map((step, index) => {
+            const complete = step.status === "complete";
+            const current = step.status === "current";
             return (
-              <li key={step} className="relative border-b border-border py-6">
+              <li key={step.stage} className="relative border-b border-border py-6">
                 <span
                   className={`absolute -left-9.75 top-6 grid size-6 place-items-center ${complete ? "bg-primary text-primary-foreground" : current ? "bg-warning text-foreground" : "bg-background ring-1 ring-border"}`}
                 >
@@ -119,7 +100,7 @@ function StatusPage() {
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <span className="eyebrow">{String(index + 1).padStart(2, "0")}</span>
-                    <h2 className="mt-1 text-2xl">{step}</h2>
+                    <h2 className="mt-1 text-2xl">{step.label}</h2>
                   </div>
                   <StatusBadge tone={complete ? "positive" : current ? "warning" : "neutral"}>
                     {complete ? "Complete" : current ? "Current stage" : "Pending"}
@@ -131,9 +112,7 @@ function StatusPage() {
         </ol>
         <aside className="h-fit bg-navy p-6 text-primary-foreground lg:sticky lg:top-28">
           <p className="eyebrow text-warning">Current next action</p>
-          <h2 className="mt-3 text-3xl">
-            {payload.case.nextAction ?? "Review eligibility items and program fit"}
-          </h2>
+          <h2 className="mt-3 text-3xl">{payload.lifecycle.nextAction}</h2>
           <dl className="mt-8 space-y-5 text-sm">
             <Side k="Assigned program" v={assignedProgram} />
             <Side k="Last update" v={lastUpdate} />
@@ -143,8 +122,14 @@ function StatusPage() {
             />
           </dl>
           <div className="mt-8">
-            <BlueprintButton to="/passport" search={{ caseId }} variant="rust">
-              Open Passport
+            <BlueprintButton
+              to={payload.lifecycle.stage === "potential_programs" ? "/inspection" : "/passport"}
+              search={{ caseId }}
+              variant="rust"
+            >
+              {payload.lifecycle.stage === "potential_programs"
+                ? "Schedule Inspection"
+                : "Open Passport"}
             </BlueprintButton>
           </div>
         </aside>

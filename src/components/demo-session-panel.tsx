@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { LogIn, LogOut, RotateCcw } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import {
   AlertDialog,
@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import {
   claimDemoSessionCase,
   getDemoSessionCases,
+  HomeFixApiError,
   openDemoSession,
   wipeDemoSessionData,
   type DemoSessionCase,
@@ -35,10 +36,14 @@ export function DemoSessionPanel({
   onReset,
   caseId,
   onClaimed,
+  onSessionChange,
+  showDeleteAction = true,
 }: {
   onReset?: () => void;
   caseId?: string;
   onClaimed?: () => void;
+  onSessionChange?: (session: DemoSession | null) => void;
+  showDeleteAction?: boolean;
 }) {
   const [session, setSession] = useState<DemoSession | null>(() => getStoredDemoSession());
   const [displayName, setDisplayName] = useState("");
@@ -47,18 +52,29 @@ export function DemoSessionPanel({
   const [error, setError] = useState("");
   const [isWorking, setIsWorking] = useState(false);
 
-  const loadCases = async (activeSession: DemoSession) => {
-    try {
-      setCases(await getDemoSessionCases(activeSession.token));
-    } catch (loadError) {
-      console.error(loadError);
-      setError("Saved demo cases could not be loaded.");
-    }
-  };
+  const loadCases = useCallback(
+    async (activeSession: DemoSession) => {
+      try {
+        setCases(await getDemoSessionCases(activeSession.token));
+      } catch (loadError) {
+        console.error(loadError);
+        if (loadError instanceof HomeFixApiError && loadError.status === 401) {
+          clearDemoSession();
+          setSession(null);
+          onSessionChange?.(null);
+          setCases([]);
+          setError("Your saved session expired. Sign in again to access saved Repair Passports.");
+        } else {
+          setError("Saved demo cases could not be loaded.");
+        }
+      }
+    },
+    [onSessionChange],
+  );
 
   useEffect(() => {
     if (session) void loadCases(session);
-  }, [session]);
+  }, [loadCases, session]);
 
   const signIn = async (event: FormEvent) => {
     event.preventDefault();
@@ -72,6 +88,7 @@ export function DemoSessionPanel({
       const nextSession = await openDemoSession(displayName, pin);
       storeDemoSession(nextSession);
       setSession(nextSession);
+      onSessionChange?.(nextSession);
       if (caseId) {
         await claimDemoSessionCase(nextSession.token, caseId);
         onClaimed?.();
@@ -93,26 +110,9 @@ export function DemoSessionPanel({
   const signOut = () => {
     clearDemoSession();
     setSession(null);
+    onSessionChange?.(null);
     setCases([]);
     setError("");
-  };
-
-  const wipe = async () => {
-    if (!session) return;
-    setIsWorking(true);
-    setError("");
-    try {
-      await wipeDemoSessionData(session.token);
-      localStorage.removeItem(lastCaseStorageKey);
-      localStorage.removeItem(demoDraftKey);
-      setCases([]);
-      onReset?.();
-    } catch (wipeError) {
-      console.error(wipeError);
-      setError("Your saved data could not be deleted. Nothing was removed.");
-    } finally {
-      setIsWorking(false);
-    }
   };
 
   const claim = async () => {
@@ -187,7 +187,8 @@ export function DemoSessionPanel({
               disabled={isWorking}
             />
             <Button type="submit" className="min-h-11 rounded-none" disabled={isWorking}>
-              <LogIn /> {isWorking ? "Opening..." : caseId ? "Save My Passport" : "Create or Sign In"}
+              <LogIn />{" "}
+              {isWorking ? "Opening..." : caseId ? "Save My Passport" : "Create or Sign In"}
             </Button>
           </form>
         ) : (
@@ -205,31 +206,16 @@ export function DemoSessionPanel({
             >
               <LogOut /> Sign Out
             </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" className="rounded-none" disabled={isWorking}>
-                  <RotateCcw /> Delete My Saved Data
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent className="rounded-none">
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete your saved Repair Passports?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This permanently removes every customer case, photo, assessment, and workflow
-                    record saved to this session. The shared program catalog will remain.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    onClick={() => void wipe()}
-                  >
-                    Delete Saved Data
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            {showDeleteAction && (
+              <SessionDataDeleteButton
+                session={session}
+                disabled={isWorking}
+                onDeleted={() => {
+                  setCases([]);
+                  onReset?.();
+                }}
+              />
+            )}
           </div>
         )}
 
@@ -252,5 +238,62 @@ export function DemoSessionPanel({
         )}
       </div>
     </section>
+  );
+}
+
+export function SessionDataDeleteButton({
+  session,
+  disabled = false,
+  onDeleted,
+  className = "rounded-none",
+}: {
+  session: DemoSession;
+  disabled?: boolean;
+  onDeleted?: () => void;
+  className?: string;
+}) {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const wipe = async () => {
+    setIsDeleting(true);
+    try {
+      await wipeDemoSessionData(session.token);
+      localStorage.removeItem(lastCaseStorageKey);
+      localStorage.removeItem(demoDraftKey);
+      onDeleted?.();
+    } catch (wipeError) {
+      console.error(wipeError);
+      window.alert("Your saved data could not be deleted. Nothing was removed.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="destructive" className={className} disabled={disabled || isDeleting}>
+          <RotateCcw /> {isDeleting ? "Removing..." : "Remove Mock Data"}
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent className="rounded-none">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remove mock data?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This permanently removes every mock customer case, photo, assessment, and workflow
+            record saved to this session. The shared program catalog will remain.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => void wipe()}
+          >
+            Remove Mock Data
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

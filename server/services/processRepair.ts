@@ -1,9 +1,10 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { caseEvents, repairCases, repairNeeds } from "../db/schema.js";
+import { caseEvents, repairNeeds } from "../db/schema.js";
 import { calculateCoveragePlan } from "./coverage.js";
 import { runMatchingForCase } from "./matching.js";
 import { runRepairTriage } from "./triage.js";
+import { syncCaseLifecycle } from "./lifecycle.js";
 
 export async function processRepair(repairNeedId: string) {
   const needRows = await db
@@ -40,15 +41,6 @@ export async function processCase(caseId: string) {
   const coverage = await calculateCoveragePlan(caseId);
 
   await db
-    .update(repairCases)
-    .set({
-      status: "intelligence_completed",
-      currentStep: "coverage",
-      nextAction: coverage.nextBestAction.message,
-    })
-    .where(eq(repairCases.id, caseId));
-
-  await db
     .delete(caseEvents)
     .where(
       and(
@@ -59,8 +51,8 @@ export async function processCase(caseId: string) {
   await db.insert(caseEvents).values({
     repairCaseId: caseId,
     eventType: "intelligence_pipeline_completed",
-    title: "Repair intelligence pipeline completed",
-    description: "Assessment, matching, and coverage updates are complete.",
+    title: "Initial eligibility screening completed",
+    description: "Report normalization and preliminary program screening are complete.",
     metadata: {
       repairNeedIds: needs.map((need) => need.id),
       matches: matches.length,
@@ -68,10 +60,13 @@ export async function processCase(caseId: string) {
     },
   });
 
+  const lifecycle = await syncCaseLifecycle(caseId);
+
   return {
     caseId,
     triage,
     matches,
     coverage,
+    lifecycle,
   };
 }

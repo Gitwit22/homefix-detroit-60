@@ -37,7 +37,7 @@ export const intakeSchema = z.object({
         description: z.string().min(1),
         startedWhen: z.string().optional(),
         gettingWorse: z.boolean().default(false),
-        safeToOccupy: z.boolean().default(true),
+        safetyStatus: z.enum(["safe", "unsafe", "unsure"]).default("unsure"),
         urgency: z.string().default("unknown"),
       }),
     )
@@ -111,9 +111,9 @@ export async function createIntakeCase(
             caseNumber,
             demoScenario: payload.demoScenario ?? null,
             demoSessionId: options.demoSessionId ?? null,
-            status: "assessment_started",
-            currentStep: "intake",
-            nextAction: "Preliminary review pending",
+            status: "reported",
+            currentStep: "reported",
+            nextAction: "Check the report against current program requirements.",
             coveragePercentage: 0,
           })
           .returning({ id: repairCases.id });
@@ -126,11 +126,12 @@ export async function createIntakeCase(
           .values(
             payload.repairs.map((repair) => ({
               repairCaseId,
+              repairRole: "PRIMARY" as const,
               category: normalizeRepairCategory(repair.category),
               description: repair.description,
               startedWhen: repair.startedWhen ?? null,
               gettingWorse: repair.gettingWorse,
-              safeToOccupy: repair.safeToOccupy,
+              safetyStatus: repair.safetyStatus,
               urgency: repair.urgency,
               status: "reported",
             })),

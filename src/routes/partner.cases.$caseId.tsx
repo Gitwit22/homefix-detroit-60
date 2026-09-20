@@ -1,6 +1,13 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, FileWarning, Wrench } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CalendarDays,
+  ClipboardCheck,
+  FileWarning,
+  Wrench,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DemoFlag,
@@ -10,7 +17,15 @@ import {
   StatusBadge,
 } from "@/components/homefix";
 import { PartnerRouteLoading } from "@/components/partner-route-state";
-import { createOverflowJob, getPartnerCase } from "@/lib/homefix-api";
+import {
+  confirmInspectionAppointment,
+  createOverflowJob,
+  getPartnerCase,
+  saveInspectionFindings,
+  type PartnerCaseDetail,
+} from "@/lib/homefix-api";
+import { toRepairCategoryLabel } from "@/lib/repair-categories";
+import { repairCategories } from "../../server/domain/repair";
 import {
   caseStatusLabels,
   coverageStatusLabels,
@@ -42,7 +57,13 @@ export const Route = createFileRoute("/partner/cases/$caseId")({
     } catch (error) {
       const baseError = error instanceof Error ? error : new Error("Case load failed");
       const statusMatch = /returned (\d{3})/.exec(baseError.message);
-      const status = statusMatch ? Number(statusMatch[1]) : undefined;
+      const errorStatus = "status" in baseError ? baseError.status : undefined;
+      const status =
+        typeof errorStatus === "number"
+          ? errorStatus
+          : statusMatch
+            ? Number(statusMatch[1])
+            : undefined;
       throw Object.assign(baseError, { status });
     }
   },
@@ -53,6 +74,7 @@ export const Route = createFileRoute("/partner/cases/$caseId")({
 
 function CaseDetail() {
   const item = Route.useLoaderData();
+  const router = useRouter();
   const [createdJob, setCreatedJob] = useState(item.overflow?.existingWorkOrder ?? null);
   const [isCreatingJob, setIsCreatingJob] = useState(false);
   const overflowNeed = useMemo(
@@ -152,7 +174,15 @@ function CaseDetail() {
             </div>
           </section>
           <section className="mt-10">
-            <SectionLabel number="02">Overflow capacity</SectionLabel>
+            <SectionLabel number="02">Professional inspection</SectionLabel>
+            <InspectionWorkspace
+              caseId={item.caseId}
+              inspectionPackage={item.inspectionPackage ?? null}
+              onUpdated={() => router.invalidate()}
+            />
+          </section>
+          <section className="mt-10">
+            <SectionLabel number="03">Overflow capacity</SectionLabel>
             <div className="mt-5 border border-border p-6">
               <span className="eyebrow">Delivery capacity</span>
               <h2 className="mt-2 text-3xl">
@@ -212,7 +242,7 @@ function CaseDetail() {
             </div>
           </section>
           <section className="mt-10">
-            <SectionLabel number="03">Case history</SectionLabel>
+            <SectionLabel number="04">Case history</SectionLabel>
             <ol className="mt-5 divide-y divide-border border-y border-border">
               <li className="grid grid-cols-[130px_1fr] py-4 text-sm">
                 <b>{reportedDate}</b>
@@ -256,6 +286,496 @@ function CaseDetail() {
   );
 }
 
+type InspectionPackage = NonNullable<PartnerCaseDetail["inspectionPackage"]>;
+
+function InspectionWorkspace({
+  caseId,
+  inspectionPackage,
+  onUpdated,
+}: {
+  caseId: string;
+  inspectionPackage: InspectionPackage | null;
+  onUpdated: () => Promise<void>;
+}) {
+  const [providerName, setProviderName] = useState(inspectionPackage?.providerName ?? "");
+  const [providerPhone, setProviderPhone] = useState(inspectionPackage?.providerPhone ?? "");
+  const [selectedStart, setSelectedStart] = useState(
+    inspectionPackage?.availabilityWindows[0]?.start ?? "",
+  );
+  const [answers, setAnswers] = useState<Record<string, { answer: string; unable: boolean }>>(() =>
+    Object.fromEntries(
+      (inspectionPackage?.questions ?? []).map((question) => [
+        question.id,
+        { answer: question.answer ?? "", unable: question.unableToVerify },
+      ]),
+    ),
+  );
+  const [findings, setFindings] = useState<
+    Record<
+      string,
+      {
+        confirmedCategory: string;
+        urgency: string;
+        condition: string;
+        notes: string;
+        verifiedScope: string;
+        estimatedCost: string;
+      }
+    >
+  >(() =>
+    Object.fromEntries(
+      (inspectionPackage?.needs ?? []).map((need) => [
+        need.repairNeedId,
+        {
+          confirmedCategory: need.finding?.confirmedCategory ?? need.reportedCategory,
+          urgency: need.finding?.urgency ?? need.assessment?.urgency ?? need.urgency,
+          condition: need.finding?.condition ?? "",
+          notes: need.finding?.notes ?? "",
+          verifiedScope: need.finding?.verifiedScope ?? "",
+          estimatedCost: need.finding?.estimatedCostCents
+            ? String(need.finding.estimatedCostCents / 100)
+            : "",
+        },
+      ]),
+    ),
+  );
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  if (!inspectionPackage) {
+    return (
+      <div className="mt-5 border-y border-border py-6">
+        <StatusBadge tone="neutral">Not requested</StatusBadge>
+        <p className="mt-3 text-sm text-muted-foreground">
+          The resident has not submitted inspection availability for this case.
+        </p>
+      </div>
+    );
+  }
+
+  const confirmAppointment = async () => {
+    const window = inspectionPackage.availabilityWindows.find(
+      (candidate) => candidate.start === selectedStart,
+    );
+    if (!window || providerName.trim().length < 2) {
+      setError("Choose a resident-provided window and enter the inspector or provider name.");
+      return;
+    }
+    setIsSaving(true);
+    setError("");
+    try {
+      await confirmInspectionAppointment(caseId, {
+        start: window.start,
+        end: window.end,
+        providerName: providerName.trim(),
+        ...(providerPhone.trim() ? { providerPhone: providerPhone.trim() } : {}),
+      });
+      await onUpdated();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Unable to confirm inspection.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const completeInspection = async () => {
+    const incompleteQuestion = inspectionPackage.questions.some((question) => {
+      const response = answers[question.id];
+      return !response || (!response.unable && !response.answer.trim());
+    });
+    const incompleteFinding = inspectionPackage.needs.some((need) => {
+      const finding = findings[need.repairNeedId];
+      return !finding?.condition.trim() || !finding.verifiedScope.trim();
+    });
+    if (incompleteQuestion || incompleteFinding) {
+      setError(
+        incompleteQuestion
+          ? "Answer every inspection question or mark it unable to verify."
+          : "Record the observed condition and verified scope for every repair need.",
+      );
+      return;
+    }
+
+    setIsSaving(true);
+    setError("");
+    try {
+      await saveInspectionFindings(
+        caseId,
+        inspectionPackage.needs.map((need) => {
+          const finding = findings[need.repairNeedId]!;
+          const estimatedCost = Number(finding.estimatedCost);
+          return {
+            repairNeedId: need.repairNeedId,
+            confirmedCategory: finding.confirmedCategory,
+            urgency: finding.urgency,
+            condition: finding.condition.trim(),
+            ...(finding.notes.trim() ? { notes: finding.notes.trim() } : {}),
+            verifiedScope: finding.verifiedScope.trim(),
+            ...(finding.estimatedCost && estimatedCost > 0
+              ? { estimatedCostCents: Math.round(estimatedCost * 100) }
+              : {}),
+          };
+        }),
+        inspectionPackage.questions.map((question) => ({
+          id: question.id,
+          repairNeedId: question.repairNeedId,
+          answer: answers[question.id]!.unable ? null : answers[question.id]!.answer.trim(),
+          unableToVerify: answers[question.id]!.unable,
+        })),
+      );
+      await onUpdated();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Unable to complete inspection.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (inspectionPackage.status === "availability_submitted") {
+    return (
+      <div className="mt-5 border-y border-border py-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <StatusBadge tone="warning">Scheduling required</StatusBadge>
+          <span className="text-sm text-muted-foreground">
+            {inspectionPackage.availabilityWindows.length} resident windows
+          </span>
+        </div>
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <label className="grid gap-2 text-sm font-semibold">
+            Appointment window
+            <select
+              className="min-h-11 border border-input bg-background px-3"
+              value={selectedStart}
+              onChange={(event) => setSelectedStart(event.target.value)}
+            >
+              {inspectionPackage.availabilityWindows.map((window) => (
+                <option key={window.start} value={window.start}>
+                  {formatInspectionWindow(window)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-2 text-sm font-semibold">
+            Inspector or provider
+            <input
+              className="min-h-11 border border-input bg-background px-3"
+              value={providerName}
+              onChange={(event) => setProviderName(event.target.value)}
+              maxLength={120}
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-semibold">
+            Provider phone (optional)
+            <input
+              className="min-h-11 border border-input bg-background px-3"
+              value={providerPhone}
+              onChange={(event) => setProviderPhone(event.target.value)}
+              maxLength={40}
+            />
+          </label>
+        </div>
+        {error && <p className="mt-4 text-sm font-semibold text-destructive">{error}</p>}
+        <Button
+          className="mt-5 min-h-12 rounded-none"
+          disabled={isSaving}
+          onClick={confirmAppointment}
+        >
+          <CalendarDays />
+          {isSaving ? "Confirming..." : "Confirm Appointment"}
+        </Button>
+      </div>
+    );
+  }
+
+  const completed = inspectionPackage.status === "completed";
+  return (
+    <div className="mt-5 border-y border-border py-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <StatusBadge tone={completed ? "positive" : "info"}>
+            {completed ? "Inspection completed" : "Inspection scheduled"}
+          </StatusBadge>
+          <h2 className="mt-3 text-2xl">
+            {inspectionPackage.confirmedStart
+              ? formatInspectionWindow({
+                  start: inspectionPackage.confirmedStart,
+                  end: inspectionPackage.confirmedEnd ?? inspectionPackage.confirmedStart,
+                })
+              : "Appointment pending"}
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {inspectionPackage.providerName}
+            {inspectionPackage.providerPhone ? ` · ${inspectionPackage.providerPhone}` : ""}
+          </p>
+        </div>
+        <ClipboardCheck className="size-7 text-primary" />
+      </div>
+
+      <div className="mt-8 space-y-10">
+        {inspectionPackage.needs.map((need, needIndex) => {
+          const finding = findings[need.repairNeedId]!;
+          const questions = inspectionPackage.questions.filter(
+            (question) => question.repairNeedId === need.repairNeedId,
+          );
+          return (
+            <section key={need.repairNeedId} className="border-t border-border pt-6">
+              <p className="eyebrow">Repair {needIndex + 1}</p>
+              <h3 className="mt-2 text-3xl">{toRepairCategoryLabel(need.reportedCategory)}</h3>
+              <p className="mt-3 max-w-3xl text-sm leading-relaxed">{need.description}</p>
+              {need.photos.length > 0 && (
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  {need.photos.map((photo) => (
+                    <img
+                      key={photo.id}
+                      src={photo.imageUrl}
+                      alt={`Resident report for ${toRepairCategoryLabel(need.reportedCategory)}`}
+                      className="aspect-video w-full border border-border object-cover"
+                    />
+                  ))}
+                </div>
+              )}
+              {need.assessment && (
+                <div className="mt-5 grid gap-4 border-l-4 border-primary pl-4 md:grid-cols-3">
+                  <div>
+                    <p className="eyebrow">Preliminary HomeFix triage</p>
+                    <p className="mt-2 text-sm leading-relaxed">{need.assessment.summary}</p>
+                  </div>
+                  <div>
+                    <p className="eyebrow">Safety considerations</p>
+                    <ul className="mt-2 space-y-1 text-sm">
+                      {need.assessment.safetyFlags.length > 0 ? (
+                        need.assessment.safetyFlags.map((flag) => <li key={flag}>{flag}</li>)
+                      ) : (
+                        <li>No preliminary safety flags.</li>
+                      )}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="eyebrow">Preliminary workforce signal</p>
+                    {need.assessment.trainingOpportunity ? (
+                      <>
+                        <p className="mt-2 text-sm font-semibold">
+                          {need.assessment.trainingOpportunity.status === "not_suitable"
+                            ? "Not currently identified"
+                            : "Pending inspector review"}
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {need.assessment.trainingOpportunity.reason}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="mt-2 text-sm text-muted-foreground">No preliminary signal.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-7">
+                <p className="eyebrow">Questions to verify</p>
+                {questions.length === 0 ? (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    No additional triage questions were generated for this repair.
+                  </p>
+                ) : (
+                  <div className="mt-3 divide-y divide-border border-y border-border">
+                    {questions.map((question) => {
+                      const response = answers[question.id]!;
+                      return (
+                        <div key={question.id} className="py-5">
+                          <p className="font-semibold">{question.question}</p>
+                          {completed ? (
+                            <p className="mt-2 text-sm text-muted-foreground">
+                              {question.unableToVerify
+                                ? "Unable to verify during visit"
+                                : question.answer}
+                            </p>
+                          ) : (
+                            <>
+                              <textarea
+                                className="mt-3 min-h-24 w-full border border-input bg-background p-3 text-sm"
+                                value={response.answer}
+                                disabled={response.unable}
+                                onChange={(event) =>
+                                  setAnswers((current) => ({
+                                    ...current,
+                                    [question.id]: { ...response, answer: event.target.value },
+                                  }))
+                                }
+                                maxLength={4000}
+                              />
+                              <label className="mt-2 flex items-center gap-2 text-sm font-semibold">
+                                <input
+                                  type="checkbox"
+                                  checked={response.unable}
+                                  onChange={(event) =>
+                                    setAnswers((current) => ({
+                                      ...current,
+                                      [question.id]: {
+                                        answer: event.target.checked ? "" : response.answer,
+                                        unable: event.target.checked,
+                                      },
+                                    }))
+                                  }
+                                />
+                                Unable to verify during this visit
+                              </label>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-7 grid gap-4 md:grid-cols-2">
+                <InspectionField label="Confirmed repair category">
+                  <select
+                    className="min-h-11 border border-input bg-background px-3"
+                    value={finding.confirmedCategory}
+                    disabled={completed}
+                    onChange={(event) =>
+                      setFindings((current) => ({
+                        ...current,
+                        [need.repairNeedId]: {
+                          ...finding,
+                          confirmedCategory: event.target.value,
+                        },
+                      }))
+                    }
+                  >
+                    {repairCategories.map((category) => (
+                      <option key={category} value={category}>
+                        {toRepairCategoryLabel(category)}
+                      </option>
+                    ))}
+                  </select>
+                </InspectionField>
+                <InspectionField label="Confirmed priority">
+                  <select
+                    className="min-h-11 border border-input bg-background px-3"
+                    value={finding.urgency}
+                    disabled={completed}
+                    onChange={(event) =>
+                      setFindings((current) => ({
+                        ...current,
+                        [need.repairNeedId]: { ...finding, urgency: event.target.value },
+                      }))
+                    }
+                  >
+                    {(["low", "moderate", "high", "critical"] as const).map((urgency) => (
+                      <option key={urgency} value={urgency}>
+                        {urgency[0]!.toUpperCase() + urgency.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                </InspectionField>
+                <InspectionField label="Observed condition">
+                  <textarea
+                    className="min-h-28 border border-input bg-background p-3"
+                    value={finding.condition}
+                    readOnly={completed}
+                    onChange={(event) =>
+                      setFindings((current) => ({
+                        ...current,
+                        [need.repairNeedId]: { ...finding, condition: event.target.value },
+                      }))
+                    }
+                    maxLength={2000}
+                  />
+                </InspectionField>
+                <InspectionField label="Recommended scope">
+                  <textarea
+                    className="min-h-28 border border-input bg-background p-3"
+                    value={finding.verifiedScope}
+                    readOnly={completed}
+                    onChange={(event) =>
+                      setFindings((current) => ({
+                        ...current,
+                        [need.repairNeedId]: { ...finding, verifiedScope: event.target.value },
+                      }))
+                    }
+                    maxLength={8000}
+                  />
+                </InspectionField>
+                <InspectionField label="Professional notes (optional)">
+                  <textarea
+                    className="min-h-24 border border-input bg-background p-3"
+                    value={finding.notes}
+                    readOnly={completed}
+                    onChange={(event) =>
+                      setFindings((current) => ({
+                        ...current,
+                        [need.repairNeedId]: { ...finding, notes: event.target.value },
+                      }))
+                    }
+                    maxLength={4000}
+                  />
+                </InspectionField>
+                <InspectionField label="Estimated cost (optional)">
+                  <input
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    className="min-h-11 border border-input bg-background px-3"
+                    value={finding.estimatedCost}
+                    readOnly={completed}
+                    onChange={(event) =>
+                      setFindings((current) => ({
+                        ...current,
+                        [need.repairNeedId]: { ...finding, estimatedCost: event.target.value },
+                      }))
+                    }
+                  />
+                </InspectionField>
+              </div>
+            </section>
+          );
+        })}
+      </div>
+      {!completed && (
+        <>
+          {error && <p className="mt-5 text-sm font-semibold text-destructive">{error}</p>}
+          <Button
+            className="mt-6 min-h-12 rounded-none"
+            disabled={isSaving}
+            onClick={completeInspection}
+          >
+            <ClipboardCheck />
+            {isSaving ? "Saving inspection..." : "Complete Inspection"}
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function InspectionField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="grid content-start gap-2 text-sm font-semibold">
+      {label}
+      {children}
+    </label>
+  );
+}
+
+function formatInspectionWindow(window: { start: string; end: string }) {
+  const start = new Date(window.start);
+  const end = new Date(window.end);
+  return `${new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Detroit",
+  }).format(start)}–${new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Detroit",
+  }).format(end)}`;
+}
+
 function CaseLoadError({
   error,
   reset,
@@ -265,6 +785,8 @@ function CaseLoadError({
 }) {
   const router = useRouter();
   const missingCase = error.status === 404;
+  const timedOut = error instanceof DOMException && error.name === "AbortError";
+  console.error(error);
   return (
     <div className="py-16">
       <DemoFlag />
@@ -274,7 +796,9 @@ function CaseLoadError({
         description={
           missingCase
             ? "This case may have been removed or is no longer available."
-            : "Try loading this case again, or return to repair cases."
+            : timedOut
+              ? "The partner service took too long to respond. Try again in a moment."
+              : "The partner service is temporarily unavailable. Try again, or return to repair cases."
         }
       />
       <Button

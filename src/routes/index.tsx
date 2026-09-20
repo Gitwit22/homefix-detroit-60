@@ -7,9 +7,13 @@ import {
   Disclaimer,
   SectionLabel,
 } from "@/components/homefix";
-import { DemoSessionPanel } from "@/components/demo-session-panel";
+import {
+  DemoSessionPanel,
+  SessionDataDeleteButton,
+} from "@/components/demo-session-panel";
 import { Button } from "@/components/ui/button";
 import { startGuideDemo } from "@/lib/homefix-guide";
+import { getStoredDemoSession, type DemoSession } from "@/lib/demo-session";
 import { lastCaseStorageKey } from "@/lib/resident-case";
 
 export const Route = createFileRoute("/")({
@@ -35,6 +39,7 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const [recentCaseId, setRecentCaseId] = useState("");
+  const [session, setSession] = useState<DemoSession | null>(() => getStoredDemoSession());
 
   useEffect(() => {
     setRecentCaseId(localStorage.getItem(lastCaseStorageKey) ?? "");
@@ -69,8 +74,17 @@ function HomePage() {
           className="absolute inset-0 size-full object-cover object-center"
         />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(8,23,35,.94)_0%,rgba(8,23,35,.72)_48%,rgba(8,23,35,.18)_100%)]" />
+        {session && (
+          <div className="absolute right-4 top-4 z-10 sm:right-6 lg:right-10">
+            <SessionDataDeleteButton
+              session={session}
+              className="rounded-none border border-white/60 bg-black/45 text-white hover:bg-destructive"
+              onDeleted={() => setRecentCaseId("")}
+            />
+          </div>
+        )}
         <div className="relative mx-auto flex min-h-[min(760px,82vh)] max-w-7xl flex-col justify-between px-4 py-7 sm:px-6 md:py-16 lg:px-10">
-          <div className="max-w-3xl">
+          <div className={`max-w-3xl ${session ? "pt-12 sm:pt-0" : ""}`}>
             <DemoFlag />
             <h1 className="mt-5 font-display text-5xl leading-[.9] sm:mt-8 sm:text-7xl lg:text-8xl">
               HomeFix 313
@@ -123,7 +137,11 @@ function HomePage() {
           </ol>
         </div>
       </section>
-      <DemoSessionPanel onReset={() => setRecentCaseId("")} />
+      <DemoSessionPanel
+        onReset={() => setRecentCaseId("")}
+        onSessionChange={setSession}
+        showDeleteAction={false}
+      />
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-10">
         <SectionLabel number="01">What HomeFix helps you do</SectionLabel>
         <div className="mt-8 grid gap-px bg-border md:grid-cols-3">

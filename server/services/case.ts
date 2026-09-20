@@ -4,6 +4,8 @@ import {
   caseEvents,
   documents,
   homes,
+  inspectionFindings,
+  inspections,
   programMatches,
   programs,
   repairAssessments,
@@ -11,7 +13,9 @@ import {
   repairNeeds,
   repairPhotos,
   residents,
+  workOrders,
 } from "../db/schema.js";
+import { getCaseLifecycle } from "./lifecycle.js";
 import { signedPhotoUrl } from "./photos.js";
 
 async function displayPhotoUrl(photo: { publicId: string | null; imageUrl: string }) {
@@ -57,7 +61,10 @@ export async function getCaseAggregate(caseId: string) {
 
   const photos =
     repairNeedIds.length > 0
-      ? await db.select().from(repairPhotos).where(inArray(repairPhotos.repairNeedId, repairNeedIds))
+      ? await db
+          .select()
+          .from(repairPhotos)
+          .where(inArray(repairPhotos.repairNeedId, repairNeedIds))
       : [];
 
   const matchRows =
@@ -74,6 +81,23 @@ export async function getCaseAggregate(caseId: string) {
 
   const caseDocuments = await db.select().from(documents).where(eq(documents.repairCaseId, caseId));
   const events = await db.select().from(caseEvents).where(eq(caseEvents.repairCaseId, caseId));
+  const inspectionRows = await db
+    .select()
+    .from(inspections)
+    .where(eq(inspections.repairCaseId, caseId))
+    .limit(1);
+  const inspection = inspectionRows[0] ?? null;
+  const findings = inspection
+    ? await db
+        .select()
+        .from(inspectionFindings)
+        .where(eq(inspectionFindings.inspectionId, inspection.id))
+    : [];
+  const caseWorkOrders = await db
+    .select()
+    .from(workOrders)
+    .where(eq(workOrders.repairCaseId, caseId));
+  const lifecycle = await getCaseLifecycle(caseId);
 
   return {
     case: foundCase,
@@ -84,6 +108,7 @@ export async function getCaseAggregate(caseId: string) {
       photos.map(async (photo) => ({
         id: photo.id,
         repairNeedId: photo.repairNeedId,
+        evidenceStage: photo.evidenceStage,
         imageUrl: await displayPhotoUrl(photo),
         originalFilename: photo.originalFilename,
         width: photo.width,
@@ -94,6 +119,10 @@ export async function getCaseAggregate(caseId: string) {
     matches: matchRows.map(({ match, program }) => ({ ...match, program })),
     documents: caseDocuments,
     events,
+    inspection,
+    inspectionFindings: findings,
+    workOrders: caseWorkOrders,
+    lifecycle,
   };
 }
 

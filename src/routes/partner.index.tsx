@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
+import { useState } from "react";
 import {
   DataTable,
   DemoFlag,
@@ -16,6 +17,7 @@ import {
   caseStatusLabels,
   matchStatusLabels,
   priorityLabels,
+  type WorkforceDiscipline,
 } from "../../server/domain/partnerAnalytics";
 
 export const Route = createFileRoute("/partner/")({
@@ -43,8 +45,21 @@ export const Route = createFileRoute("/partner/")({
 
 function PartnerDashboard() {
   const analytics: PartnerAnalytics = Route.useLoaderData();
+  const [selectedDiscipline, setSelectedDiscipline] = useState<WorkforceDiscipline>(
+    () =>
+      analytics.workforceOpportunities.byDiscipline.find((metric) => metric.count > 0)
+        ?.discipline ?? "painting_finish",
+  );
+  const [selectedOpportunityId, setSelectedOpportunityId] = useState<string | null>(null);
   const maximumDemand = Math.max(...analytics.byRepairType.map((metric) => metric.repairNeeds), 1);
   const maximumZipDemand = Math.max(...analytics.byZipCode.map((metric) => metric.repairNeeds), 1);
+  const disciplineOpportunities = analytics.workforceOpportunities.opportunities.filter(
+    (opportunity) => opportunity.discipline === selectedDiscipline,
+  );
+  const selectedOpportunity =
+    disciplineOpportunities.find(
+      (opportunity) => opportunity.repairNeedId === selectedOpportunityId,
+    ) ?? disciplineOpportunities[0];
 
   return (
     <>
@@ -59,14 +74,10 @@ function PartnerDashboard() {
           <Metric value={analytics.totals.homes} label="Homes represented" />
         </Link>
         <Metric value={analytics.totals.repairNeeds} label="Repair needs identified" />
-        <Link to="/partner/cases" search={{ priority: "high" }} className="block">
+        <Link to="/partner/cases" search={{ priorityGroup: "high_priority" }} className="block">
           <Metric value={analytics.totals.highPriorityRepairs} label="High-priority repairs" />
         </Link>
-        <Link
-          to="/partner/cases"
-          search={{ coverage: "potentially_covered" }}
-          className="block"
-        >
+        <Link to="/partner/cases" search={{ coverage: "potentially_covered" }} className="block">
           <Metric
             value={analytics.totals.potentiallyCoveredRepairs}
             label="Potential resource matches"
@@ -128,10 +139,109 @@ function PartnerDashboard() {
         </div>
       </section>
 
+      <section className="border-y border-foreground py-10">
+        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+          <div>
+            <SectionLabel number="03">Workforce development</SectionLabel>
+            <h2 className="mt-2 text-4xl">
+              {analytics.workforceOpportunities.total} Potential Workforce Opportunities
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
+              Preliminary repair-assessment signals that may support safe, supervised trades
+              training after professional inspection.
+            </p>
+          </div>
+          <StatusBadge tone="warning">Preliminary / Pending Inspection</StatusBadge>
+        </div>
+
+        {analytics.workforceOpportunities.total === 0 ? (
+          <div className="mt-7 border border-dashed border-border p-6 text-sm text-muted-foreground">
+            No preliminary workforce opportunities have been identified yet.
+          </div>
+        ) : (
+          <div className="mt-7 grid gap-px bg-border lg:grid-cols-[minmax(240px,.7fr)_1.3fr]">
+            <div className="bg-background">
+              {analytics.workforceOpportunities.byDiscipline.map((metric) => (
+                <button
+                  key={metric.discipline}
+                  type="button"
+                  aria-pressed={selectedDiscipline === metric.discipline}
+                  onClick={() => {
+                    setSelectedDiscipline(metric.discipline);
+                    setSelectedOpportunityId(null);
+                  }}
+                  className={`flex w-full items-center justify-between border-b border-border px-5 py-4 text-left font-semibold last:border-b-0 focus-visible:outline-2 focus-visible:outline-primary ${selectedDiscipline === metric.discipline ? "bg-primary text-primary-foreground" : "bg-background"}`}
+                >
+                  <span>{metric.label}</span>
+                  <span className="font-display text-3xl font-normal">{metric.count}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="bg-background p-5 sm:p-7">
+              {selectedOpportunity ? (
+                <div className="grid gap-7 xl:grid-cols-[180px_1fr]">
+                  <div>
+                    <p className="eyebrow">Opportunities</p>
+                    <div className="mt-3 grid gap-2">
+                      {disciplineOpportunities.map((opportunity) => (
+                        <button
+                          key={opportunity.repairNeedId}
+                          type="button"
+                          onClick={() => setSelectedOpportunityId(opportunity.repairNeedId)}
+                          className={`border px-3 py-2 text-left text-sm font-bold ${selectedOpportunity.repairNeedId === opportunity.repairNeedId ? "border-primary bg-primary/10 text-primary" : "border-border"}`}
+                        >
+                          {opportunity.caseNumber}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <article>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="eyebrow">{selectedOpportunity.caseNumber}</p>
+                        <h3 className="mt-2 text-3xl">{selectedOpportunity.repairLabel}</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Detroit ZIP {selectedOpportunity.zipCode}
+                        </p>
+                      </div>
+                      <StatusBadge tone="warning">Instructor Review Needed</StatusBadge>
+                    </div>
+                    <p className="mt-5 text-sm leading-relaxed">{selectedOpportunity.reason}</p>
+                    <div className="mt-5">
+                      <p className="eyebrow">Possible skills</p>
+                      <ul className="mt-2 flex flex-wrap gap-2">
+                        {selectedOpportunity.possibleSkills.map((skill) => (
+                          <li key={skill} className="border border-border px-3 py-2 text-sm">
+                            {skill}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <Link
+                      to="/partner/cases/$caseId"
+                      params={{ caseId: selectedOpportunity.caseId }}
+                      className="mt-6 inline-flex items-center gap-2 border-b border-foreground pb-1 font-bold"
+                    >
+                      View Opportunity
+                      <ArrowRight className="size-4" />
+                    </Link>
+                  </article>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No opportunities are currently assigned to this discipline.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
       <section className="border-y border-foreground bg-rust/8 py-9">
         <div className="flex flex-col justify-between gap-5 sm:flex-row">
           <div>
-            <SectionLabel number="03">Where help is missing</SectionLabel>
+            <SectionLabel number="04">Where help is missing</SectionLabel>
             <h2 className="mt-2 text-4xl">
               {analytics.totals.unmatchedNeeds} repair needs have no identified assistance resource.
             </h2>
@@ -158,7 +268,7 @@ function PartnerDashboard() {
       </section>
 
       <section className="py-10">
-        <SectionLabel number="04">High priority homes</SectionLabel>
+        <SectionLabel number="05">High priority homes</SectionLabel>
         <div className="mt-5">
           <DataTable
             headers={["Property", "ZIP", "Repair", "Priority", "Program Match", "Case Status"]}
@@ -181,7 +291,7 @@ function PartnerDashboard() {
       </section>
 
       <section className="border-t border-foreground py-10">
-        <SectionLabel number="05">Program capacity</SectionLabel>
+        <SectionLabel number="06">Program capacity</SectionLabel>
         <div className="mt-6 grid gap-px bg-border sm:grid-cols-3">
           {analytics.programCapacity.map((program) => (
             <div className="bg-background p-5" key={program.programId}>

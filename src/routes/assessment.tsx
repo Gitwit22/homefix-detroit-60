@@ -8,22 +8,23 @@ import {
   SectionLabel,
   StatusBadge,
 } from "@/components/homefix";
-import { getCase } from "@/lib/homefix-api";
+import { getCase, isValidAssessment } from "@/lib/homefix-api";
 import { runTriageServer } from "@/lib/triage.server";
 import { toRepairCategoryLabel } from "@/lib/repair-categories";
+import { toMatchStatusLabel } from "../../server/domain/eligibility";
 
 export const Route = createFileRoute("/assessment")({
   validateSearch: (search: Record<string, unknown>) => ({
-    caseId: typeof search.caseId === "string" ? search.caseId : "",
-    repairNeedId: typeof search.repairNeedId === "string" ? search.repairNeedId : "",
-    process: search.process === "1" ? "1" : "",
+    caseId: typeof search["caseId"] === "string" ? search["caseId"] : "",
+    repairNeedId: typeof search["repairNeedId"] === "string" ? search["repairNeedId"] : "",
+    process: search["process"] === "1" ? "1" : "",
   }),
   head: () => ({
     meta: [
-      { title: "Repair Assessment — HomeFix 313" },
+      { title: "Initial Screening Results — HomeFix 313" },
       {
         name: "description",
-        content: "Review a preliminary home repair assessment and recommended next steps.",
+        content: "Review preliminary repair-assistance pathways and recommended next steps.",
       },
       { property: "og:title", content: "Repair Assessment — HomeFix 313" },
       {
@@ -43,6 +44,7 @@ function AssessmentPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [processingError, setProcessingError] = useState<string | null>(null);
   const [payload, setPayload] = useState<Awaited<ReturnType<typeof getCase>> | null>(null);
 
   useEffect(() => {
@@ -65,13 +67,21 @@ function AssessmentPage() {
         }
         if (repairNeedId && process === "1") {
           setIsProcessing(true);
+          setProcessingError(null);
           try {
             await runTriageServer(repairNeedId);
-            const refreshed = await getCase(caseId);
-            if (!cancelled) setPayload(refreshed);
           } catch (processingError) {
             console.error(processingError);
+            if (!cancelled) {
+              setProcessingError("We couldn’t complete the repair analysis. Please try again.");
+            }
           } finally {
+            try {
+              const refreshed = await getCase(caseId);
+              if (!cancelled) setPayload(refreshed);
+            } catch (refreshError) {
+              console.error(refreshError);
+            }
             if (!cancelled) {
               setIsProcessing(false);
               navigate({ to: "/assessment", replace: true, search: { caseId, repairNeedId } });
@@ -97,9 +107,7 @@ function AssessmentPage() {
     [payload, repairNeedId],
   );
   const assessment = useMemo(
-    () =>
-      payload?.assessments.find((item) => item.repairNeedId === repairNeed?.id) ??
-      payload?.assessments[0],
+    () => payload?.assessments.find((item) => item.repairNeedId === repairNeed?.id),
     [payload, repairNeed],
   );
   const photos = useMemo(
@@ -121,18 +129,49 @@ function AssessmentPage() {
     return <div className="mx-auto max-w-7xl px-4 py-10">{error ?? "Assessment not found."}</div>;
   }
 
+  if (!assessment || !isValidAssessment(assessment)) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+        <DemoFlag />
+        <div className="mt-6 border border-foreground p-6 sm:p-8">
+          <p className="eyebrow">Initial eligibility screening</p>
+          <h1 className="mt-3 text-4xl sm:text-6xl">Assessment not complete</h1>
+          <p className="mt-4 max-w-2xl text-muted-foreground" role="status">
+            {isProcessing
+              ? "HomeFix is reviewing this repair report now."
+              : (processingError ??
+                "HomeFix does not have a valid assessment for this repair yet. The Repair Passport is not ready.")}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 pb-24 sm:px-6 lg:px-10">
       <DemoFlag />
       <header className="mt-6 border-b border-foreground pb-7">
-        <p className="eyebrow">Preliminary field assessment</p>
-        <h1 className="mt-3 text-5xl sm:text-7xl">What HomeFix noticed</h1>
+        <p className="eyebrow">Initial eligibility screening</p>
+        <h1 className="mt-3 text-5xl sm:text-7xl">
+          {payload.matches.length} potential assistance{" "}
+          {payload.matches.length === 1 ? "pathway" : "pathways"} identified.
+        </h1>
         <p className="mt-4 max-w-2xl text-muted-foreground">
           {assessment?.summary ?? repairNeed.description}
         </p>
         {isProcessing && (
           <p className="mt-4 text-sm font-semibold text-primary" role="status">
-            Your case is saved. HomeFix is finishing the preliminary analysis...
+            Checking your repair against available programs...
+          </p>
+        )}
+        {assessment.model === "homefix-triage-fallback-v1" && (
+          <p className="mt-4 border-l-4 border-rust pl-4 text-sm font-semibold" role="status">
+            We couldn’t complete the live analysis, so HomeFix used a fallback review.
+          </p>
+        )}
+        {processingError && assessment.model !== "homefix-triage-fallback-v1" && (
+          <p className="mt-4 border-l-4 border-rust pl-4 text-sm font-semibold" role="status">
+            {processingError} Showing the most recent completed assessment.
           </p>
         )}
       </header>
@@ -184,17 +223,21 @@ function AssessmentPage() {
             }
           />
           <Result
-            label="Analysis source"
+            label="Report normalization"
             value={
               assessment?.model === "homefix-saved-demo-v1"
-                ? "Saved demo fallback"
-                : "Live AI analysis"
+                ? "Saved demo result"
+                : assessment?.model === "homefix-triage-fallback-v1"
+                  ? "Fallback review"
+                  : assessment?.model === "homefix-triage-v1"
+                    ? "Live AI analysis"
+                    : "Preliminary review"
             }
           />
         </div>
       </section>
       <section className="py-12">
-        <SectionLabel number="01">Assessment notes</SectionLabel>
+        <SectionLabel number="01">Normalized repair report</SectionLabel>
         <div className="mt-6 divide-y divide-border border-y border-border">
           <Finding icon={Droplets} title="Observations">
             <ul className="space-y-2">
@@ -214,7 +257,11 @@ function AssessmentPage() {
               <span>No immediate safety flags detected from current information.</span>
             )}
           </Finding>
-          <Finding icon={HelpCircle} title="Questions we still need answered">
+          <Finding icon={HelpCircle} title="Questions prepared for your inspection">
+            <p className="mb-3">
+              HomeFix prepared these questions to help the inspector investigate the reported
+              condition.
+            </p>
             <ul className="space-y-2">
               {(followUpQuestions as string[]).map((item) => (
                 <li key={item}>{item}</li>
@@ -222,12 +269,48 @@ function AssessmentPage() {
             </ul>
           </Finding>
           <Finding icon={CheckCircle2} title="Recommended next step">
-            Review deterministic program matching and document requirements.
+            Submit inspection availability so a professional can verify the repair condition and
+            scope.
           </Finding>
         </div>
       </section>
+      {assessment.trainingOpportunity && (
+        <section className="border-t border-foreground py-10">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <SectionLabel number="02">Workforce development signal</SectionLabel>
+              <h2 className="mt-3 text-3xl">Preliminary training potential</h2>
+            </div>
+            <StatusBadge
+              tone={
+                assessment.trainingOpportunity.status === "not_suitable" ? "neutral" : "warning"
+              }
+            >
+              {assessment.trainingOpportunity.status === "not_suitable"
+                ? "Not currently identified"
+                : "Pending professional inspection"}
+            </StatusBadge>
+          </div>
+          <p className="mt-4 max-w-3xl text-sm leading-relaxed">
+            {assessment.trainingOpportunity.reason}
+          </p>
+          {assessment.trainingOpportunity.possibleSkills.length > 0 && (
+            <ul className="mt-5 flex flex-wrap gap-2">
+              {assessment.trainingOpportunity.possibleSkills.map((skill) => (
+                <li key={skill} className="border border-border px-3 py-2 text-sm">
+                  {skill}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-4 text-xs text-muted-foreground">
+            This signal is generated from the initial report. It is not training approval and must
+            be confirmed or rejected during inspection.
+          </p>
+        </section>
+      )}
       <section className="border-t border-foreground py-10">
-        <SectionLabel number="02">Potential programs found</SectionLabel>
+        <SectionLabel number="03">Preliminary program pathways</SectionLabel>
         <div className="mt-6 divide-y divide-border border-y border-border">
           {payload.matches.length === 0 ? (
             <p className="py-5 text-muted-foreground">No current program paths identified.</p>
@@ -245,9 +328,43 @@ function AssessmentPage() {
                         ?.category ?? "other",
                     )}
                   </p>
+                  {match.screeningResults.length > 0 && (
+                    <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+                      {match.screeningResults.map((result, index) => (
+                        <div key={`${result.ruleType}-${index}`} className="flex gap-2">
+                          <dt
+                            className={
+                              result.passed === true
+                                ? "font-bold text-positive"
+                                : result.passed === false
+                                  ? "font-bold text-destructive"
+                                  : "font-bold text-rust"
+                            }
+                          >
+                            {result.passed === true
+                              ? "PASS"
+                              : result.passed === false
+                                ? "FAIL"
+                                : "VERIFY"}
+                          </dt>
+                          <dd className="text-muted-foreground">{result.reason}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
                 </div>
-                <StatusBadge tone={match.matchStatus === "strong_match" ? "positive" : "info"}>
-                  {match.matchStatus === "strong_match" ? "Strong Match" : "Potential Match"}
+                <StatusBadge
+                  tone={
+                    match.matchStatus === "strong_match"
+                      ? "positive"
+                      : match.matchStatus === "verification_needed"
+                        ? "warning"
+                        : match.matchStatus === "not_eligible"
+                          ? "danger"
+                          : "info"
+                  }
+                >
+                  {toMatchStatusLabel(match.matchStatus)}
                 </StatusBadge>
               </div>
             ))
@@ -256,18 +373,18 @@ function AssessmentPage() {
       </section>
       <Disclaimer />
       <div className="mt-8 max-w-2xl border-l-4 border-primary pl-5">
-        <h2 className="text-2xl">Your Repair Passport is ready.</h2>
+        <h2 className="text-2xl">Your initial screening is ready.</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          HomeFix organized your property information, repair assessment, and potential resources
-          into one reusable record.
+          These are preliminary pathways, not final approvals. A professional inspection verifies
+          the repair condition and scope before final program review.
         </p>
         <Link
           className="blueprint-button button-primary mt-5 inline-flex items-center"
           data-guide-target="assessment-next"
-          to="/passport"
+          to={payload.matches.length > 0 ? "/inspection" : "/passport"}
           search={{ caseId }}
         >
-          View My Repair Passport
+          {payload.matches.length > 0 ? "Schedule Inspection" : "View My Repair Passport"}
         </Link>
       </div>
     </div>

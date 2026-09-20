@@ -1,4 +1,5 @@
 import {
+  type AnyPgColumn,
   boolean,
   index,
   integer,
@@ -10,6 +11,8 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { repairRoles } from "../domain/repair.js";
+import type { TrainingOpportunity } from "../validation/triage.js";
 
 export const residents = pgTable("residents", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -75,11 +78,17 @@ export const repairNeeds = pgTable("repair_needs", {
   repairCaseId: uuid("repair_case_id")
     .references(() => repairCases.id, { onDelete: "cascade" })
     .notNull(),
+  repairRole: text("repair_role", { enum: repairRoles }).default("PRIMARY").notNull(),
+  parentRepairNeedId: uuid("parent_repair_need_id").references((): AnyPgColumn => repairNeeds.id, {
+    onDelete: "cascade",
+  }),
   category: text("category").notNull(),
   description: text("description").notNull(),
   startedWhen: text("started_when"),
   gettingWorse: boolean("getting_worse").default(false).notNull(),
-  safeToOccupy: boolean("safe_to_occupy").default(true).notNull(),
+  safetyStatus: text("safety_status", { enum: ["safe", "unsafe", "unsure"] })
+    .default("unsure")
+    .notNull(),
   urgency: text("urgency").default("unknown").notNull(),
   status: text("status").default("reported").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -90,6 +99,7 @@ export const repairPhotos = pgTable("repair_photos", {
   repairNeedId: uuid("repair_need_id")
     .references(() => repairNeeds.id, { onDelete: "cascade" })
     .notNull(),
+  evidenceStage: text("evidence_stage").default("resident_report").notNull(),
   imageUrl: text("image_url").notNull(),
   publicId: text("public_id").unique(),
   originalFilename: text("original_filename"),
@@ -114,6 +124,7 @@ export const repairAssessments = pgTable(
     safetyFlags: jsonb("safety_flags"),
     followUpQuestions: jsonb("follow_up_questions"),
     confidence: numeric("confidence"),
+    trainingOpportunity: jsonb("training_opportunity").$type<TrainingOpportunity>(),
     model: text("model"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -190,6 +201,13 @@ export const programMatches = pgTable(
     matchStatus: text("match_status").notNull(),
     approvalStatus: text("approval_status").default("pending").notNull(),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
+    screeningResults: jsonb("screening_results")
+      .$type<
+        Array<{ ruleType: string; required: boolean; passed: boolean | null; reason: string }>
+      >()
+      .default([])
+      .notNull(),
+    screenedAt: timestamp("screened_at", { withTimezone: true }),
     explanation: text("explanation"),
     missingRequirements: jsonb("missing_requirements"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -225,6 +243,68 @@ export const caseEvents = pgTable("case_events", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export type InspectionQuestion = {
+  id: string;
+  repairNeedId: string;
+  question: string;
+  answer: string | null;
+  unableToVerify: boolean;
+};
+
+export const inspections = pgTable(
+  "inspections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    repairCaseId: uuid("repair_case_id")
+      .references(() => repairCases.id, { onDelete: "cascade" })
+      .notNull(),
+    status: text("status").default("availability_requested").notNull(),
+    availabilityWindows: jsonb("availability_windows")
+      .$type<Array<{ start: string; end: string }>>()
+      .default([])
+      .notNull(),
+    inspectionQuestions: jsonb("inspection_questions")
+      .$type<InspectionQuestion[]>()
+      .default([])
+      .notNull(),
+    confirmedStart: timestamp("confirmed_start", { withTimezone: true }),
+    confirmedEnd: timestamp("confirmed_end", { withTimezone: true }),
+    providerName: text("provider_name"),
+    providerPhone: text("provider_phone"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("inspections_repair_case_id_unique").on(table.repairCaseId)],
+);
+
+export const inspectionFindings = pgTable(
+  "inspection_findings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    inspectionId: uuid("inspection_id")
+      .references(() => inspections.id, { onDelete: "cascade" })
+      .notNull(),
+    repairNeedId: uuid("repair_need_id")
+      .references(() => repairNeeds.id, { onDelete: "cascade" })
+      .notNull(),
+    confirmedCategory: text("confirmed_category").notNull(),
+    urgency: text("urgency").notNull(),
+    condition: text("condition").notNull(),
+    notes: text("notes"),
+    verifiedScope: text("verified_scope").notNull(),
+    estimatedCostCents: integer("estimated_cost_cents"),
+    completedAt: timestamp("completed_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("inspection_findings_inspection_repair_need_unique").on(
+      table.inspectionId,
+      table.repairNeedId,
+    ),
+  ],
+);
+
 export const workOrders = pgTable("work_orders", {
   id: uuid("id").defaultRandom().primaryKey(),
   repairCaseId: uuid("repair_case_id")
@@ -244,6 +324,11 @@ export const workOrders = pgTable("work_orders", {
   fundingStatus: text("funding_status").default("program_approved").notNull(),
   capacityStatus: text("capacity_status").default("overflow").notNull(),
   status: text("status").default("open").notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  completionNotes: text("completion_notes"),
+  verificationStatus: text("verification_status").default("pending").notNull(),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
   isSynthetic: boolean("is_synthetic").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
