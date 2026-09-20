@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Clock, FileWarning, Send, Wrench } from "lucide-react";
+import { ArrowLeft, ArrowRight, FileWarning, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DemoFlag,
@@ -9,6 +9,7 @@ import {
   SectionLabel,
   StatusBadge,
 } from "@/components/homefix";
+import { PartnerRouteLoading } from "@/components/partner-route-state";
 import { createOverflowJob, getPartnerCase } from "@/lib/homefix-api";
 import {
   caseStatusLabels,
@@ -36,6 +37,7 @@ export const Route = createFileRoute("/partner/cases/$caseId")({
     ],
   }),
   loader: ({ params }) => getPartnerCase(params.caseId),
+  pendingComponent: PartnerRouteLoading,
   errorComponent: CaseLoadError,
   component: CaseDetail,
 });
@@ -239,20 +241,6 @@ function CaseDetail() {
               </div>
             </div>
           )}
-          <div className="grid gap-2">
-            <Button className="min-h-12 rounded-none bg-primary">
-              <Send />
-              Request Information
-            </Button>
-            <Button variant="outline" className="min-h-12 rounded-none">
-              <Wrench />
-              Review Program Pathway
-            </Button>
-            <Button variant="outline" className="min-h-12 rounded-none">
-              <Clock />
-              Mark for Review
-            </Button>
-          </div>
         </aside>
       </div>
     </>
@@ -265,10 +253,13 @@ function CaseLoadError() {
       <DemoFlag />
       <PageIntro
         eyebrow="Case unavailable"
-        title="Synthetic case not found"
-        description="This case is not part of the current deterministic demonstration dataset."
+        title="Partner data could not be loaded."
+        description="Try loading this case again, or return to repair cases."
       />
-      <Button asChild variant="outline" className="mt-6 rounded-none">
+      <Button className="mt-6 min-h-12 rounded-none bg-primary" onClick={() => window.location.reload()}>
+        Try Again
+      </Button>
+      <Button asChild variant="outline" className="mt-3 rounded-none">
         <Link to="/partner/cases">
           <ArrowLeft />
           Back to repair cases

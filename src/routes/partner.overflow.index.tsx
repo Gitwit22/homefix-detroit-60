@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import { DataTable, DemoFlag, PageIntro, PriorityBadge, StatusBadge } from "@/components/homefix";
+import { PartnerRouteError, PartnerRouteLoading } from "@/components/partner-route-state";
 import { getOverflowJobs } from "@/lib/homefix-api";
 
 export const Route = createFileRoute("/partner/overflow/")({
@@ -21,6 +22,8 @@ export const Route = createFileRoute("/partner/overflow/")({
     ],
   }),
   loader: () => getOverflowJobs(),
+  pendingComponent: PartnerRouteLoading,
+  errorComponent: PartnerRouteError,
   component: Overflow,
 });
 
@@ -40,35 +43,44 @@ function Overflow() {
         official government procurement.
       </div>
       <div className="mt-8">
-        <DataTable
-          headers={[
-            "Job",
-            "Repair Type",
-            "Location",
-            "Priority",
-            "Program Funding",
-            "Job Status",
-            "Responses",
-          ]}
-          rows={jobs.map((job) => [
-            <Link
-              to="/partner/overflow/$jobId"
-              params={{ jobId: job.workOrderNumber }}
-              className="flex items-center gap-2 font-bold text-primary"
-            >
-              {job.workOrderNumber}
-              <ArrowRight className="size-4" />
-            </Link>,
-            job.repairLabel,
-            `${job.city}, ${job.state} ${job.zipCode}`,
-            <PriorityBadge priority={job.priorityLabel} />,
-            <StatusBadge tone="positive">{job.fundingStatusLabel}</StatusBadge>,
-            <StatusBadge tone={job.status === "open" ? "warning" : "positive"}>
-              {job.statusLabel}
-            </StatusBadge>,
-            `${job.responseCount} Responses`,
-          ])}
-        />
+        {jobs.length === 0 ? (
+          <div className="border border-dashed border-border p-6 text-sm">
+            <p>No overflow jobs have been created yet.</p>
+            <p className="mt-2 text-muted-foreground">
+              Create one from an eligible repair case.
+            </p>
+          </div>
+        ) : (
+          <DataTable
+            headers={[
+              "Job",
+              "Repair Type",
+              "Location",
+              "Priority",
+              "Program Funding",
+              "Job Status",
+              "Responses",
+            ]}
+            rows={jobs.map((job) => [
+              <Link
+                to="/partner/overflow/$jobId"
+                params={{ jobId: job.workOrderNumber }}
+                className="flex items-center gap-2 font-bold text-primary"
+              >
+                {job.workOrderNumber}
+                <ArrowRight className="size-4" />
+              </Link>,
+              job.repairLabel,
+              `${job.city}, ${job.state} ${job.zipCode}`,
+              <PriorityBadge priority={job.priorityLabel} />,
+              <StatusBadge tone="positive">{job.fundingStatusLabel}</StatusBadge>,
+              <StatusBadge tone={job.status === "open" ? "warning" : "positive"}>
+                {job.statusLabel}
+              </StatusBadge>,
+              `${job.responseCount} Responses`,
+            ])}
+          />
+        )}
       </div>
     </>
   );

@@ -9,6 +9,7 @@ import {
   SectionLabel,
   StatusBadge,
 } from "@/components/homefix";
+import { PartnerRouteLoading } from "@/components/partner-route-state";
 import { getOverflowJob, submitBid } from "@/lib/homefix-api";
 
 export const Route = createFileRoute("/partner/overflow/$jobId")({
@@ -32,6 +33,8 @@ export const Route = createFileRoute("/partner/overflow/$jobId")({
     ],
   }),
   loader: ({ params }) => getOverflowJob(params.jobId),
+  pendingComponent: PartnerRouteLoading,
+  errorComponent: OverflowJobError,
   component: Job,
 });
 
@@ -378,4 +381,20 @@ function formatMoney(value: number) {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(value / 100);
+}
+
+function OverflowJobError() {
+  return (
+    <div className="py-10">
+      <DemoFlag />
+      <PageIntro
+        eyebrow="Overflow network"
+        title="Partner data could not be loaded."
+        description="Please try loading this overflow job again."
+      />
+      <Button className="mt-4 min-h-12 rounded-none bg-primary" onClick={() => window.location.reload()}>
+        Try Again
+      </Button>
+    </div>
+  );
 }

@@ -8,6 +8,7 @@ import { toRepairCategoryLabel } from "@/lib/repair-categories";
 export const Route = createFileRoute("/programs/$programId")({
   validateSearch: (search: Record<string, unknown>) => ({
     caseId: typeof search["caseId"] === "string" ? search["caseId"] : "",
+    from: search["from"] === "partner" ? "partner" : "",
   }),
   loader: ({ params }) => getProgram(params.programId),
   head: ({ params }) => ({
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/programs/$programId")({
 
 function ProgramPage() {
   const program: ProgramDetailResponse = Route.useLoaderData();
-  const { caseId } = Route.useSearch();
+  const { caseId, from } = Route.useSearch();
   const verified = program.lastVerifiedAt
     ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(
         new Date(program.lastVerifiedAt),
@@ -149,6 +150,11 @@ function ProgramPage() {
               className="blueprint-button button-primary mt-6 inline-flex items-center"
             >
               Return to Passport
+            </Link>
+          )}
+          {from === "partner" && (
+            <Link to="/partner/programs" className="blueprint-button button-primary mt-6 inline-flex items-center">
+              Back to Partner Programs
             </Link>
           )}
         </aside>
