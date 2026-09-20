@@ -137,6 +137,47 @@ function CaseDetail() {
             <Info label="Coverage" value={coverageStatusLabels[item.coverageStatus]} />
             <Info label="Case status" value={caseStatusLabels[item.caseStatus]} />
           </section>
+          {item.resident && (
+            <section className="mt-10 border-y border-border py-6">
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div>
+                  <p className="eyebrow">Resident</p>
+                  <h2 className="mt-2 text-2xl">{item.resident.name}</h2>
+                  {item.resident.phone && (
+                    <p className="mt-1 text-sm text-muted-foreground">{item.resident.phone}</p>
+                  )}
+                </div>
+                <div>
+                  <p className="eyebrow">Primary contact</p>
+                  <h2 className="mt-2 text-2xl">
+                    {item.primaryContact?.name ?? item.resident.name}
+                  </h2>
+                  {item.primaryContact?.relationship && (
+                    <p className="mt-1 font-semibold">{item.primaryContact.relationship}</p>
+                  )}
+                  {(item.primaryContact?.phone ?? item.resident.phone) && (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {item.primaryContact?.phone ?? item.resident.phone}
+                    </p>
+                  )}
+                  {item.primaryContact?.assistingWithApplication && (
+                    <p className="mt-3 text-sm font-semibold text-primary">
+                      Assisting with application
+                    </p>
+                  )}
+                </div>
+              </div>
+              {item.assistant && !item.assistant.isPrimaryContact && (
+                <div className="mt-6 border-t border-border pt-5">
+                  <p className="eyebrow">Authorized assisting contact</p>
+                  <p className="mt-2 font-semibold">{item.assistant.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {[item.assistant.relationship, item.assistant.phone].filter(Boolean).join(" · ")}
+                  </p>
+                </div>
+              )}
+            </section>
+          )}
           <section className="mt-10">
             <SectionLabel number="01">Repair needs & resource alignment</SectionLabel>
             <div className="mt-5 divide-y divide-border border-y border-border">

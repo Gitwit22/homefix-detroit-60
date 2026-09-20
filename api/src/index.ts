@@ -219,6 +219,16 @@ async function withOverflowCaseState(caseId: string, source: PartnerDataSource) 
 
   return {
     ...partnerCase,
+    resident: aggregate?.resident
+      ? {
+          name: `${aggregate.resident.firstName} ${aggregate.resident.lastName}`.trim(),
+          phone: aggregate.resident.phone,
+          email: aggregate.resident.email,
+        }
+      : null,
+    assistant:
+      aggregate?.contacts.find((contact) => contact.contactType === "assistant") ?? null,
+    primaryContact: aggregate?.primaryContact ?? null,
     documents:
       aggregate?.documents.map((document) => ({
         ...document,

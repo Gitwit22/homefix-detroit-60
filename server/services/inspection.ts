@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { db } from "../db/index.js";
 import {
+  caseContacts,
   caseEvents,
   homes,
   inspectionAppointments,
@@ -14,9 +15,11 @@ import {
   repairCases,
   repairNeeds,
   repairPhotos,
+  residents,
   type InspectionCaseSnapshot,
   type InspectionQuestion,
 } from "../db/schema.js";
+import { resolvePrimaryCaseContact } from "../domain/caseContact.js";
 import { repairCategories, triageUrgencies } from "../domain/repair.js";
 import { syncCaseLifecycle } from "./lifecycle.js";
 
@@ -216,6 +219,14 @@ export async function listInspectionQueue() {
       status: inspectionRequests.status,
       streetAddress: homes.streetAddress,
       zipCode: homes.zipCode,
+      residentFirstName: residents.firstName,
+      residentLastName: residents.lastName,
+      residentPhone: residents.phone,
+      residentEmail: residents.email,
+      assistantName: caseContacts.name,
+      assistantPhone: caseContacts.phone,
+      assistantRelationship: caseContacts.relationship,
+      assistantIsPrimary: caseContacts.isPrimaryContact,
       requestedAt: inspectionRequests.createdAt,
       updatedAt: inspectionRequests.updatedAt,
       appointmentStart: inspectionAppointments.confirmedStart,
@@ -226,6 +237,8 @@ export async function listInspectionQueue() {
     .from(inspectionRequests)
     .innerJoin(repairCases, eq(repairCases.id, inspectionRequests.repairCaseId))
     .innerJoin(homes, eq(homes.id, repairCases.homeId))
+    .innerJoin(residents, eq(residents.id, homes.residentId))
+    .leftJoin(caseContacts, eq(caseContacts.repairCaseId, repairCases.id))
     .leftJoin(
       inspectionAppointments,
       eq(inspectionAppointments.inspectionRequestId, inspectionRequests.id),
@@ -245,17 +258,45 @@ export async function listInspectionQueue() {
         eq(inspectionAvailability.active, true),
       ),
     );
-  return requests.map((request) => ({
-    ...request,
-    requestedAt: request.requestedAt.toISOString(),
-    updatedAt: request.updatedAt.toISOString(),
-    appointmentStart: request.appointmentStart?.toISOString() ?? null,
-    appointmentEnd: request.appointmentEnd?.toISOString() ?? null,
-    availabilityWindows: windows
-      .filter((window) => window.inspectionRequestId === request.id)
-      .sort((left, right) => left.start.getTime() - right.start.getTime())
-      .map((window) => ({ start: window.start.toISOString(), end: window.end.toISOString() })),
-  }));
+  return requests.map((request) => {
+    const primaryContact = resolvePrimaryCaseContact(
+      {
+        firstName: request.residentFirstName,
+        lastName: request.residentLastName,
+        phone: request.residentPhone,
+        email: request.residentEmail,
+      },
+      request.assistantName && request.assistantPhone
+        ? {
+            contactType: "assistant",
+            name: request.assistantName,
+            phone: request.assistantPhone,
+            relationship: request.assistantRelationship,
+            isPrimaryContact: request.assistantIsPrimary ?? false,
+          }
+        : null,
+    );
+
+    return {
+      id: request.id,
+      caseId: request.caseId,
+      caseNumber: request.caseNumber,
+      status: request.status,
+      streetAddress: request.streetAddress,
+      zipCode: request.zipCode,
+      primaryContact,
+      requestedAt: request.requestedAt.toISOString(),
+      updatedAt: request.updatedAt.toISOString(),
+      appointmentStart: request.appointmentStart?.toISOString() ?? null,
+      appointmentEnd: request.appointmentEnd?.toISOString() ?? null,
+      providerName: request.providerName,
+      providerPhone: request.providerPhone,
+      availabilityWindows: windows
+        .filter((window) => window.inspectionRequestId === request.id)
+        .sort((left, right) => left.start.getTime() - right.start.getTime())
+        .map((window) => ({ start: window.start.toISOString(), end: window.end.toISOString() })),
+    };
+  });
 }
 
 export async function submitInspectionAvailability(caseId: string, input: unknown) {

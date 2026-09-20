@@ -2,6 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   ChoiceGroup,
   DemoFlag,
@@ -116,6 +118,12 @@ function IntakePage() {
   const [senior, setSenior] = useState(demo ? "Yes" : "No");
   const [children, setChildren] = useState("No");
   const [access, setAccess] = useState("No");
+  const [fillingOutForSomeoneElse, setFillingOutForSomeoneElse] = useState(Boolean(demo));
+  const [assistantName, setAssistantName] = useState(demo ? "Angela Carter" : "");
+  const [assistantPhone, setAssistantPhone] = useState(demo ? "3135550123" : "");
+  const [assistantRelationship, setAssistantRelationship] = useState(demo ? "Daughter" : "");
+  const [assistantPrimary, setAssistantPrimary] = useState(Boolean(demo));
+  const [permissionAcknowledged, setPermissionAcknowledged] = useState(Boolean(demo));
   const [repairs, setRepairs] = useState<RepairDraft[]>(() =>
     demo
       ? [createRepairDraft(0), createRepairDraft(1), createRepairDraft(2)]
@@ -160,6 +168,12 @@ function IntakePage() {
         householdSize?: string;
         incomeRange?: string;
         applicantAge?: string;
+        fillingOutForSomeoneElse?: boolean;
+        assistantName?: string;
+        assistantPhone?: string;
+        assistantRelationship?: string;
+        assistantPrimary?: boolean;
+        permissionAcknowledged?: boolean;
         repairs?: Array<Omit<RepairDraft, "files">>;
       };
       if (draft.step && draft.step >= 1 && draft.step <= 5) setStep(draft.step);
@@ -173,6 +187,15 @@ function IntakePage() {
       if (draft.householdSize) setHouseholdSize(draft.householdSize);
       if (draft.incomeRange) setIncomeRange(draft.incomeRange);
       if (draft.applicantAge) setApplicantAge(draft.applicantAge);
+      if (draft.fillingOutForSomeoneElse !== undefined)
+        setFillingOutForSomeoneElse(draft.fillingOutForSomeoneElse);
+      if (draft.assistantName !== undefined) setAssistantName(draft.assistantName);
+      if (draft.assistantPhone !== undefined) setAssistantPhone(draft.assistantPhone);
+      if (draft.assistantRelationship !== undefined)
+        setAssistantRelationship(draft.assistantRelationship);
+      if (draft.assistantPrimary !== undefined) setAssistantPrimary(draft.assistantPrimary);
+      if (draft.permissionAcknowledged !== undefined)
+        setPermissionAcknowledged(draft.permissionAcknowledged);
       if (draft.repairs?.length) {
         setRepairs(draft.repairs.map((repair) => ({ ...repair, files: [] })));
       }
@@ -197,6 +220,12 @@ function IntakePage() {
         householdSize,
         incomeRange,
         applicantAge,
+        fillingOutForSomeoneElse,
+        assistantName,
+        assistantPhone,
+        assistantRelationship,
+        assistantPrimary,
+        permissionAcknowledged,
         repairs: repairs.map(({ files: _files, ...repair }) => repair),
       }),
     );
@@ -213,6 +242,12 @@ function IntakePage() {
     householdSize,
     incomeRange,
     applicantAge,
+    fillingOutForSomeoneElse,
+    assistantName,
+    assistantPhone,
+    assistantRelationship,
+    assistantPrimary,
+    permissionAcknowledged,
     repairs,
   ]);
 
@@ -236,6 +271,15 @@ function IntakePage() {
 
   const validateStep = () => {
     if (step === 1) {
+      if (fillingOutForSomeoneElse && (!assistantName.trim() || !assistantPhone.trim())) {
+        return "Enter the name and phone number of the person assisting with this application.";
+      }
+      if (fillingOutForSomeoneElse && assistantPhone.trim().length < 7) {
+        return "Enter a valid phone number for the person assisting with this application.";
+      }
+      if (fillingOutForSomeoneElse && assistantPrimary && !permissionAcknowledged) {
+        return "Confirm that the resident has given permission to make this person the primary contact.";
+      }
       if (!firstName.trim() || !lastName.trim() || !streetAddress.trim()) {
         return "Enter the resident name and Detroit street address.";
       }
@@ -296,6 +340,18 @@ function IntakePage() {
         createdCase ??
         (await submitIntakeServer({
           demoScenario: demo,
+          assistance: fillingOutForSomeoneElse
+            ? {
+                fillingOutForSomeoneElse: true,
+                assistant: {
+                  name: assistantName.trim(),
+                  phone: assistantPhone.trim(),
+                  ...(assistantRelationship ? { relationship: assistantRelationship } : {}),
+                  primaryContact: assistantPrimary,
+                  permissionAcknowledged: assistantPrimary && permissionAcknowledged,
+                },
+              }
+            : { fillingOutForSomeoneElse: false },
           resident: { firstName, lastName, email, phone },
           property: {
             streetAddress,
@@ -393,53 +449,160 @@ function IntakePage() {
           )}
           <div className="mt-10 border-y border-foreground py-8">
             {step === 1 && (
-              <div className="grid gap-6 sm:grid-cols-2">
-                <FormField label="First name">
-                  <input value={firstName} onChange={(event) => setFirstName(event.target.value)} />
-                </FormField>
-                <FormField label="Last name">
-                  <input value={lastName} onChange={(event) => setLastName(event.target.value)} />
-                </FormField>
-                <FormField label="Email (optional)">
-                  <input value={email} onChange={(event) => setEmail(event.target.value)} />
-                </FormField>
-                <FormField label="Phone (optional)">
-                  <input value={phone} onChange={(event) => setPhone(event.target.value)} />
-                </FormField>
-                <FormField label="Detroit street address">
-                  <input
-                    data-guide-target="intake-address"
-                    value={streetAddress}
-                    onChange={(event) => setStreetAddress(event.target.value)}
-                  />
-                </FormField>
-                <FormField label="ZIP code">
-                  <input
-                    value={zipCode}
-                    onChange={(event) => setZipCode(event.target.value)}
-                    inputMode="numeric"
-                  />
-                </FormField>
-                <ChoiceGroup
-                  label="Do you own or rent?"
-                  options={["Owner", "Renter"]}
-                  value={owner}
-                  onChange={setOwner}
-                />
-                <ChoiceGroup
-                  label="Is this your primary residence?"
-                  options={["Yes", "No"]}
-                  value={primary}
-                  onChange={setPrimary}
-                />
-                <FormField label="How many years have you lived here?">
-                  <input
-                    type="number"
-                    value={yearsAtProperty}
-                    onChange={(event) => setYearsAtProperty(event.target.value)}
-                    min="0"
-                  />
-                </FormField>
+              <div className="space-y-10">
+                <section aria-labelledby="application-completer-heading">
+                  <h2 id="application-completer-heading" className="text-2xl">
+                    Who is completing this application?
+                  </h2>
+                  <fieldset className="mt-5">
+                    <legend className="font-semibold">Are you filling this out for someone else?</legend>
+                    <RadioGroup
+                      className="mt-3 gap-3"
+                      value={fillingOutForSomeoneElse ? "assistant" : "resident"}
+                      onValueChange={(value) => {
+                        const isAssistant = value === "assistant";
+                        setFillingOutForSomeoneElse(isAssistant);
+                        if (!isAssistant) {
+                          setAssistantPrimary(false);
+                          setPermissionAcknowledged(false);
+                        }
+                      }}
+                    >
+                      <label className="flex min-h-12 cursor-pointer items-center gap-3 border border-input bg-paper px-4">
+                        <RadioGroupItem value="resident" />
+                        <span>No, I am completing this for myself</span>
+                      </label>
+                      <label className="flex min-h-12 cursor-pointer items-center gap-3 border border-input bg-paper px-4">
+                        <RadioGroupItem value="assistant" />
+                        <span>Yes, I am helping someone else</span>
+                      </label>
+                    </RadioGroup>
+                  </fieldset>
+
+                  {fillingOutForSomeoneElse && (
+                    <div className="mt-6 border-l-4 border-primary bg-secondary/45 p-5 sm:p-6">
+                      <p className="eyebrow">Person assisting with this application</p>
+                      <div className="mt-5 grid gap-6 sm:grid-cols-2">
+                        <FormField label="Your name">
+                          <input
+                            value={assistantName}
+                            onChange={(event) => setAssistantName(event.target.value)}
+                            autoComplete="name"
+                          />
+                        </FormField>
+                        <FormField label="Your phone number">
+                          <input
+                            type="tel"
+                            value={assistantPhone}
+                            onChange={(event) => setAssistantPhone(event.target.value)}
+                            autoComplete="tel"
+                          />
+                        </FormField>
+                        <FormField label="Relationship to resident (optional)">
+                          <select
+                            value={assistantRelationship}
+                            onChange={(event) => setAssistantRelationship(event.target.value)}
+                          >
+                            <option value="">Choose a relationship</option>
+                            <option>Family member</option>
+                            <option>Daughter</option>
+                            <option>Son</option>
+                            <option>Friend</option>
+                            <option>Neighbor</option>
+                            <option>Caregiver</option>
+                            <option>Case worker</option>
+                            <option>Other</option>
+                          </select>
+                        </FormField>
+                      </div>
+                      <label className="mt-6 flex cursor-pointer items-start gap-3 font-semibold">
+                        <Checkbox
+                          checked={assistantPrimary}
+                          onCheckedChange={(checked) => {
+                            const isPrimary = checked === true;
+                            setAssistantPrimary(isPrimary);
+                            if (!isPrimary) setPermissionAcknowledged(false);
+                          }}
+                        />
+                        <span>
+                          Make me the primary contact for this case
+                          <small className="mt-1 block font-normal text-muted-foreground">
+                            HomeFix will contact you first about case updates, documents, and
+                            scheduling. The resident remains the applicant and property resident.
+                          </small>
+                        </span>
+                      </label>
+                      {assistantPrimary && (
+                        <label className="mt-5 flex cursor-pointer items-start gap-3 border-t border-border pt-5 text-sm font-semibold">
+                          <Checkbox
+                            checked={permissionAcknowledged}
+                            onCheckedChange={(checked) =>
+                              setPermissionAcknowledged(checked === true)
+                            }
+                          />
+                          <span>
+                            The resident has given me permission to assist with this repair case and
+                            receive communications about scheduling and case progress.
+                          </span>
+                        </label>
+                      )}
+                    </div>
+                  )}
+                </section>
+
+                <section aria-labelledby="resident-information-heading">
+                  <h2 id="resident-information-heading" className="text-2xl">
+                    Resident information
+                  </h2>
+                  <div className="mt-5 grid gap-6 sm:grid-cols-2">
+                    <FormField label="First name">
+                      <input value={firstName} onChange={(event) => setFirstName(event.target.value)} />
+                    </FormField>
+                    <FormField label="Last name">
+                      <input value={lastName} onChange={(event) => setLastName(event.target.value)} />
+                    </FormField>
+                    <FormField label="Email (optional)">
+                      <input value={email} onChange={(event) => setEmail(event.target.value)} />
+                    </FormField>
+                    <FormField label="Phone (optional)">
+                      <input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} />
+                    </FormField>
+                    <FormField label="Detroit street address">
+                      <input
+                        data-guide-target="intake-address"
+                        value={streetAddress}
+                        onChange={(event) => setStreetAddress(event.target.value)}
+                      />
+                    </FormField>
+                    <FormField label="ZIP code">
+                      <input
+                        value={zipCode}
+                        onChange={(event) => setZipCode(event.target.value)}
+                        inputMode="numeric"
+                      />
+                    </FormField>
+                    <ChoiceGroup
+                      label="Do you own or rent?"
+                      options={["Owner", "Renter"]}
+                      value={owner}
+                      onChange={setOwner}
+                    />
+                    <ChoiceGroup
+                      label="Is this your primary residence?"
+                      options={["Yes", "No"]}
+                      value={primary}
+                      onChange={setPrimary}
+                    />
+                    <FormField label="How many years have you lived here?">
+                      <input
+                        type="number"
+                        value={yearsAtProperty}
+                        onChange={(event) => setYearsAtProperty(event.target.value)}
+                        min="0"
+                      />
+                    </FormField>
+                  </div>
+                </section>
               </div>
             )}
             {step === 2 && (
@@ -600,6 +763,12 @@ function IntakePage() {
               <div className="space-y-6">
                 <div className="grid gap-px bg-border sm:grid-cols-2">
                   <Review label="Resident" value={`${firstName} ${lastName}`} />
+                  {fillingOutForSomeoneElse && (
+                    <Review
+                      label={assistantPrimary ? "Primary contact" : "Assisting contact"}
+                      value={`${assistantName}${assistantRelationship ? ` · ${assistantRelationship}` : ""}`}
+                    />
+                  )}
                   <Review label="Property" value={`${streetAddress} · Detroit ${zipCode}`} />
                   <Review
                     label="Household"

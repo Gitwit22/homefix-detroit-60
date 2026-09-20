@@ -56,6 +56,14 @@ export type PartnerInspectionQueueItem = {
   appointmentEnd: string | null;
   providerName: string | null;
   providerPhone: string | null;
+  primaryContact: {
+    contactType: "resident" | "assistant";
+    name: string;
+    phone: string | null;
+    email: string | null;
+    relationship: string | null;
+    assistingWithApplication: boolean;
+  };
   availabilityWindows: Array<{ start: string; end: string }>;
 };
 
@@ -87,6 +95,18 @@ export function isValidAssessment(
 
 export type IntakePayload = {
   demoScenario?: "denise-carter-pitch-v1";
+  assistance:
+    | { fillingOutForSomeoneElse: false }
+    | {
+        fillingOutForSomeoneElse: true;
+        assistant: {
+          name: string;
+          phone: string;
+          relationship?: string;
+          primaryContact: boolean;
+          permissionAcknowledged: boolean;
+        };
+      };
   resident: {
     firstName: string;
     lastName: string;
@@ -143,6 +163,23 @@ export type CaseAggregateResponse = {
     lastName: string;
     email: string | null;
     phone: string | null;
+  } | null;
+  contacts: Array<{
+    id: string;
+    contactType: "assistant";
+    name: string;
+    phone: string;
+    relationship: string | null;
+    isPrimaryContact: boolean;
+    permissionAcknowledgedAt: string | null;
+  }>;
+  primaryContact: {
+    contactType: "resident" | "assistant";
+    name: string;
+    phone: string | null;
+    email: string | null;
+    relationship: string | null;
+    assistingWithApplication: boolean;
   } | null;
   home: {
     streetAddress: string;

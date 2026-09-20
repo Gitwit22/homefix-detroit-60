@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
+  caseContacts,
   caseEvents,
   documents,
   homes,
@@ -14,6 +15,7 @@ import {
   residents,
   workOrders,
 } from "../db/schema.js";
+import { resolvePrimaryCaseContact } from "../domain/caseContact.js";
 import { getCaseLifecycle } from "./lifecycle.js";
 import { getInspectionState } from "./inspection.js";
 import { presentDocument } from "./documents.js";
@@ -48,6 +50,14 @@ export async function getCaseAggregate(caseId: string) {
     .where(eq(residents.id, home.residentId))
     .limit(1);
   const resident = residentRow[0] ?? null;
+  const contacts = await db
+    .select()
+    .from(caseContacts)
+    .where(eq(caseContacts.repairCaseId, caseId));
+  const assistant = contacts.find((contact) => contact.contactType === "assistant") ?? null;
+  const primaryContact = resident
+    ? resolvePrimaryCaseContact(resident, assistant)
+    : null;
 
   const needs = await db.select().from(repairNeeds).where(eq(repairNeeds.repairCaseId, caseId));
   const repairNeedIds = needs.map((need) => need.id);
@@ -98,6 +108,8 @@ export async function getCaseAggregate(caseId: string) {
   return {
     case: foundCase,
     resident,
+    contacts,
+    primaryContact,
     home,
     repairNeeds: needs,
     photos: await Promise.all(

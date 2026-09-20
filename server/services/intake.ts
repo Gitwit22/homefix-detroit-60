@@ -1,11 +1,13 @@
 import { z } from "zod";
 import { db } from "../db/index.js";
-import { homes, repairCases, repairNeeds, residents } from "../db/schema.js";
+import { caseContacts, homes, repairCases, repairNeeds, residents } from "../db/schema.js";
 import { DENISE_DEMO_SCENARIO } from "../demo/deniseScenario.js";
 import { normalizeRepairCategory } from "../domain/repair.js";
+import { intakeAssistanceSchema } from "../validation/intakeAssistance.js";
 
 export const intakeSchema = z.object({
   demoScenario: z.literal(DENISE_DEMO_SCENARIO).optional(),
+  assistance: intakeAssistanceSchema.default({ fillingOutForSomeoneElse: false }),
   resident: z.object({
     firstName: z.string().min(1),
     lastName: z.string().min(1),
@@ -122,6 +124,19 @@ export async function createIntakeCase(
 
         const repairCaseId = repairCaseResult[0]?.id;
         if (!repairCaseId) throw new Error("Repair case could not be created");
+
+        if (payload.assistance.fillingOutForSomeoneElse) {
+          const assistant = payload.assistance.assistant;
+          await transaction.insert(caseContacts).values({
+            repairCaseId,
+            contactType: "assistant",
+            name: assistant.name,
+            phone: assistant.phone,
+            relationship: assistant.relationship || null,
+            isPrimaryContact: assistant.primaryContact,
+            permissionAcknowledgedAt: assistant.permissionAcknowledged ? new Date() : null,
+          });
+        }
 
         const repairNeedResult = await transaction
           .insert(repairNeeds)

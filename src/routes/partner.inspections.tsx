@@ -56,7 +56,7 @@ function InspectionQueue() {
             {queue.items.map((item) => (
               <article
                 key={item.id}
-                className="grid gap-4 py-5 md:grid-cols-[1.25fr_1fr_1fr_auto] md:items-center"
+                className="grid gap-4 py-5 md:grid-cols-[1.2fr_0.8fr_1fr_1fr_auto] md:items-center"
               >
                 <div>
                   <p className="eyebrow">{item.caseNumber}</p>
@@ -69,6 +69,18 @@ function InspectionQueue() {
                     {item.availabilityWindows.length} resident window
                     {item.availabilityWindows.length === 1 ? "" : "s"}
                   </p>
+                </div>
+                <div>
+                  <p className="eyebrow">Scheduling contact</p>
+                  <p className="mt-2 font-semibold">{item.primaryContact.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {[item.primaryContact.relationship, item.primaryContact.phone]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                  {item.primaryContact.assistingWithApplication && (
+                    <small className="mt-1 block text-primary">Assisting with application</small>
+                  )}
                 </div>
                 <div className="flex gap-2 text-sm">
                   <Clock3 className="mt-0.5 size-4 shrink-0 text-primary" />

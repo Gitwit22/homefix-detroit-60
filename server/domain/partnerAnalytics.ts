@@ -209,6 +209,25 @@ export type PartnerCaseSummary = {
 };
 
 export type PartnerCaseDetail = PartnerCaseSummary & {
+  resident?: {
+    name: string;
+    phone: string | null;
+    email: string | null;
+  } | null;
+  assistant?: {
+    name: string;
+    phone: string;
+    relationship: string | null;
+    isPrimaryContact: boolean;
+  } | null;
+  primaryContact?: {
+    contactType: "resident" | "assistant";
+    name: string;
+    phone: string | null;
+    email: string | null;
+    relationship: string | null;
+    assistingWithApplication: boolean;
+  } | null;
   needs: Array<{
     repairNeedId: string;
     repairType: RepairType;
