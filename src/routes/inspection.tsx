@@ -27,6 +27,8 @@ export const Route = createFileRoute("/inspection")({
 type AvailabilityWindow = { start: string; end: string };
 
 const detroitTimeZone = "America/Detroit";
+const minimumAvailabilityWindows = 2;
+const maximumAvailabilityWindows = 6;
 
 function dateParts(date: Date) {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -122,16 +124,22 @@ function InspectionPage() {
     return <div className="mx-auto max-w-6xl px-4 py-10">{error || "Case not found."}</div>;
 
   const toggleWindow = (window: AvailabilityWindow) => {
-    setSelected((current) =>
-      current.some((item) => item.start === window.start)
-        ? current.filter((item) => item.start !== window.start)
-        : [...current, window],
-    );
+    setSelected((current) => {
+      const isSelected = current.some((item) => item.start === window.start);
+      if (isSelected) return current.filter((item) => item.start !== window.start);
+      if (current.length >= maximumAvailabilityWindows) return current;
+      return [...current, window];
+    });
+    setError("");
   };
 
   const submit = async () => {
-    if (selected.length < 2) {
+    if (selected.length < minimumAvailabilityWindows) {
       setError("Choose at least two acceptable inspection windows.");
+      return;
+    }
+    if (selected.length > maximumAvailabilityWindows) {
+      setError("Choose no more than six acceptable inspection windows.");
       return;
     }
     setIsSubmitting(true);
@@ -211,20 +219,23 @@ function InspectionPage() {
               <h2 className="mt-2 text-3xl">What times work for you?</h2>
             </div>
             <StatusBadge tone={selected.length >= 2 ? "positive" : "neutral"}>
-              {selected.length} selected
+              {selected.length} of {maximumAvailabilityWindows} selected
             </StatusBadge>
           </div>
+          <p className="mt-4 text-sm text-muted-foreground">Choose between two and six windows.</p>
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {windows.map((window) => {
               const label = formatWindow(window);
               const active = selected.some((item) => item.start === window.start);
+              const unavailable = !active && selected.length >= maximumAvailabilityWindows;
               return (
                 <button
                   key={window.start}
                   type="button"
                   aria-pressed={active}
+                  disabled={unavailable}
                   onClick={() => toggleWindow(window)}
-                  className={`grid min-h-28 grid-cols-[auto_1fr_auto] items-center gap-3 border p-4 text-left ${active ? "border-primary bg-primary/10" : "border-border bg-background"}`}
+                  className={`grid min-h-28 grid-cols-[auto_1fr_auto] items-center gap-3 border p-4 text-left disabled:cursor-not-allowed disabled:opacity-50 ${active ? "border-primary bg-primary/10" : "border-border bg-background"}`}
                 >
                   <CalendarDays className="size-5 text-primary" />
                   <span>
@@ -255,7 +266,7 @@ function InspectionPage() {
           )}
           <Button
             className="mt-6 min-h-12 rounded-none"
-            disabled={isSubmitting || selected.length < 2}
+            disabled={isSubmitting || selected.length < minimumAvailabilityWindows}
             onClick={submit}
           >
             {isSubmitting ? "Submitting..." : "Submit Availability"}

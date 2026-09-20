@@ -1113,7 +1113,12 @@ const server = createServer(async (request, response) => {
             ? 400
             : 409;
       sendJson(response, status, {
-        error: error instanceof Error ? error.message : "Unable to submit inspection availability",
+        error:
+          error instanceof Error && error.name === "ZodError"
+            ? "Choose between two and six valid future inspection windows."
+            : error instanceof Error
+              ? error.message
+              : "Unable to submit inspection availability",
       });
     }
     return;

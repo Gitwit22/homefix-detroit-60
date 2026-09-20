@@ -242,19 +242,21 @@ test("triage responses require a bounded preliminary training opportunity", () =
 
 test("inspection availability requires multiple unique future windows", () => {
   const start = new Date(Date.now() + 86_400_000);
-  const end = new Date(start.getTime() + 3 * 60 * 60 * 1_000);
-  const secondStart = new Date(start.getTime() + 24 * 60 * 60 * 1_000);
-  const secondEnd = new Date(secondStart.getTime() + 3 * 60 * 60 * 1_000);
-  const valid = [
-    { start: start.toISOString(), end: end.toISOString() },
-    { start: secondStart.toISOString(), end: secondEnd.toISOString() },
-  ];
+  const valid = Array.from({ length: 7 }, (_, index) => {
+    const windowStart = new Date(start.getTime() + index * 24 * 60 * 60 * 1_000);
+    const windowEnd = new Date(windowStart.getTime() + 3 * 60 * 60 * 1_000);
+    return { start: windowStart.toISOString(), end: windowEnd.toISOString() };
+  });
 
-  assert.equal(inspectionAvailabilitySchema.safeParse({ windows: valid }).success, true);
+  assert.equal(
+    inspectionAvailabilitySchema.safeParse({ windows: valid.slice(0, 6) }).success,
+    true,
+  );
   assert.equal(
     inspectionAvailabilitySchema.safeParse({ windows: valid.slice(0, 1) }).success,
     false,
   );
+  assert.equal(inspectionAvailabilitySchema.safeParse({ windows: valid }).success, false);
   assert.equal(
     inspectionAvailabilitySchema.safeParse({ windows: [valid[0], valid[0]] }).success,
     false,
