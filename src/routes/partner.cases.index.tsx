@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { DataTable, DemoFlag, PageIntro, PriorityBadge, StatusBadge } from "@/components/homefix";
-import { PartnerRouteError, PartnerRouteLoading } from "@/components/partner-route-state";
+import { PartnerDataWarning, PartnerRouteError, PartnerRouteLoading } from "@/components/partner-route-state";
 import { getPartnerAnalytics } from "@/lib/homefix-api";
 import { matchesPartnerPriority, parsePartnerCaseFilters } from "@/lib/partner-filters";
 import {
@@ -87,6 +87,7 @@ function Cases() {
 
   return (
     <>
+      <PartnerDataWarning warning={analytics.warning} />
       <DemoFlag />
       <PageIntro
         eyebrow="Case operations"

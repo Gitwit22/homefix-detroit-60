@@ -424,6 +424,7 @@ export async function ensureOverflowDemoData() {
         id: entry.caseId,
         homeId: entry.homeId,
         caseNumber: entry.caseNumber,
+        provenance: "seeded_demo",
         status: "program_review",
         currentStep: "coverage",
         nextAction:
@@ -437,7 +438,7 @@ export async function ensureOverflowDemoData() {
     )
     .onConflictDoUpdate({
       target: repairCases.id,
-      set: { updatedAt: new Date(createdAt) },
+      set: { provenance: "seeded_demo", updatedAt: new Date(createdAt) },
     });
 
   await db

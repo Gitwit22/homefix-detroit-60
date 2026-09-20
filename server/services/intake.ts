@@ -111,6 +111,8 @@ export async function createIntakeCase(
             caseNumber,
             demoScenario: payload.demoScenario ?? null,
             demoSessionId: options.demoSessionId ?? null,
+            provenance:
+              payload.demoScenario || options.demoSessionId ? "demo_submission" : "resident",
             status: "reported",
             currentStep: "reported",
             nextAction: "Check the report against current program requirements.",

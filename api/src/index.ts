@@ -17,20 +17,37 @@ import {
 import { getCaseAggregate } from "../../server/services/case.js";
 import {
   confirmInspection,
+  listInspectionQueue,
   recordInspectionFindings,
   submitInspectionAvailability,
 } from "../../server/services/inspection.js";
 import { processCase, processRepair } from "../../server/services/processRepair.js";
 import { rollbackRepairPhoto, uploadRepairPhoto } from "../../server/services/photos.js";
+import {
+  caseExists,
+  reviewCaseDocument,
+  rollbackCaseDocument,
+  uploadCaseDocument,
+} from "../../server/services/documents.js";
 import { getProgramDetail, listProgramCatalog } from "../../server/services/program.js";
+import {
+  getPublicOpportunity,
+  listPublicOpportunities,
+} from "../../server/services/opportunities.js";
 import { calculateCoveragePlan, getCoveragePlan } from "../../server/services/coverage.js";
-import { syntheticProgramCapacities } from "../../server/demo/partnerDataset.js";
+import {
+  DEFAULT_PARTNER_DEMO_SEED,
+  PARTNER_DEMO_GENERATED_AT,
+  generateSyntheticPartnerDataset,
+  syntheticProgramCapacities,
+} from "../../server/demo/partnerDataset.js";
 import {
   calculatePartnerAnalytics,
   getPartnerCaseDetail,
+  mergePartnerFacts,
 } from "../../server/services/partnerAnalytics.js";
 import { findExistingOverflowWorkOrderByCaseNumber } from "../../server/demo/overflowDemo.js";
-import { listPersistedPartnerFacts } from "../../server/services/partnerCaseData.js";
+import { loadPartnerFactsFromDatabase } from "../../server/services/partnerCaseData.js";
 import {
   createOverflowJob,
   getOverflowJob,
@@ -54,15 +71,78 @@ import {
   submitOverflowBidSchema,
 } from "../../server/services/overflow.js";
 import { trainingOpportunitySchema } from "../../server/validation/triage.js";
+import {
+  getPartnerDemoControl,
+  resetPartnerDemoData,
+  restorePartnerDemoData,
+} from "../../server/services/demoControl.js";
 
 const port = parsePort(process.env.PORT);
 const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGINS);
 const maxBodyBytes = 100_000;
 const demoMode = process.env.HOMEFIX_DEMO_MODE === "1";
-async function withOverflowCaseState(caseId: string) {
-  const partnerFacts = await listPersistedPartnerFacts();
+const partnerDatabaseTimeoutMs = 5_000;
+type PartnerDataSource = "live" | "demo" | "combined";
+
+function parsePartnerDataSource(requestUrl: URL): PartnerDataSource {
+  const source = requestUrl.searchParams.get("source");
+  if (source === "live" || source === "demo") return source;
+  return "combined";
+}
+
+async function withPartnerDatabaseDeadline<T>(request: Promise<T>): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      request,
+      new Promise<never>((_resolve, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error("Partner database request timed out")),
+          partnerDatabaseTimeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+async function loadPartnerFacts(source: PartnerDataSource) {
+  if (source === "demo") {
+    return { facts: generateSyntheticPartnerDataset(), degraded: false };
+  }
+
+  if (source === "live") {
+    return { facts: await loadPartnerFactsFromDatabase(), degraded: false };
+  }
+
+  try {
+    const { baselineEnabled } = await withPartnerDatabaseDeadline(getPartnerDemoControl());
+    const syntheticFacts = baselineEnabled ? generateSyntheticPartnerDataset() : [];
+    const persistedFacts = await withPartnerDatabaseDeadline(loadPartnerFactsFromDatabase());
+    return {
+      facts: baselineEnabled ? mergePartnerFacts(syntheticFacts, persistedFacts) : persistedFacts,
+      degraded: false,
+    };
+  } catch (error) {
+    console.error(error);
+    return { facts: generateSyntheticPartnerDataset(), degraded: true };
+  }
+}
+
+async function withOverflowCaseState(caseId: string, source: PartnerDataSource) {
+  const { facts: partnerFacts } = await loadPartnerFacts(source);
   const partnerCase = getPartnerCaseDetail(partnerFacts, caseId);
   if (!partnerCase) return null;
+
+  if (partnerCase.caseId.startsWith("HF-DEMO-") || partnerCase.caseId === "HF-313-0842") {
+    return {
+      ...partnerCase,
+      documents: [],
+      inspectionPackage: null,
+      overflow: { eligible: false, existingWorkOrder: null },
+    };
+  }
 
   const [existingWorkOrder, aggregate] = await Promise.all([
     findExistingOverflowWorkOrderByCaseNumber(partnerCase.caseNumber),
@@ -116,6 +196,7 @@ async function withOverflowCaseState(caseId: string) {
                   notes: finding.notes,
                   verifiedScope: finding.verifiedScope,
                   estimatedCostCents: finding.estimatedCostCents,
+                  trainingSuitability: finding.trainingSuitability,
                 }
               : null,
           };
@@ -125,6 +206,12 @@ async function withOverflowCaseState(caseId: string) {
 
   return {
     ...partnerCase,
+    documents:
+      aggregate?.documents.map((document) => ({
+        ...document,
+        createdAt: document.createdAt.toISOString(),
+        updatedAt: document.updatedAt.toISOString(),
+      })) ?? [],
     inspectionPackage,
     overflow: {
       eligible: false,
@@ -190,6 +277,17 @@ function sendJson(response: ServerResponse, status: number, payload: unknown): v
   response.end(JSON.stringify(payload));
 }
 
+function requireOperatorCode(payload: unknown) {
+  const configuredCode = process.env.PARTNER_DEMO_OPERATOR_CODE;
+  const suppliedCode =
+    payload && typeof payload === "object" && "operatorCode" in payload
+      ? (payload as { operatorCode?: unknown }).operatorCode
+      : null;
+  if (!configuredCode || typeof suppliedCode !== "string" || suppliedCode !== configuredCode) {
+    throw new RequestError(403, "Operator code is invalid");
+  }
+}
+
 async function readPhotoFiles(request: IncomingMessage) {
   const form = formidable({
     maxFiles: 5,
@@ -201,6 +299,23 @@ async function readPhotoFiles(request: IncomingMessage) {
   return Object.values(files)
     .flat()
     .filter((file) => file != null);
+}
+
+async function readDocumentFile(request: IncomingMessage) {
+  const form = formidable({
+    maxFiles: 1,
+    maxFileSize: 15 * 1024 * 1024,
+    allowEmptyFiles: false,
+    filter: ({ mimetype }) =>
+      ["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(mimetype ?? ""),
+  });
+  const [fields, files] = await form.parse(request);
+  const documentTypeValue = fields["documentType"];
+  const documentType = Array.isArray(documentTypeValue)
+    ? documentTypeValue[0]
+    : documentTypeValue;
+  const file = Object.values(files).flat().find((candidate) => candidate != null);
+  return { documentType: documentType ?? "", file };
 }
 
 async function readJson(request: IncomingMessage): Promise<unknown> {
@@ -240,6 +355,14 @@ async function requireDemoSession(request: IncomingMessage) {
   return session;
 }
 
+async function requireResidentCaseAccess(request: IncomingMessage, caseId: string) {
+  const foundCase = await caseExists(caseId);
+  if (!foundCase) throw new RequestError(404, "Case not found");
+  if (!foundCase.demoSessionId) return;
+  const session = await requireDemoSession(request);
+  if (session.id !== foundCase.demoSessionId) throw new RequestError(403, "Case access is denied");
+}
+
 const server = createServer(async (request, response) => {
   const requestUrl = new URL(request.url ?? "/", "http://localhost");
   const method = (request.method ?? "").toUpperCase();
@@ -257,6 +380,39 @@ const server = createServer(async (request, response) => {
 
   if (method === "GET" && requestUrl.pathname === "/health") {
     sendJson(response, 200, { status: "ok", service: "homefix-api" });
+    return;
+  }
+
+  if (method === "GET" && requestUrl.pathname === "/api/v1/opportunities") {
+    try {
+      sendJson(
+        response,
+        200,
+        await listPublicOpportunities(Object.fromEntries(requestUrl.searchParams.entries())),
+      );
+    } catch (error) {
+      const status = error instanceof Error && error.name === "ZodError" ? 400 : 500;
+      if (status === 500) console.error(error);
+      sendJson(response, status, { error: "Unable to load public opportunities" });
+    }
+    return;
+  }
+
+  const publicOpportunityMatch = requestUrl.pathname.match(/^\/api\/v1\/opportunities\/([^/]+)$/);
+  if (method === "GET" && publicOpportunityMatch) {
+    try {
+      const opportunity = await getPublicOpportunity(
+        decodeURIComponent(publicOpportunityMatch[1]!),
+      );
+      if (!opportunity) {
+        sendJson(response, 404, { error: "Opportunity not found" });
+        return;
+      }
+      sendJson(response, 200, opportunity);
+    } catch (error) {
+      console.error(error);
+      sendJson(response, 500, { error: "Unable to load public opportunity" });
+    }
     return;
   }
 
@@ -316,6 +472,40 @@ const server = createServer(async (request, response) => {
     }
   }
 
+  if (requestUrl.pathname === "/api/v1/partner-demo-control") {
+    try {
+      if (method === "GET") {
+        sendJson(response, 200, await getPartnerDemoControl());
+        return;
+      }
+    } catch (error) {
+      console.error(error);
+      sendJson(response, 500, { error: "Unable to load partner demo controls" });
+      return;
+    }
+  }
+
+  if (
+    method === "POST" &&
+    (requestUrl.pathname === "/api/v1/partner-demo-control/reset" ||
+      requestUrl.pathname === "/api/v1/partner-demo-control/restore")
+  ) {
+    try {
+      requireOperatorCode(await readJson(request));
+      const payload = requestUrl.pathname.endsWith("/reset")
+        ? await resetPartnerDemoData()
+        : await restorePartnerDemoData();
+      sendJson(response, 200, payload);
+    } catch (error) {
+      const status = error instanceof RequestError ? error.status : 500;
+      if (status === 500) console.error(error);
+      sendJson(response, status, {
+        error: error instanceof RequestError ? error.message : "Unable to update partner demo data",
+      });
+    }
+    return;
+  }
+
   if (requestUrl.pathname === "/api/v1/demo-session/claim") {
     try {
       if (method === "POST") {
@@ -348,15 +538,40 @@ const server = createServer(async (request, response) => {
 
   if (method === "GET" && requestUrl.pathname === "/api/v1/partner-analytics") {
     try {
-      const facts = await listPersistedPartnerFacts();
-      sendJson(
-        response,
-        200,
-        calculatePartnerAnalytics(facts, syntheticProgramCapacities, 0, new Date().toISOString()),
+      const source = parsePartnerDataSource(requestUrl);
+      const { facts, degraded } = await loadPartnerFacts(source);
+      const analytics = calculatePartnerAnalytics(
+        facts,
+        syntheticProgramCapacities,
+        source === "live" ? 0 : DEFAULT_PARTNER_DEMO_SEED,
+        source === "demo" ? PARTNER_DEMO_GENERATED_AT : new Date().toISOString(),
       );
+      sendJson(response, 200, {
+        ...analytics,
+        ...(degraded
+          ? {
+              degraded: true,
+              warning: "Resident submissions are temporarily unavailable; showing baseline data.",
+            }
+          : {}),
+      });
     } catch (error) {
       console.error(error);
       sendJson(response, 500, { error: "Unable to load partner analytics" });
+    }
+    return;
+  }
+
+  if (method === "GET" && requestUrl.pathname === "/api/v1/partner-inspections") {
+    try {
+      const source = parsePartnerDataSource(requestUrl);
+      sendJson(response, 200, {
+        source,
+        items: source === "demo" ? [] : await listInspectionQueue(),
+      });
+    } catch (error) {
+      console.error(error);
+      sendJson(response, 500, { error: "Unable to load inspection queue" });
     }
     return;
   }
@@ -440,7 +655,7 @@ const server = createServer(async (request, response) => {
   if (method === "GET" && partnerCaseMatch) {
     try {
       const caseId = decodeURIComponent(partnerCaseMatch[1]!);
-      const partnerCase = await withOverflowCaseState(caseId);
+      const partnerCase = await withOverflowCaseState(caseId, parsePartnerDataSource(requestUrl));
       if (!partnerCase) {
         sendJson(response, 404, { error: "Partner case not found" });
         return;
@@ -666,6 +881,69 @@ const server = createServer(async (request, response) => {
     } catch (error) {
       console.error(error);
       sendJson(response, 500, { error: "Unable to load case" });
+    }
+    return;
+  }
+
+  const caseDocumentsMatch = requestUrl.pathname.match(
+    /^\/api\/v1\/cases\/([0-9a-f-]+)\/documents$/i,
+  );
+  if (method === "POST" && caseDocumentsMatch) {
+    let filepath: string | null = null;
+    let documentId: string | null = null;
+    try {
+      const caseId = caseDocumentsMatch[1]!;
+      await requireResidentCaseAccess(request, caseId);
+      const { documentType, file } = await readDocumentFile(request);
+      if (!file) throw new RequestError(400, "A valid document is required");
+      filepath = file.filepath;
+      const document = await uploadCaseDocument({
+        caseId,
+        documentType,
+        filepath,
+        originalFilename: file.originalFilename ?? "case-document",
+        mimeType: file.mimetype ?? "application/octet-stream",
+      });
+      documentId = document.id;
+      sendJson(response, 201, { document });
+    } catch (error) {
+      if (documentId) {
+        await rollbackCaseDocument(documentId).catch((cleanupError) =>
+          console.error("Unable to roll back case document", cleanupError),
+        );
+      }
+      const status = error instanceof RequestError ? error.status : 400;
+      sendJson(response, status, {
+        error: error instanceof Error ? error.message : "Unable to upload document",
+      });
+    } finally {
+      if (filepath) await rm(filepath, { force: true });
+    }
+    return;
+  }
+
+  const partnerDocumentMatch = requestUrl.pathname.match(
+    /^\/api\/v1\/partner-cases\/([^/]+)\/documents\/([0-9a-f-]+)$/i,
+  );
+  if (method === "PATCH" && partnerDocumentMatch) {
+    try {
+      const caseId = decodeURIComponent(partnerDocumentMatch[1]!);
+      const document = await reviewCaseDocument(
+        caseId,
+        partnerDocumentMatch[2]!,
+        await readJson(request),
+      );
+      sendJson(response, 200, { document });
+    } catch (error) {
+      const status =
+        error instanceof Error && error.name === "ZodError"
+          ? 400
+          : error instanceof Error && error.message === "Document not found"
+            ? 404
+            : 400;
+      sendJson(response, status, {
+        error: error instanceof Error ? error.message : "Unable to review document",
+      });
     }
     return;
   }

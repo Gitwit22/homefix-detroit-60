@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AlertTriangle } from "lucide-react";
 import { DemoFlag, Metric, PageIntro, SectionLabel, StatusBadge } from "@/components/homefix";
-import { PartnerRouteError, PartnerRouteLoading } from "@/components/partner-route-state";
+import { PartnerDataWarning, PartnerRouteError, PartnerRouteLoading } from "@/components/partner-route-state";
 import { getPartnerAnalytics } from "@/lib/homefix-api";
 
 export const Route = createFileRoute("/partner/unmet-needs")({
@@ -39,6 +39,7 @@ function Unmet() {
 
   return (
     <>
+      <PartnerDataWarning warning={analytics.warning} />
       <DemoFlag />
       <PageIntro
         eyebrow="Planning intelligence"

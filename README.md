@@ -341,6 +341,9 @@ Create a Render Blueprint from `render.yaml`, then set:
 - `HOMEFIX_DEMO_MODE=1` to enable optional name-only demo sessions and the
   session-scoped resident demo wipe endpoint. This is presentation convenience,
   not authentication and must not be used to protect real resident data.
+- `PARTNER_DEMO_OPERATOR_CODE` to a temporary buildathon operator code used by
+   the Partner View reset and restore controls. Keep this value server-side and
+   replace it with partner-role authorization after the demonstration.
 - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, and
   `R2_BUCKET_NAME` to a private Cloudflare R2 bucket and an object read/write
   API token.
@@ -348,11 +351,14 @@ Create a Render Blueprint from `render.yaml`, then set:
 Render supplies `PORT`; do not set it manually. The service health check is
 `/health` and intake submissions use `POST /api/v1/intakes`.
 
-Partner intelligence reads normalized resident-case facts from Postgres and
-combines them with modeled program-capacity data:
+Partner intelligence combines the deterministic synthetic planning baseline
+with normalized resident-case facts from Postgres and modeled program-capacity
+data. Persisted cases replace baseline cases with the same case number:
 
-- `GET /api/v1/partner-analytics` returns calculated demand, coverage, gap,
-  case, ZIP, and modeled-capacity metrics.
+- `GET /api/v1/partner-analytics` returns combined demand, coverage, gap, case,
+  ZIP, and modeled-capacity metrics. If Neon misses the short server deadline,
+  it returns baseline data with `degraded: true` and a warning instead of
+  leaving the frontend loading until its request deadline.
 - `GET /api/v1/partner-cases/:caseId` returns a persisted case dossier,
   inspection state, and overflow-work-order state, or `404` when the case is
   not present in the configured database.
@@ -360,6 +366,10 @@ combines them with modeled program-capacity data:
 The partner routes depend on `DATABASE_URL` and the deployed migrations and
 seed data. The frontend applies a 30-second request deadline so an unavailable
 API displays a retryable error instead of remaining on its loading state.
+The protected Partner View reset removes only cases tagged as demo submissions
+or seeded demo data, disables the generated baseline, and preserves resident
+cases and the program catalog. Restore re-enables the baseline and idempotently
+recreates the seeded workflow cases.
 
 ### Cloudflare Pages
 

@@ -7,7 +7,12 @@ import {
   generateSyntheticPartnerDataset,
   syntheticProgramCapacities,
 } from "../demo/partnerDataset.js";
-import { calculatePartnerAnalytics, getPartnerCaseDetail } from "./partnerAnalytics.js";
+import { mapPartnerFactRows, toPartnerCaseStatus } from "./partnerCaseData.js";
+import {
+  calculatePartnerAnalytics,
+  getPartnerCaseDetail,
+  mergePartnerFacts,
+} from "./partnerAnalytics.js";
 import { matchesPartnerPriority, parsePartnerCaseFilters } from "../../src/lib/partner-filters.js";
 
 test("the partner dataset is deterministic and normalized", () => {
@@ -78,6 +83,7 @@ test("analytics totals reconcile with grouped metrics", () => {
     DEFAULT_PARTNER_DEMO_SEED,
     PARTNER_DEMO_GENERATED_AT,
   );
+  assert.equal(analytics.source, "demo");
   assert.equal(analytics.totals.homes, 150);
   assert.equal(analytics.totals.repairNeeds, 224);
   assert.equal(analytics.cases.length, 150);
@@ -97,6 +103,108 @@ test("analytics totals reconcile with grouped metrics", () => {
     analytics.coverage.unmatchedPercentage,
     Math.round((analytics.totals.unmatchedNeeds / 224) * 100),
   );
+});
+
+test("an empty live dataset is not labeled synthetic", () => {
+  const analytics = calculatePartnerAnalytics([], syntheticProgramCapacities, 0, new Date(0).toISOString());
+  assert.equal(analytics.source, "live");
+  assert.equal(analytics.synthetic, false);
+});
+
+test("combined partner facts prefer persisted cases without double-counting", () => {
+  const syntheticFacts = generateSyntheticPartnerDataset();
+  const persistedDenise = syntheticFacts
+    .filter((fact) => fact.caseNumber === "HF-313-0842")
+    .map((fact, index) => ({
+      ...fact,
+      caseId: "84030000-0000-4000-8000-000000000001",
+      repairNeedId: `84040000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      synthetic: false,
+    }));
+  const merged = mergePartnerFacts(syntheticFacts, persistedDenise);
+  const analytics = calculatePartnerAnalytics(
+    merged,
+    syntheticProgramCapacities,
+    DEFAULT_PARTNER_DEMO_SEED,
+    PARTNER_DEMO_GENERATED_AT,
+  );
+
+  assert.equal(merged.length, syntheticFacts.length);
+  assert.equal(analytics.source, "combined");
+  assert.equal(analytics.synthetic, false);
+  assert.equal(analytics.cases.filter((item) => item.caseNumber === "HF-313-0842").length, 1);
+  assert.equal(
+    analytics.cases.find((item) => item.caseNumber === "HF-313-0842")?.caseId,
+    "84030000-0000-4000-8000-000000000001",
+  );
+});
+
+test("live partner facts keep real status and canonical strongest program slug", () => {
+  const baseRow = {
+    homeId: "10000000-0000-4000-8000-000000000001",
+    caseId: "20000000-0000-4000-8000-000000000001",
+    caseNumber: "HF-48205-10001",
+    streetAddress: "100 Test Street",
+    zipCode: "48205",
+    caseStatus: "inspection",
+    createdAt: new Date("2026-09-20T12:00:00.000Z"),
+    repairNeedId: "30000000-0000-4000-8000-000000000001",
+    category: "roof_water_intrusion",
+    urgency: "high",
+    trainingOpportunity: null,
+  };
+  const facts = mapPartnerFactRows([
+    { ...baseRow, matchStatus: "verification_needed", programSlug: "secondary-program" },
+    { ...baseRow, matchStatus: "strong_match", programSlug: "critical-home-repair" },
+  ]);
+
+  assert.equal(facts.length, 1);
+  assert.equal(facts[0]!.caseStatus, "inspection");
+  assert.equal(facts[0]!.matchStatus, "strong_match");
+  assert.equal(facts[0]!.programId, "critical-home-repair");
+  assert.equal(facts[0]!.synthetic, false);
+});
+
+test("live partner facts retain unmatched repair needs", () => {
+  const facts = mapPartnerFactRows([
+    {
+      homeId: "10000000-0000-4000-8000-000000000002",
+      caseId: "20000000-0000-4000-8000-000000000002",
+      caseNumber: "HF-48224-10002",
+      streetAddress: "200 Test Street",
+      zipCode: "48224",
+      caseStatus: "reported",
+      createdAt: new Date("2026-09-20T12:00:00.000Z"),
+      repairNeedId: "30000000-0000-4000-8000-000000000002",
+      category: "plumbing",
+      urgency: "unknown",
+      trainingOpportunity: null,
+      matchStatus: null,
+      programSlug: null,
+    },
+  ]);
+
+  assert.equal(facts[0]!.caseStatus, "reported");
+  assert.equal(facts[0]!.matchStatus, "no_match");
+  assert.equal(facts[0]!.coverageStatus, "funding_gap");
+  assert.equal(facts[0]!.programId, undefined);
+});
+
+test("partner status mapping covers lifecycle stages", () => {
+  for (const status of [
+    "reported",
+    "screening",
+    "potential_programs",
+    "inspection",
+    "verified_scope",
+    "documents",
+    "program_approval",
+    "repair_assignment",
+    "completion",
+    "completed",
+  ] as const) {
+    assert.equal(toPartnerCaseStatus(status), status);
+  }
 });
 
 test("priority queue and capacity overage follow locked definitions", () => {

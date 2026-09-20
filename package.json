@@ -16,9 +16,9 @@
     "preview": "vite preview",
     "start:api": "node api-dist/api/src/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p server/tsconfig.json --noEmit",
-    "test": "tsx --test src/lib/api-request.test.ts server/domain/lifecycle.test.ts server/services/sprints.test.ts server/services/partnerAnalytics.test.ts",
+    "test": "tsx --test src/lib/api-request.test.ts server/domain/lifecycle.test.ts server/domain/opportunity.test.ts server/services/opportunities.test.ts server/services/sprints.test.ts server/services/partnerAnalytics.test.ts",
     "test:partner-analytics": "tsx --test server/services/partnerAnalytics.test.ts",
-    "test:sprints": "tsx --test src/lib/api-request.test.ts server/domain/lifecycle.test.ts server/services/sprints.test.ts server/services/partnerAnalytics.test.ts",
+    "test:sprints": "tsx --test src/lib/api-request.test.ts server/domain/lifecycle.test.ts server/domain/opportunity.test.ts server/services/opportunities.test.ts server/services/sprints.test.ts server/services/partnerAnalytics.test.ts",
     "verify": "npm run typecheck && npm run test && npm run build:api && npm run build && npm run lint",
     "lint": "eslint .",
     "format": "prettier --write ."

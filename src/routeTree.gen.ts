@@ -20,6 +20,8 @@ import { Route as StatusRouteImport } from './routes/status'
 import { Route as PartnerIndexRouteImport } from './routes/partner.index'
 import { Route as PartnerAnalyticsRouteImport } from './routes/partner.analytics'
 import { Route as PartnerCasesRouteImport } from './routes/partner.cases'
+import { Route as PartnerInspectionsRouteImport } from './routes/partner.inspections'
+import { Route as PartnerOpportunitiesRouteImport } from './routes/partner.opportunities'
 import { Route as PartnerOverflowRouteImport } from './routes/partner.overflow'
 import { Route as PartnerProgramsRouteImport } from './routes/partner.programs'
 import { Route as PartnerUnmetNeedsRouteImport } from './routes/partner.unmet-needs'
@@ -84,6 +86,16 @@ const PartnerCasesRoute = PartnerCasesRouteImport.update({
   path: '/cases',
   getParentRoute: () => PartnerRoute,
 } as any)
+const PartnerInspectionsRoute = PartnerInspectionsRouteImport.update({
+  id: '/inspections',
+  path: '/inspections',
+  getParentRoute: () => PartnerRoute,
+} as any)
+const PartnerOpportunitiesRoute = PartnerOpportunitiesRouteImport.update({
+  id: '/opportunities',
+  path: '/opportunities',
+  getParentRoute: () => PartnerRoute,
+} as any)
 const PartnerOverflowRoute = PartnerOverflowRouteImport.update({
   id: '/overflow',
   path: '/overflow',
@@ -136,6 +148,8 @@ export interface FileRoutesByFullPath {
   '/status': typeof StatusRoute
   '/partner/analytics': typeof PartnerAnalyticsRoute
   '/partner/cases': typeof PartnerCasesRouteWithChildren
+  '/partner/inspections': typeof PartnerInspectionsRoute
+  '/partner/opportunities': typeof PartnerOpportunitiesRoute
   '/partner/overflow': typeof PartnerOverflowRouteWithChildren
   '/partner/programs': typeof PartnerProgramsRoute
   '/partner/unmet-needs': typeof PartnerUnmetNeedsRoute
@@ -155,6 +169,8 @@ export interface FileRoutesByTo {
   '/passport': typeof PassportRoute
   '/status': typeof StatusRoute
   '/partner/analytics': typeof PartnerAnalyticsRoute
+  '/partner/inspections': typeof PartnerInspectionsRoute
+  '/partner/opportunities': typeof PartnerOpportunitiesRoute
   '/partner/programs': typeof PartnerProgramsRoute
   '/partner/unmet-needs': typeof PartnerUnmetNeedsRoute
   '/programs/$programId': typeof ProgramsProgramIdRoute
@@ -176,6 +192,8 @@ export interface FileRoutesById {
   '/status': typeof StatusRoute
   '/partner/analytics': typeof PartnerAnalyticsRoute
   '/partner/cases': typeof PartnerCasesRouteWithChildren
+  '/partner/inspections': typeof PartnerInspectionsRoute
+  '/partner/opportunities': typeof PartnerOpportunitiesRoute
   '/partner/overflow': typeof PartnerOverflowRouteWithChildren
   '/partner/programs': typeof PartnerProgramsRoute
   '/partner/unmet-needs': typeof PartnerUnmetNeedsRoute
@@ -199,6 +217,8 @@ export interface FileRouteTypes {
     | '/status'
     | '/partner/analytics'
     | '/partner/cases'
+    | '/partner/inspections'
+    | '/partner/opportunities'
     | '/partner/overflow'
     | '/partner/programs'
     | '/partner/unmet-needs'
@@ -218,6 +238,8 @@ export interface FileRouteTypes {
     | '/passport'
     | '/status'
     | '/partner/analytics'
+    | '/partner/inspections'
+    | '/partner/opportunities'
     | '/partner/programs'
     | '/partner/unmet-needs'
     | '/programs/$programId'
@@ -238,6 +260,8 @@ export interface FileRouteTypes {
     | '/status'
     | '/partner/analytics'
     | '/partner/cases'
+    | '/partner/inspections'
+    | '/partner/opportunities'
     | '/partner/overflow'
     | '/partner/programs'
     | '/partner/unmet-needs'
@@ -340,6 +364,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PartnerCasesRouteImport
       parentRoute: typeof PartnerRoute
     }
+    '/partner/inspections': {
+      id: '/partner/inspections'
+      path: '/inspections'
+      fullPath: '/partner/inspections'
+      preLoaderRoute: typeof PartnerInspectionsRouteImport
+      parentRoute: typeof PartnerRoute
+    }
+    '/partner/opportunities': {
+      id: '/partner/opportunities'
+      path: '/opportunities'
+      fullPath: '/partner/opportunities'
+      preLoaderRoute: typeof PartnerOpportunitiesRouteImport
+      parentRoute: typeof PartnerRoute
+    }
     '/partner/overflow': {
       id: '/partner/overflow'
       path: '/overflow'
@@ -430,6 +468,8 @@ const PartnerOverflowRouteWithChildren = PartnerOverflowRoute._addFileChildren(
 interface PartnerRouteChildren {
   PartnerAnalyticsRoute: typeof PartnerAnalyticsRoute
   PartnerCasesRoute: typeof PartnerCasesRouteWithChildren
+  PartnerInspectionsRoute: typeof PartnerInspectionsRoute
+  PartnerOpportunitiesRoute: typeof PartnerOpportunitiesRoute
   PartnerOverflowRoute: typeof PartnerOverflowRouteWithChildren
   PartnerProgramsRoute: typeof PartnerProgramsRoute
   PartnerUnmetNeedsRoute: typeof PartnerUnmetNeedsRoute
@@ -439,6 +479,8 @@ interface PartnerRouteChildren {
 const PartnerRouteChildren: PartnerRouteChildren = {
   PartnerAnalyticsRoute: PartnerAnalyticsRoute,
   PartnerCasesRoute: PartnerCasesRouteWithChildren,
+  PartnerInspectionsRoute: PartnerInspectionsRoute,
+  PartnerOpportunitiesRoute: PartnerOpportunitiesRoute,
   PartnerOverflowRoute: PartnerOverflowRouteWithChildren,
   PartnerProgramsRoute: PartnerProgramsRoute,
   PartnerUnmetNeedsRoute: PartnerUnmetNeedsRoute,

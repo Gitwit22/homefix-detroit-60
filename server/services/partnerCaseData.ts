@@ -8,6 +8,7 @@ import {
   repairAssessments,
   repairCases,
   repairNeeds,
+  residents,
 } from "../db/schema.js";
 import type {
   CaseStatus,
@@ -49,7 +50,17 @@ function toCoverageStatus(status: MatchStatus): CoverageStatus {
   return "funding_gap";
 }
 
-function toCaseStatus(value: string): CaseStatus {
+export function toPartnerCaseStatus(value: string): CaseStatus {
+  if (value === "reported") return "reported";
+  if (value === "screening") return "screening";
+  if (value === "potential_programs") return "potential_programs";
+  if (value === "inspection") return "inspection";
+  if (value === "verified_scope") return "verified_scope";
+  if (value === "documents") return "documents";
+  if (value === "program_approval") return "program_approval";
+  if (value === "repair_assignment") return "repair_assignment";
+  if (value === "completion") return "completion";
+  if (value === "completed") return "completed";
   if (value === "documents_needed") return "documents_needed";
   if (value === "referred") return "referred";
   if (value === "waitlisted") return "waitlisted";
@@ -58,31 +69,24 @@ function toCaseStatus(value: string): CaseStatus {
   return "assessment_complete";
 }
 
-export async function listPersistedPartnerFacts(): Promise<PartnerRepairFact[]> {
-  const rows = await db
-    .select({
-      homeId: homes.id,
-      caseId: repairCases.id,
-      caseNumber: repairCases.caseNumber,
-      streetAddress: homes.streetAddress,
-      zipCode: homes.zipCode,
-      caseStatus: repairCases.status,
-      createdAt: repairCases.createdAt,
-      repairNeedId: repairNeeds.id,
-      category: repairNeeds.category,
-      urgency: repairNeeds.urgency,
-      trainingOpportunity: repairAssessments.trainingOpportunity,
-      matchStatus: programMatches.matchStatus,
-      programSlug: programs.slug,
-    })
-    .from(repairNeeds)
-    .innerJoin(repairCases, eq(repairCases.id, repairNeeds.repairCaseId))
-    .innerJoin(homes, eq(homes.id, repairCases.homeId))
-    .leftJoin(repairAssessments, eq(repairAssessments.repairNeedId, repairNeeds.id))
-    .leftJoin(programMatches, eq(programMatches.repairNeedId, repairNeeds.id))
-    .leftJoin(programs, eq(programs.id, programMatches.programId));
+type PartnerFactRow = {
+  homeId: string;
+  caseId: string;
+  caseNumber: string;
+  streetAddress: string;
+  zipCode: string;
+  caseStatus: string;
+  createdAt: Date;
+  repairNeedId: string;
+  category: string;
+  urgency: string;
+  trainingOpportunity: Exclude<PartnerRepairFact["trainingOpportunity"], undefined>;
+  matchStatus: string | null;
+  programSlug: string | null;
+};
 
-  const grouped = new Map<string, typeof rows>();
+export function mapPartnerFactRows(rows: PartnerFactRow[]): PartnerRepairFact[] {
+  const grouped = new Map<string, PartnerFactRow[]>();
   for (const row of rows) {
     grouped.set(row.repairNeedId, [...(grouped.get(row.repairNeedId) ?? []), row]);
   }
@@ -103,7 +107,7 @@ export async function listPersistedPartnerFacts(): Promise<PartnerRepairFact[]> 
       priority: toPriority(first.urgency),
       matchStatus: best.status,
       coverageStatus: toCoverageStatus(best.status),
-      caseStatus: toCaseStatus(first.caseStatus),
+      caseStatus: toPartnerCaseStatus(first.caseStatus),
       trainingOpportunity: first.trainingOpportunity,
       createdAt: first.createdAt.toISOString(),
       synthetic: false,
@@ -111,3 +115,33 @@ export async function listPersistedPartnerFacts(): Promise<PartnerRepairFact[]> 
     return best.row.programSlug ? { ...fact, programId: best.row.programSlug } : fact;
   });
 }
+
+export async function loadPartnerFactsFromDatabase(): Promise<PartnerRepairFact[]> {
+  const rows = await db
+    .select({
+      homeId: homes.id,
+      caseId: repairCases.id,
+      caseNumber: repairCases.caseNumber,
+      streetAddress: homes.streetAddress,
+      zipCode: homes.zipCode,
+      caseStatus: repairCases.status,
+      createdAt: repairCases.createdAt,
+      repairNeedId: repairNeeds.id,
+      category: repairNeeds.category,
+      urgency: repairNeeds.urgency,
+      trainingOpportunity: repairAssessments.trainingOpportunity,
+      matchStatus: programMatches.matchStatus,
+      programSlug: programs.slug,
+    })
+    .from(repairNeeds)
+    .innerJoin(repairCases, eq(repairCases.id, repairNeeds.repairCaseId))
+    .innerJoin(homes, eq(homes.id, repairCases.homeId))
+    .innerJoin(residents, eq(residents.id, homes.residentId))
+    .leftJoin(repairAssessments, eq(repairAssessments.repairNeedId, repairNeeds.id))
+    .leftJoin(programMatches, eq(programMatches.repairNeedId, repairNeeds.id))
+    .leftJoin(programs, eq(programs.id, programMatches.programId));
+
+  return mapPartnerFactRows(rows);
+}
+
+export const listPersistedPartnerFacts = loadPartnerFactsFromDatabase;

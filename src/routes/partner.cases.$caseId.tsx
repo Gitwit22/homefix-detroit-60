@@ -5,6 +5,8 @@ import {
   ArrowRight,
   CalendarDays,
   ClipboardCheck,
+  ExternalLink,
+  FileCheck,
   FileWarning,
   Wrench,
 } from "lucide-react";
@@ -21,6 +23,7 @@ import {
   confirmInspectionAppointment,
   createOverflowJob,
   getPartnerCase,
+  reviewCaseDocument,
   saveInspectionFindings,
   type PartnerCaseDetail,
 } from "@/lib/homefix-api";
@@ -182,7 +185,15 @@ function CaseDetail() {
             />
           </section>
           <section className="mt-10">
-            <SectionLabel number="03">Overflow capacity</SectionLabel>
+            <SectionLabel number="03">Case documents</SectionLabel>
+            <DocumentReviewWorkspace
+              caseId={item.caseId}
+              documents={item.documents ?? []}
+              onUpdated={() => router.invalidate()}
+            />
+          </section>
+          <section className="mt-10">
+            <SectionLabel number="04">Overflow capacity</SectionLabel>
             <div className="mt-5 border border-border p-6">
               <span className="eyebrow">Delivery capacity</span>
               <h2 className="mt-2 text-3xl">
@@ -242,7 +253,7 @@ function CaseDetail() {
             </div>
           </section>
           <section className="mt-10">
-            <SectionLabel number="04">Case history</SectionLabel>
+            <SectionLabel number="05">Case history</SectionLabel>
             <ol className="mt-5 divide-y divide-border border-y border-border">
               <li className="grid grid-cols-[130px_1fr] py-4 text-sm">
                 <b>{reportedDate}</b>
@@ -288,6 +299,92 @@ function CaseDetail() {
 
 type InspectionPackage = NonNullable<PartnerCaseDetail["inspectionPackage"]>;
 
+function DocumentReviewWorkspace({
+  caseId,
+  documents,
+  onUpdated,
+}: {
+  caseId: string;
+  documents: NonNullable<PartnerCaseDetail["documents"]>;
+  onUpdated: () => Promise<void>;
+}) {
+  const [notes, setNotes] = useState<Record<string, string>>(() =>
+    Object.fromEntries(documents.map((document) => [document.id, document.reviewNotes ?? ""])),
+  );
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  if (documents.length === 0) {
+    return <p className="mt-5 border-y border-border py-6 text-sm text-muted-foreground">No document requirements are attached to this case.</p>;
+  }
+
+  const saveReview = async (documentId: string, status: "approved" | "rejected") => {
+    setSavingId(documentId);
+    try {
+      await reviewCaseDocument(caseId, documentId, {
+        status,
+        reviewNotes: notes[documentId]?.trim() || null,
+      });
+      await onUpdated();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Unable to review document.");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  return (
+    <div className="mt-5 divide-y divide-border border-y border-border">
+      {documents.map((document) => (
+        <article key={document.id} className="grid gap-4 py-5 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+          <div>
+            <p className="eyebrow">{document.status}</p>
+            <h3 className="mt-2 text-xl">{document.documentType}</h3>
+            <p className="mt-1 truncate text-sm text-muted-foreground">
+              {document.originalFilename ?? "No file uploaded"}
+            </p>
+          </div>
+          <label className="grid gap-2 text-sm font-semibold">
+            Review notes
+            <textarea
+              className="min-h-20 border border-input bg-background p-3 font-normal"
+              value={notes[document.id] ?? ""}
+              disabled={!document.downloadUrl || savingId === document.id}
+              onChange={(event) =>
+                setNotes((current) => ({ ...current, [document.id]: event.target.value }))
+              }
+              maxLength={2000}
+            />
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {document.downloadUrl && (
+              <Button asChild variant="outline" className="rounded-none">
+                <a href={document.downloadUrl} target="_blank" rel="noreferrer">
+                  <ExternalLink /> Open
+                </a>
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              className="rounded-none"
+              disabled={!document.downloadUrl || savingId === document.id}
+              onClick={() => saveReview(document.id, "rejected")}
+            >
+              <FileWarning /> Reject
+            </Button>
+            <Button
+              className="rounded-none"
+              disabled={!document.downloadUrl || savingId === document.id}
+              onClick={() => saveReview(document.id, "approved")}
+            >
+              <FileCheck /> Approve
+            </Button>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 function InspectionWorkspace({
   caseId,
   inspectionPackage,
@@ -320,6 +417,7 @@ function InspectionWorkspace({
         notes: string;
         verifiedScope: string;
         estimatedCost: string;
+        trainingSuitability: "" | "not_suitable" | "potential" | "suitable";
       }
     >
   >(() =>
@@ -335,6 +433,7 @@ function InspectionWorkspace({
           estimatedCost: need.finding?.estimatedCostCents
             ? String(need.finding.estimatedCostCents / 100)
             : "",
+          trainingSuitability: need.finding?.trainingSuitability ?? "",
         },
       ]),
     ),
@@ -385,13 +484,17 @@ function InspectionWorkspace({
     });
     const incompleteFinding = inspectionPackage.needs.some((need) => {
       const finding = findings[need.repairNeedId];
-      return !finding?.condition.trim() || !finding.verifiedScope.trim();
+      return (
+        !finding?.condition.trim() ||
+        !finding.verifiedScope.trim() ||
+        !finding.trainingSuitability
+      );
     });
     if (incompleteQuestion || incompleteFinding) {
       setError(
         incompleteQuestion
           ? "Answer every inspection question or mark it unable to verify."
-          : "Record the observed condition and verified scope for every repair need.",
+          : "Record condition, scope, and training suitability for every repair need.",
       );
       return;
     }
@@ -411,6 +514,10 @@ function InspectionWorkspace({
             condition: finding.condition.trim(),
             ...(finding.notes.trim() ? { notes: finding.notes.trim() } : {}),
             verifiedScope: finding.verifiedScope.trim(),
+            trainingSuitability: finding.trainingSuitability as
+              | "not_suitable"
+              | "potential"
+              | "suitable",
             ...(finding.estimatedCost && estimatedCost > 0
               ? { estimatedCostCents: Math.round(estimatedCost * 100) }
               : {}),
@@ -727,6 +834,27 @@ function InspectionWorkspace({
                       }))
                     }
                   />
+                </InspectionField>
+                <InspectionField label="Training suitability">
+                  <select
+                    className="min-h-11 border border-input bg-background px-3"
+                    value={finding.trainingSuitability}
+                    disabled={completed}
+                    onChange={(event) =>
+                      setFindings((current) => ({
+                        ...current,
+                        [need.repairNeedId]: {
+                          ...finding,
+                          trainingSuitability: event.target.value as typeof finding.trainingSuitability,
+                        },
+                      }))
+                    }
+                  >
+                    <option value="">Select inspector finding</option>
+                    <option value="not_suitable">Not suitable</option>
+                    <option value="potential">Potential with supervision</option>
+                    <option value="suitable">Suitable training scope</option>
+                  </select>
                 </InspectionField>
               </div>
             </section>

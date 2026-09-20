@@ -1,59 +1,25 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
-import {
-  DeleteObjectCommand,
-  GetObjectCommand,
-  PutObjectCommand,
-  S3Client,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { eq } from "drizzle-orm";
 
 import { db } from "../db/index.js";
 import { repairNeeds, repairPhotos } from "../db/schema.js";
+import {
+  deletePrivateObject,
+  getSignedObjectUrl,
+  privateObjectReference,
+  putPrivateObject,
+} from "../storage/r2.js";
 
 const allowedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-function getR2Config() {
-  const accountId = process.env.R2_ACCOUNT_ID;
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-  const bucket = process.env.R2_BUCKET_NAME;
-  if (!accountId || !accessKeyId || !secretAccessKey || !bucket) {
-    throw new Error("Cloudflare R2 is not configured");
-  }
-  return { accountId, accessKeyId, secretAccessKey, bucket };
-}
-
-function getR2Client() {
-  const config = getR2Config();
-  return new S3Client({
-    region: "auto",
-    endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId: config.accessKeyId,
-      secretAccessKey: config.secretAccessKey,
-    },
-  });
-}
-
 export async function signedPhotoUrl(objectKey: string) {
-  const config = getR2Config();
-  const requestedTtl = Number(process.env.R2_SIGNED_URL_TTL_SECONDS ?? 3_600);
-  const expiresIn = Number.isFinite(requestedTtl)
-    ? Math.min(604_800, Math.max(60, Math.round(requestedTtl)))
-    : 3_600;
-  return getSignedUrl(
-    getR2Client(),
-    new GetObjectCommand({ Bucket: config.bucket, Key: objectKey }),
-    { expiresIn },
-  );
+  return getSignedObjectUrl(objectKey);
 }
 
 export async function deleteRepairPhotoObject(objectKey: string) {
-  const config = getR2Config();
-  await getR2Client().send(new DeleteObjectCommand({ Bucket: config.bucket, Key: objectKey }));
+  await deletePrivateObject(objectKey);
 }
 
 export async function rollbackRepairPhoto(photoId: string) {
@@ -95,19 +61,9 @@ export async function uploadRepairPhoto(input: {
   const need = needRows[0];
   if (!need) throw new Error("Repair need not found");
 
-  const config = getR2Config();
-  const client = getR2Client();
   const body = await readFile(input.filepath);
-  const objectKey = `homefix/${need.repairCaseId}/${need.id}/${randomUUID()}.${extensionForMimeType(input.mimeType)}`;
-  await client.send(
-    new PutObjectCommand({
-      Bucket: config.bucket,
-      Key: objectKey,
-      Body: body,
-      ContentType: input.mimeType,
-      CacheControl: "private, max-age=3600",
-    }),
-  );
+  const objectKey = `homefix/cases/${need.repairCaseId}/repairs/${need.id}/photos/${randomUUID()}.${extensionForMimeType(input.mimeType)}`;
+  await putPrivateObject({ objectKey, body, contentType: input.mimeType });
 
   try {
     const rows = await db
@@ -115,7 +71,7 @@ export async function uploadRepairPhoto(input: {
       .values({
         repairNeedId: need.id,
         evidenceStage: input.evidenceStage ?? "resident_report",
-        imageUrl: `r2://${config.bucket}/${objectKey}`,
+        imageUrl: privateObjectReference(objectKey),
         publicId: objectKey,
         originalFilename: input.originalFilename,
         mimeType: input.mimeType,
@@ -138,7 +94,7 @@ export async function uploadRepairPhoto(input: {
       imageUrl: await signedPhotoUrl(objectKey),
     };
   } catch (error) {
-    await client.send(new DeleteObjectCommand({ Bucket: config.bucket, Key: objectKey }));
+    await deletePrivateObject(objectKey);
     throw error;
   }
 }

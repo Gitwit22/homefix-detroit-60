@@ -15,6 +15,7 @@ import {
   BriefcaseBusiness,
   Building2,
   Camera,
+  CalendarCheck,
   Check,
   ChevronRight,
   CircleDot,
@@ -22,6 +23,7 @@ import {
   FileCheck2,
   FileText,
   Gauge,
+  GraduationCap,
   Hammer,
   Home,
   LayoutDashboard,
@@ -53,6 +55,18 @@ export const partnerLinks = [
     label: "Repair Cases",
     icon: ClipboardList,
     guideTarget: "partner-nav-cases",
+  },
+  {
+    to: "/partner/inspections",
+    label: "Inspection Queue",
+    icon: CalendarCheck,
+    guideTarget: "partner-nav-inspections",
+  },
+  {
+    to: "/partner/opportunities",
+    label: "Opportunities",
+    icon: GraduationCap,
+    guideTarget: "partner-nav-opportunities",
   },
   {
     to: "/partner/unmet-needs",
@@ -103,7 +117,7 @@ export function ViewSwitcher() {
         Resident View
       </Link>
       <Link to="/partner" className={cn(partner && "is-active")}>
-        Partner View
+        Partner Admin
       </Link>
     </div>
   );

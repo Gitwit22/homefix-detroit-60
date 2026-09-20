@@ -5,7 +5,7 @@ import {
   caseEvents,
   documents,
   inspectionFindings,
-  inspections,
+  inspectionRequests,
   programMatches,
   repairAssessments,
   repairCases,
@@ -38,7 +38,11 @@ export async function getCaseLifecycle(caseId: string) {
         .select({ status: documents.status })
         .from(documents)
         .where(eq(documents.repairCaseId, caseId)),
-      db.select().from(inspections).where(eq(inspections.repairCaseId, caseId)).limit(1),
+      db
+        .select()
+        .from(inspectionRequests)
+        .where(eq(inspectionRequests.repairCaseId, caseId))
+        .limit(1),
       db
         .select({ status: workOrders.status, verificationStatus: workOrders.verificationStatus })
         .from(workOrders)
@@ -62,7 +66,7 @@ export async function getCaseLifecycle(caseId: string) {
           verifiedScope: inspectionFindings.verifiedScope,
         })
         .from(inspectionFindings)
-        .where(eq(inspectionFindings.inspectionId, inspection.id))
+        .where(eq(inspectionFindings.inspectionRequestId, inspection.id))
     : [];
   const assessedNeedIds = new Set(assessments.map((assessment) => assessment.repairNeedId));
   const findingNeedIds = new Set(findings.map((finding) => finding.repairNeedId));

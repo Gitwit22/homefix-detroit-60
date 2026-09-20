@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Check, FileText } from "lucide-react";
+import { Check, ExternalLink, FileText, Upload } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { DemoSessionPanel } from "@/components/demo-session-panel";
 import { DemoFlag, PriorityBadge, SectionLabel, StatusBadge } from "@/components/homefix";
 import { ResidentCaseRequired } from "@/components/resident-case-required";
-import { getCase, isValidAssessment } from "@/lib/homefix-api";
+import { getCase, isValidAssessment, uploadCaseDocument } from "@/lib/homefix-api";
 import { toRepairCategoryLabel } from "@/lib/repair-categories";
 import { resolveResidentCaseId } from "@/lib/resident-case";
 
@@ -62,7 +63,11 @@ function PassportPage() {
     return () => {
       cancelled = true;
     };
-  }, [caseId]);
+  }, [caseId, claimVersion]);
+
+  const reloadPassport = async () => {
+    if (caseId) setPayload(await getCase(caseId));
+  };
 
   const completedDocuments = useMemo(
     () => payload?.documents.filter((doc) => doc.status !== "missing").length ?? 0,
@@ -187,19 +192,56 @@ function PassportPage() {
               </div>
             </div>
           </div>
-          <div className="mt-6 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
             {payload.documents.map((doc) => {
               const done = doc.status !== "missing";
               return (
-                <div key={doc.id} className="flex gap-2 border-t border-border pt-3 text-sm">
+                <div key={doc.id} className="flex gap-3 border-t border-border py-4 text-sm">
                   <span className={done ? "text-primary" : "text-rust"}>
                     {done ? <Check className="size-4" /> : <FileText className="size-4" />}
                   </span>
-                  <span>
-                    {doc.documentType}
+                  <span className="min-w-0 flex-1">
+                    <strong>{doc.documentType}</strong>
                     <small className="block text-muted-foreground">
-                      {done ? "Available for review" : "Verification pending"}
+                      {documentStatusLabel(doc.status)}
                     </small>
+                    {doc.reviewNotes && (
+                      <small className="mt-1 block text-rust">{doc.reviewNotes}</small>
+                    )}
+                    <span className="mt-3 flex flex-wrap gap-2">
+                      <label className="blueprint-button button-secondary inline-flex cursor-pointer items-center gap-2">
+                        <Upload className="size-4" />
+                        {done ? "Replace" : "Upload"}
+                        <input
+                          type="file"
+                          className="sr-only"
+                          accept="application/pdf,image/jpeg,image/png,image/webp"
+                          onChange={async (event) => {
+                            const file = event.target.files?.[0];
+                            if (!file) return;
+                            try {
+                              await uploadCaseDocument(caseId, doc.documentType, file);
+                              await reloadPassport();
+                            } catch (uploadError) {
+                              window.alert(
+                                uploadError instanceof Error
+                                  ? uploadError.message
+                                  : "Unable to upload document.",
+                              );
+                            } finally {
+                              event.target.value = "";
+                            }
+                          }}
+                        />
+                      </label>
+                      {doc.downloadUrl && (
+                        <Button asChild variant="outline" className="rounded-none">
+                          <a href={doc.downloadUrl} target="_blank" rel="noreferrer">
+                            <ExternalLink /> View
+                          </a>
+                        </Button>
+                      )}
+                    </span>
                   </span>
                 </div>
               );
@@ -264,6 +306,13 @@ function PassportPage() {
       </div>
     </div>
   );
+}
+
+function documentStatusLabel(status: string) {
+  if (status === "approved") return "Approved by partner";
+  if (status === "rejected") return "Needs attention";
+  if (status === "uploaded") return "Available for review";
+  return "Verification pending";
 }
 
 function toPriority(urgency: string) {

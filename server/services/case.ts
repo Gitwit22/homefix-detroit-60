@@ -5,7 +5,6 @@ import {
   documents,
   homes,
   inspectionFindings,
-  inspections,
   programMatches,
   programs,
   repairAssessments,
@@ -16,6 +15,8 @@ import {
   workOrders,
 } from "../db/schema.js";
 import { getCaseLifecycle } from "./lifecycle.js";
+import { getInspectionState } from "./inspection.js";
+import { presentDocument } from "./documents.js";
 import { signedPhotoUrl } from "./photos.js";
 
 async function displayPhotoUrl(photo: { publicId: string | null; imageUrl: string }) {
@@ -81,17 +82,12 @@ export async function getCaseAggregate(caseId: string) {
 
   const caseDocuments = await db.select().from(documents).where(eq(documents.repairCaseId, caseId));
   const events = await db.select().from(caseEvents).where(eq(caseEvents.repairCaseId, caseId));
-  const inspectionRows = await db
-    .select()
-    .from(inspections)
-    .where(eq(inspections.repairCaseId, caseId))
-    .limit(1);
-  const inspection = inspectionRows[0] ?? null;
+  const inspection = await getInspectionState(caseId);
   const findings = inspection
     ? await db
         .select()
         .from(inspectionFindings)
-        .where(eq(inspectionFindings.inspectionId, inspection.id))
+        .where(eq(inspectionFindings.inspectionRequestId, inspection.id))
     : [];
   const caseWorkOrders = await db
     .select()
@@ -117,10 +113,13 @@ export async function getCaseAggregate(caseId: string) {
     ),
     assessments,
     matches: matchRows.map(({ match, program }) => ({ ...match, program })),
-    documents: caseDocuments,
+    documents: await Promise.all(caseDocuments.map(presentDocument)),
     events,
     inspection,
-    inspectionFindings: findings,
+    inspectionFindings: findings.map(({ inspectionRequestId, ...finding }) => ({
+      ...finding,
+      inspectionId: inspectionRequestId,
+    })),
     workOrders: caseWorkOrders,
     lifecycle,
   };

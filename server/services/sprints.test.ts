@@ -16,6 +16,7 @@ const {
   applyInspectionQuestionResponses,
   buildInspectionQuestionSnapshot,
   inspectionAvailabilitySchema,
+  inspectionFindingsSchema,
 } = await import("./inspection.js");
 const { loadSavedDemoAssessment, loadSavedDemoMatch } = await import("../demo/deniseScenario.js");
 
@@ -250,6 +251,28 @@ test("inspection availability requires multiple unique future windows", () => {
   );
   assert.equal(
     inspectionAvailabilitySchema.safeParse({ windows: [valid[0], valid[0]] }).success,
+    false,
+  );
+});
+
+test("inspection findings require an authoritative training suitability", () => {
+  const finding = {
+    repairNeedId: "11111111-1111-4111-8111-111111111111",
+    confirmedCategory: "electrical",
+    urgency: "high",
+    condition: "Unsafe panel condition observed.",
+    verifiedScope: "Replace the damaged service panel.",
+  };
+
+  assert.equal(
+    inspectionFindingsSchema.safeParse({
+      findings: [{ ...finding, trainingSuitability: "not_suitable" }],
+      questionResponses: [],
+    }).success,
+    true,
+  );
+  assert.equal(
+    inspectionFindingsSchema.safeParse({ findings: [finding], questionResponses: [] }).success,
     false,
   );
 });

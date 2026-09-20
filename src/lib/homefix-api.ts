@@ -11,6 +11,50 @@ import { clearDemoSession, getStoredDemoSession, type DemoSession } from "./demo
 export type { PartnerAnalytics, PartnerCaseDetail };
 export { HomeFixApiError };
 
+export type PartnerDataSource = "live" | "demo" | "combined";
+
+export type CaseDocument = {
+  id: string;
+  repairCaseId: string;
+  documentType: string;
+  originalFilename: string | null;
+  mimeType: string | null;
+  bytes: number | null;
+  status: string;
+  reviewNotes: string | null;
+  downloadUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PartnerInspectionQueueItem = {
+  id: string;
+  caseId: string;
+  caseNumber: string;
+  status: string;
+  streetAddress: string;
+  zipCode: string;
+  requestedAt: string;
+  updatedAt: string;
+  appointmentStart: string | null;
+  appointmentEnd: string | null;
+  providerName: string | null;
+  providerPhone: string | null;
+  availabilityWindows: Array<{ start: string; end: string }>;
+};
+
+const partnerDataSourceKey = "homefix:partner-data-source";
+
+export function getPartnerDataSource(): PartnerDataSource {
+  if (typeof window === "undefined") return "combined";
+  const source = window.localStorage.getItem(partnerDataSourceKey);
+  return source === "live" || source === "demo" ? source : "combined";
+}
+
+export function setPartnerDataSource(source: PartnerDataSource) {
+  if (typeof window !== "undefined") window.localStorage.setItem(partnerDataSourceKey, source);
+}
+
 const validAssessmentModels = new Set([
   "homefix-triage-v1",
   "homefix-saved-demo-v1",
@@ -150,7 +194,7 @@ export type CaseAggregateResponse = {
     missingRequirements: unknown;
     program: { id: string; name: string };
   }>;
-  documents: Array<{ id: string; documentType: string; status: string }>;
+  documents: CaseDocument[];
   events: Array<{
     id: string;
     eventType: string;
@@ -354,11 +398,61 @@ export type OverflowWorkOrder = {
   synthetic: true;
 };
 
+export type PublicOpportunity = {
+  publicNumber: string;
+  type: "inspection" | "repair" | "training";
+  repairCategory: string;
+  priority: string;
+  publicScope: string;
+  city: "Detroit";
+  state: "MI";
+  zipCode: string;
+  fundingStatus: string | null;
+  trainingOpportunityStatus: string | null;
+  potentialSkills: string[];
+  status: "open" | "responses_received" | "assigned" | "in_progress" | "completed";
+  publishedAt: string;
+};
+
+export type PublicOpportunityPage = {
+  items: PublicOpportunity[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
 const apiUrl = import.meta.env["VITE_HOMEFIX_API_URL"]?.replace(/\/$/, "");
 const requestTimeoutMs = 30_000;
 
 async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
   return requestWithTimeout((signal) => fetch(input, { ...init, signal }), requestTimeoutMs);
+}
+
+export async function getPublicOpportunities(filters: {
+  type?: PublicOpportunity["type"];
+  zipCode?: string;
+  priority?: string;
+} = {}): Promise<PublicOpportunityPage> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const search = new URLSearchParams();
+  if (filters.type) search.set("type", filters.type);
+  if (filters.zipCode) search.set("zipCode", filters.zipCode);
+  if (filters.priority) search.set("priority", filters.priority);
+  const query = search.size > 0 ? `?${search.toString()}` : "";
+  const response = await fetchWithTimeout(`${apiUrl}/api/v1/opportunities${query}`);
+  if (!response.ok) throw await homeFixApiError(response);
+  return response.json() as Promise<PublicOpportunityPage>;
+}
+
+export async function getPublicOpportunity(
+  opportunityNumber: string,
+): Promise<PublicOpportunity> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetchWithTimeout(
+    `${apiUrl}/api/v1/opportunities/${encodeURIComponent(opportunityNumber)}`,
+  );
+  if (!response.ok) throw await homeFixApiError(response);
+  return response.json() as Promise<PublicOpportunity>;
 }
 
 export type DemoSessionCase = {
@@ -438,6 +532,29 @@ export async function wipeDemoSessionData(token: string) {
   return response.json() as Promise<{ deletedCases: number; deletedPhotos: number }>;
 }
 
+export type PartnerDemoControl = { baselineEnabled: boolean };
+
+export async function getPartnerDemoControl(): Promise<PartnerDemoControl> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetchWithTimeout(`${apiUrl}/api/v1/partner-demo-control`);
+  if (!response.ok) throw await homeFixApiError(response);
+  return response.json() as Promise<PartnerDemoControl>;
+}
+
+export async function updatePartnerDemoControl(
+  action: "reset" | "restore",
+  operatorCode: string,
+): Promise<PartnerDemoControl> {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetchWithTimeout(`${apiUrl}/api/v1/partner-demo-control/${action}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ operatorCode }),
+  });
+  if (!response.ok) throw await homeFixApiError(response);
+  return response.json() as Promise<PartnerDemoControl>;
+}
+
 export async function getCase(caseId: string): Promise<CaseAggregateResponse> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
   const response = await fetch(`${apiUrl}/api/v1/cases/${caseId}`);
@@ -493,6 +610,7 @@ export function saveInspectionFindings(
     notes?: string;
     verifiedScope: string;
     estimatedCostCents?: number;
+    trainingSuitability: "not_suitable" | "potential" | "suitable";
   }>,
   questionResponses: Array<{
     id: string;
@@ -505,6 +623,15 @@ export function saveInspectionFindings(
     findings,
     questionResponses,
   });
+}
+
+export async function getPartnerInspectionQueue(
+  source: PartnerDataSource = getPartnerDataSource(),
+) {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetchWithTimeout(`${apiUrl}/api/v1/partner-inspections?source=${source}`);
+  if (!response.ok) throw await homeFixApiError(response);
+  return response.json() as Promise<{ source: PartnerDataSource; items: PartnerInspectionQueueItem[] }>;
 }
 
 export async function processRepair(repairNeedId: string) {
@@ -536,6 +663,39 @@ export async function uploadRepairPhotos(
   return response.json() as Promise<{ photos: Array<{ id: string; imageUrl: string }> }>;
 }
 
+export async function uploadCaseDocument(caseId: string, documentType: string, file: File) {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const body = new FormData();
+  body.append("documentType", documentType);
+  body.append("document", file);
+  const demoSession = getStoredDemoSession();
+  const response = await fetchWithTimeout(`${apiUrl}/api/v1/cases/${caseId}/documents`, {
+    method: "POST",
+    headers: demoSession ? { "x-homefix-demo-session": demoSession.token } : {},
+    body,
+  });
+  if (!response.ok) throw await homeFixApiError(response);
+  return response.json() as Promise<{ document: CaseDocument }>;
+}
+
+export async function reviewCaseDocument(
+  caseId: string,
+  documentId: string,
+  input: { status: "uploaded" | "approved" | "rejected"; reviewNotes?: string | null },
+) {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetchWithTimeout(
+    `${apiUrl}/api/v1/partner-cases/${encodeURIComponent(caseId)}/documents/${documentId}`,
+    {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
+  if (!response.ok) throw await homeFixApiError(response);
+  return response.json() as Promise<{ document: CaseDocument }>;
+}
+
 export async function processCase(caseId: string) {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
   const response = await fetchWithTimeout(`${apiUrl}/api/v1/cases/${caseId}/process`, {
@@ -552,17 +712,24 @@ export async function getCoverage(caseId: string): Promise<CoveragePlanResponse>
   return response.json() as Promise<CoveragePlanResponse>;
 }
 
-export async function getPartnerAnalytics(): Promise<PartnerAnalytics> {
+export async function getPartnerAnalytics(
+  source: PartnerDataSource = "combined",
+): Promise<PartnerAnalytics> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetchWithTimeout(`${apiUrl}/api/v1/partner-analytics`);
+  const query = source === "combined" ? "" : `?source=${source}`;
+  const response = await fetchWithTimeout(`${apiUrl}/api/v1/partner-analytics${query}`);
   if (!response.ok) throw await homeFixApiError(response);
   return response.json() as Promise<PartnerAnalytics>;
 }
 
-export async function getPartnerCase(caseId: string): Promise<PartnerCaseDetail> {
+export async function getPartnerCase(
+  caseId: string,
+  source: PartnerDataSource = "combined",
+): Promise<PartnerCaseDetail> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const query = source === "combined" ? "" : `?source=${source}`;
   const response = await fetchWithTimeout(
-    `${apiUrl}/api/v1/partner-cases/${encodeURIComponent(caseId)}`,
+    `${apiUrl}/api/v1/partner-cases/${encodeURIComponent(caseId)}${query}`,
   );
   if (!response.ok) throw await homeFixApiError(response);
   return response.json() as Promise<PartnerCaseDetail>;

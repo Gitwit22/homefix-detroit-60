@@ -185,6 +185,17 @@ function buildWorkforceOpportunities(facts: PartnerRepairFact[]) {
   };
 }
 
+export function mergePartnerFacts(
+  syntheticFacts: PartnerRepairFact[],
+  persistedFacts: PartnerRepairFact[],
+): PartnerRepairFact[] {
+  const persistedCaseNumbers = new Set(persistedFacts.map((fact) => fact.caseNumber));
+  return [
+    ...syntheticFacts.filter((fact) => !persistedCaseNumbers.has(fact.caseNumber)),
+    ...persistedFacts,
+  ];
+}
+
 export function calculatePartnerAnalytics(
   facts: PartnerRepairFact[],
   capacities: ProgramCapacityModel[],
@@ -272,11 +283,15 @@ export function calculatePartnerAnalytics(
   });
   const { summaries } = buildCases(facts);
   const workforceOpportunities = buildWorkforceOpportunities(facts);
+  const synthetic = facts.length > 0 && facts.every((fact) => fact.synthetic);
+  const hasSyntheticFacts = facts.some((fact) => fact.synthetic);
+  const hasPersistedFacts = facts.some((fact) => !fact.synthetic);
 
   return {
+    source: hasSyntheticFacts && hasPersistedFacts ? "combined" : synthetic ? "demo" : "live",
     generatedAt,
     seed,
-    synthetic: facts.every((fact) => fact.synthetic),
+    synthetic,
     totals: {
       homes: new Set(facts.map((fact) => fact.homeId)).size,
       repairNeeds: facts.length,

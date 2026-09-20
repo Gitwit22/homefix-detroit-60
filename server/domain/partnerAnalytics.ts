@@ -21,6 +21,16 @@ export type MatchStatus =
   "strong_match" | "potential_match" | "verification_needed" | "not_eligible" | "no_match";
 export type CoverageStatus = "potentially_covered" | "verification_needed" | "funding_gap";
 export type CaseStatus =
+  | "reported"
+  | "screening"
+  | "potential_programs"
+  | "inspection"
+  | "verified_scope"
+  | "documents"
+  | "program_approval"
+  | "repair_assignment"
+  | "completion"
+  | "completed"
   | "assessment_complete"
   | "documents_needed"
   | "program_review"
@@ -84,6 +94,16 @@ export const coverageStatusLabels: Record<CoverageStatus, string> = {
 };
 
 export const caseStatusLabels: Record<CaseStatus, string> = {
+  reported: "Reported",
+  screening: "Initial Screening",
+  potential_programs: "Potential Programs",
+  inspection: "Inspection",
+  verified_scope: "Scope Verified",
+  documents: "Documents",
+  program_approval: "Program Approval",
+  repair_assignment: "Repair Assignment",
+  completion: "Completion",
+  completed: "Completed",
   assessment_complete: "Assessment Complete",
   documents_needed: "Documents Needed",
   program_review: "Program Review",
@@ -198,6 +218,18 @@ export type PartnerCaseDetail = PartnerCaseSummary & {
     coverageStatus: CoverageStatus;
     programId?: string;
   }>;
+  documents?: Array<{
+    id: string;
+    documentType: string;
+    originalFilename: string | null;
+    mimeType: string | null;
+    bytes: number | null;
+    status: string;
+    reviewNotes: string | null;
+    downloadUrl: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
   inspectionPackage?: {
     status: string;
     availabilityWindows: Array<{ start: string; end: string }>;
@@ -236,6 +268,7 @@ export type PartnerCaseDetail = PartnerCaseSummary & {
         notes: string | null;
         verifiedScope: string;
         estimatedCostCents: number | null;
+        trainingSuitability: "not_suitable" | "potential" | "suitable" | null;
       } | null;
     }>;
   } | null;
@@ -276,9 +309,12 @@ export type WorkforceOpportunity = {
 };
 
 export type PartnerAnalytics = {
+  source: "live" | "demo" | "combined";
   generatedAt: string;
   seed: number;
   synthetic: boolean;
+  degraded?: boolean;
+  warning?: string;
   totals: {
     homes: number;
     repairNeeds: number;

@@ -11,6 +11,14 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import {
+  opportunityAssignmentStatuses,
+  opportunityResponseStatuses,
+  opportunityResponseTypes,
+  opportunityStatuses,
+  opportunityTypes,
+} from "../domain/opportunity.js";
 import { repairRoles } from "../domain/repair.js";
 import type { TrainingOpportunity } from "../validation/triage.js";
 
@@ -30,6 +38,12 @@ export const demoSessions = pgTable("demo_sessions", {
   normalizedName: text("normalized_name").unique().notNull(),
   pinHash: text("pin_hash"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const demoControl = pgTable("demo_control", {
+  id: text("id").primaryKey(),
+  baselineEnabled: boolean("baseline_enabled").default(true).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -65,6 +79,7 @@ export const repairCases = pgTable("repair_cases", {
   demoSessionId: uuid("demo_session_id").references(() => demoSessions.id, {
     onDelete: "set null",
   }),
+  provenance: text("provenance").default("resident").notNull(),
   status: text("status").default("assessment_started").notNull(),
   currentStep: text("current_step").default("intake").notNull(),
   nextAction: text("next_action"),
@@ -227,8 +242,15 @@ export const documents = pgTable("documents", {
     .notNull(),
   documentType: text("document_type").notNull(),
   fileUrl: text("file_url"),
+  objectKey: text("object_key").unique(),
+  originalFilename: text("original_filename"),
+  mimeType: text("mime_type"),
+  bytes: integer("bytes"),
   status: text("status").default("missing").notNull(),
+  reviewNotes: text("review_notes"),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const caseEvents = pgTable("case_events", {
@@ -251,38 +273,90 @@ export type InspectionQuestion = {
   unableToVerify: boolean;
 };
 
-export const inspections = pgTable(
-  "inspections",
+export type InspectionCaseSnapshot = {
+  needs: Array<{
+    repairNeedId: string;
+    description: string;
+    preliminaryCategory: string;
+    safetyFlags: string[];
+    trainingOpportunity: TrainingOpportunity | null;
+    photos: Array<{ id: string; objectKey: string | null }>;
+  }>;
+};
+
+export const inspectionRequests = pgTable(
+  "inspection_requests",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     repairCaseId: uuid("repair_case_id")
       .references(() => repairCases.id, { onDelete: "cascade" })
       .notNull(),
     status: text("status").default("availability_requested").notNull(),
-    availabilityWindows: jsonb("availability_windows")
-      .$type<Array<{ start: string; end: string }>>()
-      .default([])
+    caseSnapshot: jsonb("case_snapshot")
+      .$type<InspectionCaseSnapshot>()
+      .default({ needs: [] })
       .notNull(),
     inspectionQuestions: jsonb("inspection_questions")
       .$type<InspectionQuestion[]>()
       .default([])
       .notNull(),
-    confirmedStart: timestamp("confirmed_start", { withTimezone: true }),
-    confirmedEnd: timestamp("confirmed_end", { withTimezone: true }),
-    providerName: text("provider_name"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("inspection_requests_repair_case_id_unique").on(table.repairCaseId)],
+);
+
+export const inspectionAvailability = pgTable(
+  "inspection_availability",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    inspectionRequestId: uuid("inspection_request_id")
+      .references(() => inspectionRequests.id, { onDelete: "cascade" })
+      .notNull(),
+    start: timestamp("start", { withTimezone: true }).notNull(),
+    end: timestamp("end", { withTimezone: true }).notNull(),
+    active: boolean("active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("inspection_availability_request_window_unique").on(
+      table.inspectionRequestId,
+      table.start,
+      table.end,
+    ),
+  ],
+);
+
+export const inspectionAppointments = pgTable(
+  "inspection_appointments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    inspectionRequestId: uuid("inspection_request_id")
+      .references(() => inspectionRequests.id, { onDelete: "cascade" })
+      .notNull(),
+    availabilityId: uuid("availability_id").references(() => inspectionAvailability.id, {
+      onDelete: "restrict",
+    }),
+    status: text("status").default("scheduled").notNull(),
+    confirmedStart: timestamp("confirmed_start", { withTimezone: true }).notNull(),
+    confirmedEnd: timestamp("confirmed_end", { withTimezone: true }).notNull(),
+    providerName: text("provider_name").notNull(),
     providerPhone: text("provider_phone"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [uniqueIndex("inspections_repair_case_id_unique").on(table.repairCaseId)],
+  (table) => [
+    uniqueIndex("inspection_appointments_request_unique").on(table.inspectionRequestId),
+  ],
 );
 
 export const inspectionFindings = pgTable(
   "inspection_findings",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    inspectionId: uuid("inspection_id")
-      .references(() => inspections.id, { onDelete: "cascade" })
+    inspectionRequestId: uuid("inspection_request_id")
+      .references(() => inspectionRequests.id, { onDelete: "cascade" })
       .notNull(),
     repairNeedId: uuid("repair_need_id")
       .references(() => repairNeeds.id, { onDelete: "cascade" })
@@ -293,13 +367,14 @@ export const inspectionFindings = pgTable(
     notes: text("notes"),
     verifiedScope: text("verified_scope").notNull(),
     estimatedCostCents: integer("estimated_cost_cents"),
+    trainingSuitability: text("training_suitability"),
     completedAt: timestamp("completed_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
-    uniqueIndex("inspection_findings_inspection_repair_need_unique").on(
-      table.inspectionId,
+    uniqueIndex("inspection_findings_request_repair_need_unique").on(
+      table.inspectionRequestId,
       table.repairNeedId,
     ),
   ],
@@ -386,3 +461,211 @@ export const overflowBids = pgTable("overflow_bids", {
   synthetic: boolean("synthetic").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const userIdentities = pgTable("user_identities", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  clerkUserId: text("clerk_user_id").unique().notNull(),
+  email: text("email"),
+  displayName: text("display_name"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const providerOrganizations = pgTable("provider_organizations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  clerkOrganizationId: text("clerk_organization_id").unique().notNull(),
+  name: text("name").notNull(),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  verificationStatus: text("verification_status", {
+    enum: ["pending", "verified", "suspended"],
+  })
+    .default("pending")
+    .notNull(),
+  performsInspections: boolean("performs_inspections").default(false).notNull(),
+  performsRepairs: boolean("performs_repairs").default(false).notNull(),
+  supervisesTraining: boolean("supervises_training").default(false).notNull(),
+  repairSpecialties: jsonb("repair_specialties").$type<string[]>().default([]).notNull(),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const providerMemberships = pgTable(
+  "provider_memberships",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    providerOrganizationId: uuid("provider_organization_id")
+      .references(() => providerOrganizations.id, { onDelete: "cascade" })
+      .notNull(),
+    userIdentityId: uuid("user_identity_id")
+      .references(() => userIdentities.id, { onDelete: "cascade" })
+      .notNull(),
+    role: text("role", { enum: ["owner", "administrator", "member"] })
+      .default("member")
+      .notNull(),
+    status: text("status", { enum: ["active", "suspended", "removed"] })
+      .default("active")
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("provider_memberships_organization_user_unique").on(
+      table.providerOrganizationId,
+      table.userIdentityId,
+    ),
+  ],
+);
+
+export const partnerMemberships = pgTable(
+  "partner_memberships",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userIdentityId: uuid("user_identity_id")
+      .references(() => userIdentities.id, { onDelete: "cascade" })
+      .notNull(),
+    role: text("role", { enum: ["administrator", "case_manager", "reviewer"] }).notNull(),
+    status: text("status", { enum: ["active", "suspended", "removed"] })
+      .default("active")
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("partner_memberships_user_unique").on(table.userIdentityId)],
+);
+
+export const opportunities = pgTable(
+  "opportunities",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    publicNumber: text("public_number").unique().notNull(),
+    repairCaseId: uuid("repair_case_id")
+      .references(() => repairCases.id, { onDelete: "cascade" })
+      .notNull(),
+    repairNeedId: uuid("repair_need_id")
+      .references(() => repairNeeds.id, { onDelete: "cascade" })
+      .notNull(),
+    programId: uuid("program_id").references(() => programs.id, { onDelete: "set null" }),
+    type: text("type", { enum: opportunityTypes }).notNull(),
+    repairCategory: text("repair_category").notNull(),
+    priority: text("priority").notNull(),
+    publicScope: text("public_scope").notNull(),
+    zipCode: text("zip_code").notNull(),
+    fundingStatus: text("funding_status"),
+    trainingOpportunityStatus: text("training_opportunity_status"),
+    potentialSkills: jsonb("potential_skills").$type<string[]>().default([]).notNull(),
+    status: text("status", { enum: opportunityStatuses }).default("open").notNull(),
+    publishedByUserId: uuid("published_by_user_id").references(() => userIdentities.id, {
+      onDelete: "set null",
+    }),
+    publishedAt: timestamp("published_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("opportunities_public_list_idx").on(table.status, table.type, table.createdAt),
+    index("opportunities_zip_category_idx").on(table.zipCode, table.repairCategory),
+    uniqueIndex("opportunities_active_need_type_unique")
+      .on(table.repairNeedId, table.type)
+      .where(sql`${table.status} not in ('completed', 'cancelled')`),
+  ],
+);
+
+export const opportunityResponses = pgTable(
+  "opportunity_responses",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    opportunityId: uuid("opportunity_id")
+      .references(() => opportunities.id, { onDelete: "cascade" })
+      .notNull(),
+    providerOrganizationId: uuid("provider_organization_id")
+      .references(() => providerOrganizations.id, { onDelete: "restrict" })
+      .notNull(),
+    submittedByUserId: uuid("submitted_by_user_id")
+      .references(() => userIdentities.id, { onDelete: "restrict" })
+      .notNull(),
+    responseType: text("response_type", { enum: opportunityResponseTypes }).notNull(),
+    estimatedPriceCents: integer("estimated_price_cents"),
+    estimatedDurationDays: integer("estimated_duration_days"),
+    notes: text("notes"),
+    status: text("status", { enum: opportunityResponseStatuses }).default("submitted").notNull(),
+    reviewedByUserId: uuid("reviewed_by_user_id").references(() => userIdentities.id, {
+      onDelete: "set null",
+    }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("opportunity_responses_opportunity_provider_unique").on(
+      table.opportunityId,
+      table.providerOrganizationId,
+    ),
+    index("opportunity_responses_review_queue_idx").on(table.opportunityId, table.status),
+  ],
+);
+
+export const opportunityAssignments = pgTable(
+  "opportunity_assignments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    opportunityId: uuid("opportunity_id")
+      .references(() => opportunities.id, { onDelete: "cascade" })
+      .notNull(),
+    opportunityResponseId: uuid("opportunity_response_id").references(
+      () => opportunityResponses.id,
+      { onDelete: "set null" },
+    ),
+    providerOrganizationId: uuid("provider_organization_id")
+      .references(() => providerOrganizations.id, { onDelete: "restrict" })
+      .notNull(),
+    assignedUserId: uuid("assigned_user_id")
+      .references(() => userIdentities.id, { onDelete: "restrict" })
+      .notNull(),
+    assignedByUserId: uuid("assigned_by_user_id")
+      .references(() => userIdentities.id, { onDelete: "restrict" })
+      .notNull(),
+    status: text("status", { enum: opportunityAssignmentStatuses }).default("active").notNull(),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).defaultNow().notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revocationReason: text("revocation_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("opportunity_assignments_active_opportunity_unique")
+      .on(table.opportunityId)
+      .where(sql`${table.status} = 'active'`),
+    index("opportunity_assignments_provider_status_idx").on(
+      table.providerOrganizationId,
+      table.status,
+    ),
+  ],
+);
+
+export const opportunityPhotoReleases = pgTable(
+  "opportunity_photo_releases",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    opportunityId: uuid("opportunity_id")
+      .references(() => opportunities.id, { onDelete: "cascade" })
+      .notNull(),
+    repairPhotoId: uuid("repair_photo_id")
+      .references(() => repairPhotos.id, { onDelete: "cascade" })
+      .notNull(),
+    approvedByUserId: uuid("approved_by_user_id")
+      .references(() => userIdentities.id, { onDelete: "restrict" })
+      .notNull(),
+    approvedAt: timestamp("approved_at", { withTimezone: true }).defaultNow().notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("opportunity_photo_releases_opportunity_photo_unique").on(
+      table.opportunityId,
+      table.repairPhotoId,
+    ),
+  ],
+);

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { DemoFlag, Metric, PageIntro, SectionLabel } from "@/components/homefix";
-import { PartnerRouteError, PartnerRouteLoading } from "@/components/partner-route-state";
+import { PartnerDataWarning, PartnerRouteError, PartnerRouteLoading } from "@/components/partner-route-state";
 import { getPartnerAnalytics } from "@/lib/homefix-api";
 import { parsePartnerFilters } from "@/lib/partner-filters";
 import { repairTypeLabels } from "../../server/domain/partnerAnalytics";
@@ -126,6 +126,7 @@ function Analytics() {
 
   return (
     <>
+      <PartnerDataWarning warning={analytics.warning} />
       <DemoFlag />
       <PageIntro
         eyebrow="Planning trends"

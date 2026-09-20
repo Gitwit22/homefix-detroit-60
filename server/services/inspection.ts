@@ -1,14 +1,20 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "../db/index.js";
 import {
   caseEvents,
+  homes,
+  inspectionAppointments,
+  inspectionAvailability,
   inspectionFindings,
-  inspections,
+  inspectionRequests,
   programMatches,
   repairAssessments,
+  repairCases,
   repairNeeds,
+  repairPhotos,
+  type InspectionCaseSnapshot,
   type InspectionQuestion,
 } from "../db/schema.js";
 import { repairCategories, triageUrgencies } from "../domain/repair.js";
@@ -130,6 +136,7 @@ export const inspectionFindingsSchema = z.object({
         notes: z.string().trim().max(4_000).optional(),
         verifiedScope: z.string().trim().min(3).max(8_000),
         estimatedCostCents: z.number().int().positive().max(100_000_000).optional(),
+        trainingSuitability: z.enum(["not_suitable", "potential", "suitable"]),
       }),
     )
     .min(1)
@@ -139,7 +146,11 @@ export const inspectionFindingsSchema = z.object({
 
 async function requireViablePathway(caseId: string) {
   const needs = await db
-    .select({ id: repairNeeds.id })
+    .select({
+      id: repairNeeds.id,
+      description: repairNeeds.description,
+      category: repairNeeds.category,
+    })
     .from(repairNeeds)
     .where(eq(repairNeeds.repairCaseId, caseId));
   if (needs.length === 0) throw new Error("Case has no reported repair needs");
@@ -157,106 +168,263 @@ async function requireViablePathway(caseId: string) {
     throw new Error("A potential program pathway is required before scheduling an inspection");
 }
 
+export async function getInspectionState(caseId: string) {
+  const requestRows = await db
+    .select()
+    .from(inspectionRequests)
+    .where(eq(inspectionRequests.repairCaseId, caseId))
+    .limit(1);
+  const request = requestRows[0];
+  if (!request) return null;
+
+  const [windows, appointmentRows] = await Promise.all([
+    db
+      .select()
+      .from(inspectionAvailability)
+      .where(
+        and(
+          eq(inspectionAvailability.inspectionRequestId, request.id),
+          eq(inspectionAvailability.active, true),
+        ),
+      ),
+    db
+      .select()
+      .from(inspectionAppointments)
+      .where(eq(inspectionAppointments.inspectionRequestId, request.id))
+      .limit(1),
+  ]);
+  const appointment = appointmentRows[0] ?? null;
+
+  return {
+    ...request,
+    availabilityWindows: windows
+      .sort((left, right) => left.start.getTime() - right.start.getTime())
+      .map((window) => ({ start: window.start.toISOString(), end: window.end.toISOString() })),
+    confirmedStart: appointment?.confirmedStart ?? null,
+    confirmedEnd: appointment?.confirmedEnd ?? null,
+    providerName: appointment?.providerName ?? null,
+    providerPhone: appointment?.providerPhone ?? null,
+  };
+}
+
+export async function listInspectionQueue() {
+  const requests = await db
+    .select({
+      id: inspectionRequests.id,
+      caseId: repairCases.id,
+      caseNumber: repairCases.caseNumber,
+      status: inspectionRequests.status,
+      streetAddress: homes.streetAddress,
+      zipCode: homes.zipCode,
+      requestedAt: inspectionRequests.createdAt,
+      updatedAt: inspectionRequests.updatedAt,
+      appointmentStart: inspectionAppointments.confirmedStart,
+      appointmentEnd: inspectionAppointments.confirmedEnd,
+      providerName: inspectionAppointments.providerName,
+      providerPhone: inspectionAppointments.providerPhone,
+    })
+    .from(inspectionRequests)
+    .innerJoin(repairCases, eq(repairCases.id, inspectionRequests.repairCaseId))
+    .innerJoin(homes, eq(homes.id, repairCases.homeId))
+    .leftJoin(
+      inspectionAppointments,
+      eq(inspectionAppointments.inspectionRequestId, inspectionRequests.id),
+    )
+    .orderBy(desc(inspectionRequests.updatedAt));
+  if (requests.length === 0) return [];
+
+  const windows = await db
+    .select()
+    .from(inspectionAvailability)
+    .where(
+      and(
+        inArray(
+          inspectionAvailability.inspectionRequestId,
+          requests.map((request) => request.id),
+        ),
+        eq(inspectionAvailability.active, true),
+      ),
+    );
+  return requests.map((request) => ({
+    ...request,
+    requestedAt: request.requestedAt.toISOString(),
+    updatedAt: request.updatedAt.toISOString(),
+    appointmentStart: request.appointmentStart?.toISOString() ?? null,
+    appointmentEnd: request.appointmentEnd?.toISOString() ?? null,
+    availabilityWindows: windows
+      .filter((window) => window.inspectionRequestId === request.id)
+      .sort((left, right) => left.start.getTime() - right.start.getTime())
+      .map((window) => ({ start: window.start.toISOString(), end: window.end.toISOString() })),
+  }));
+}
+
 export async function submitInspectionAvailability(caseId: string, input: unknown) {
   const parsed = inspectionAvailabilitySchema.parse(input);
   await requireViablePathway(caseId);
 
   const needs = await db
-    .select({ id: repairNeeds.id })
+    .select({
+      id: repairNeeds.id,
+      description: repairNeeds.description,
+      category: repairNeeds.category,
+    })
     .from(repairNeeds)
     .where(eq(repairNeeds.repairCaseId, caseId));
-  const assessments = await db
-    .select({
-      repairNeedId: repairAssessments.repairNeedId,
-      followUpQuestions: repairAssessments.followUpQuestions,
-    })
-    .from(repairAssessments)
-    .where(
-      inArray(
-        repairAssessments.repairNeedId,
-        needs.map((need) => need.id),
-      ),
-    );
+  const needIds = needs.map((need) => need.id);
+  const [assessments, photos] = await Promise.all([
+    db
+      .select()
+      .from(repairAssessments)
+      .where(inArray(repairAssessments.repairNeedId, needIds)),
+    db.select().from(repairPhotos).where(inArray(repairPhotos.repairNeedId, needIds)),
+  ]);
   const inspectionQuestions = buildInspectionQuestionSnapshot(assessments);
+  const assessmentByNeed = new Map(assessments.map((assessment) => [assessment.repairNeedId, assessment]));
+  const caseSnapshot: InspectionCaseSnapshot = {
+    needs: needs.map((need) => {
+      const assessment = assessmentByNeed.get(need.id);
+      return {
+        repairNeedId: need.id,
+        description: need.description,
+        preliminaryCategory: assessment?.predictedCategory ?? need.category,
+        safetyFlags: Array.isArray(assessment?.safetyFlags)
+          ? assessment.safetyFlags.filter((flag): flag is string => typeof flag === "string")
+          : [],
+        trainingOpportunity: assessment?.trainingOpportunity ?? null,
+        photos: photos
+          .filter((photo) => photo.repairNeedId === need.id)
+          .map((photo) => ({ id: photo.id, objectKey: photo.publicId })),
+      };
+    }),
+  };
 
-  const rows = await db
-    .insert(inspections)
-    .values({
-      repairCaseId: caseId,
-      status: "availability_submitted",
-      availabilityWindows: parsed.windows,
-      inspectionQuestions,
-    })
-    .onConflictDoUpdate({
-      target: inspections.repairCaseId,
-      set: {
+  await db.transaction(async (transaction) => {
+    const rows = await transaction
+      .insert(inspectionRequests)
+      .values({
+        repairCaseId: caseId,
         status: "availability_submitted",
-        availabilityWindows: parsed.windows,
-        confirmedStart: null,
-        confirmedEnd: null,
-        providerName: null,
-        providerPhone: null,
-        updatedAt: new Date(),
-      },
-    })
-    .returning();
-  await db.insert(caseEvents).values({
-    repairCaseId: caseId,
-    eventType: "inspection_availability_submitted",
-    title: "Inspection availability submitted",
-    description: `${parsed.windows.length} acceptable appointment windows were submitted.`,
-    metadata: { windows: parsed.windows },
+        caseSnapshot,
+        inspectionQuestions,
+      })
+      .onConflictDoUpdate({
+        target: inspectionRequests.repairCaseId,
+        set: {
+          status: "availability_submitted",
+          caseSnapshot,
+          inspectionQuestions,
+          updatedAt: new Date(),
+        },
+      })
+      .returning({ id: inspectionRequests.id });
+    const request = rows[0];
+    if (!request) throw new Error("Inspection request could not be saved");
+
+    const existingAppointment = await transaction
+      .select({ id: inspectionAppointments.id })
+      .from(inspectionAppointments)
+      .where(eq(inspectionAppointments.inspectionRequestId, request.id))
+      .limit(1);
+    if (existingAppointment.length > 0) {
+      throw new Error("Availability cannot be changed after an appointment is confirmed");
+    }
+
+    await transaction
+      .delete(inspectionAvailability)
+      .where(eq(inspectionAvailability.inspectionRequestId, request.id));
+    await transaction.insert(inspectionAvailability).values(
+      parsed.windows.map((window) => ({
+        inspectionRequestId: request.id,
+        start: new Date(window.start),
+        end: new Date(window.end),
+      })),
+    );
+    await transaction.insert(caseEvents).values({
+      repairCaseId: caseId,
+      eventType: "inspection_availability_submitted",
+      title: "Inspection availability submitted",
+      description: `${parsed.windows.length} acceptable appointment windows were submitted.`,
+      metadata: { windows: parsed.windows },
+    });
   });
   const lifecycle = await syncCaseLifecycle(caseId);
-  return { inspection: rows[0]!, lifecycle };
+  return { inspection: await getInspectionState(caseId), lifecycle };
 }
 
 export async function confirmInspection(caseId: string, input: unknown) {
   const parsed = confirmInspectionSchema.parse(input);
   const rows = await db
     .select()
-    .from(inspections)
-    .where(eq(inspections.repairCaseId, caseId))
+    .from(inspectionRequests)
+    .where(eq(inspectionRequests.repairCaseId, caseId))
     .limit(1);
-  const inspection = rows[0];
-  if (!inspection) throw new Error("Resident availability has not been submitted");
-  const selectedWindow = inspection.availabilityWindows.some(
-    (window) => window.start === parsed.start && window.end === parsed.end,
+  const request = rows[0];
+  if (!request) throw new Error("Resident availability has not been submitted");
+  const windows = await db
+    .select()
+    .from(inspectionAvailability)
+    .where(
+      and(
+        eq(inspectionAvailability.inspectionRequestId, request.id),
+        eq(inspectionAvailability.active, true),
+      ),
+    );
+  const selectedWindow = windows.find(
+    (window) =>
+      window.start.getTime() === new Date(parsed.start).getTime() &&
+      window.end.getTime() === new Date(parsed.end).getTime(),
   );
   if (!selectedWindow) throw new Error("Confirmed appointment must use a resident-provided window");
 
-  const updated = await db
-    .update(inspections)
-    .set({
-      status: "scheduled",
-      confirmedStart: new Date(parsed.start),
-      confirmedEnd: new Date(parsed.end),
-      providerName: parsed.providerName,
-      providerPhone: parsed.providerPhone ?? null,
-      updatedAt: new Date(),
-    })
-    .where(eq(inspections.id, inspection.id))
-    .returning();
-  await db.insert(caseEvents).values({
-    repairCaseId: caseId,
-    eventType: "inspection_scheduled",
-    title: "Professional inspection scheduled",
-    description: `${parsed.providerName} confirmed the inspection appointment.`,
-    metadata: { start: parsed.start, end: parsed.end },
+  await db.transaction(async (transaction) => {
+    await transaction
+      .insert(inspectionAppointments)
+      .values({
+        inspectionRequestId: request.id,
+        availabilityId: selectedWindow.id,
+        status: "scheduled",
+        confirmedStart: new Date(parsed.start),
+        confirmedEnd: new Date(parsed.end),
+        providerName: parsed.providerName,
+        providerPhone: parsed.providerPhone ?? null,
+      })
+      .onConflictDoUpdate({
+        target: inspectionAppointments.inspectionRequestId,
+        set: {
+          availabilityId: selectedWindow.id,
+          status: "scheduled",
+          confirmedStart: new Date(parsed.start),
+          confirmedEnd: new Date(parsed.end),
+          providerName: parsed.providerName,
+          providerPhone: parsed.providerPhone ?? null,
+          updatedAt: new Date(),
+        },
+      });
+    await transaction
+      .update(inspectionRequests)
+      .set({ status: "scheduled", updatedAt: new Date() })
+      .where(eq(inspectionRequests.id, request.id));
+    await transaction.insert(caseEvents).values({
+      repairCaseId: caseId,
+      eventType: "inspection_scheduled",
+      title: "Professional inspection scheduled",
+      description: `${parsed.providerName} confirmed the inspection appointment.`,
+      metadata: { start: parsed.start, end: parsed.end },
+    });
   });
   const lifecycle = await syncCaseLifecycle(caseId);
-  return { inspection: updated[0]!, lifecycle };
+  return { inspection: await getInspectionState(caseId), lifecycle };
 }
 
 export async function recordInspectionFindings(caseId: string, input: unknown) {
   const parsed = inspectionFindingsSchema.parse(input);
   const inspectionRows = await db
     .select()
-    .from(inspections)
-    .where(eq(inspections.repairCaseId, caseId))
+    .from(inspectionRequests)
+    .where(eq(inspectionRequests.repairCaseId, caseId))
     .limit(1);
-  const inspection = inspectionRows[0];
-  if (!inspection || inspection.status !== "scheduled") {
+  const request = inspectionRows[0];
+  if (!request || request.status !== "scheduled") {
     throw new Error("A confirmed inspection is required before recording findings");
   }
   const needs = await db
@@ -268,7 +436,7 @@ export async function recordInspectionFindings(caseId: string, input: unknown) {
     throw new Error("Inspection finding does not belong to this case");
   }
   const answeredQuestions = applyInspectionQuestionResponses(
-    inspection.inspectionQuestions,
+    request.inspectionQuestions,
     parsed.questionResponses,
   );
 
@@ -276,30 +444,30 @@ export async function recordInspectionFindings(caseId: string, input: unknown) {
     for (const finding of parsed.findings) {
       await transaction
         .insert(inspectionFindings)
-        .values({ inspectionId: inspection.id, ...finding, completedAt: new Date() })
+        .values({ inspectionRequestId: request.id, ...finding, completedAt: new Date() })
         .onConflictDoUpdate({
-          target: [inspectionFindings.inspectionId, inspectionFindings.repairNeedId],
+          target: [inspectionFindings.inspectionRequestId, inspectionFindings.repairNeedId],
           set: { ...finding, completedAt: new Date(), updatedAt: new Date() },
         });
     }
     const recorded = await transaction
       .select({ repairNeedId: inspectionFindings.repairNeedId })
       .from(inspectionFindings)
-      .where(eq(inspectionFindings.inspectionId, inspection.id));
+      .where(eq(inspectionFindings.inspectionRequestId, request.id));
     if (new Set(recorded.map((finding) => finding.repairNeedId)).size === needs.length) {
       await transaction
-        .update(inspections)
+        .update(inspectionRequests)
         .set({
           status: "completed",
           inspectionQuestions: answeredQuestions,
           updatedAt: new Date(),
         })
-        .where(eq(inspections.id, inspection.id));
+        .where(eq(inspectionRequests.id, request.id));
     } else {
       await transaction
-        .update(inspections)
+        .update(inspectionRequests)
         .set({ inspectionQuestions: answeredQuestions, updatedAt: new Date() })
-        .where(eq(inspections.id, inspection.id));
+        .where(eq(inspectionRequests.id, request.id));
     }
     await transaction.insert(caseEvents).values({
       repairCaseId: caseId,

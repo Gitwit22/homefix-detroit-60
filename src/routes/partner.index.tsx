@@ -10,7 +10,7 @@ import {
   SectionLabel,
   StatusBadge,
 } from "@/components/homefix";
-import { PartnerRouteError, PartnerRouteLoading } from "@/components/partner-route-state";
+import { PartnerDataWarning, PartnerRouteError, PartnerRouteLoading } from "@/components/partner-route-state";
 import { getPartnerAnalytics, type PartnerAnalytics } from "@/lib/homefix-api";
 import {
   capacityStatusLabels,
@@ -63,6 +63,7 @@ function PartnerDashboard() {
 
   return (
     <>
+      <PartnerDataWarning warning={analytics.warning} />
       <DemoFlag />
       <PageIntro
         eyebrow="HomeFix Partner Intelligence"

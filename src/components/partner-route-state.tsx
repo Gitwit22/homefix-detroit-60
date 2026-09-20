@@ -2,6 +2,15 @@ import { useRouter } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { DemoFlag, PageIntro } from "@/components/homefix";
 
+export function PartnerDataWarning({ warning }: { warning?: string }) {
+  if (!warning) return null;
+  return (
+    <div className="border-y border-warning bg-warning/15 px-4 py-3 text-sm font-semibold" role="status">
+      {warning}
+    </div>
+  );
+}
+
 export function PartnerRouteLoading() {
   return (
     <div className="py-10">

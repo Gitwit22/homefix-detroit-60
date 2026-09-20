@@ -273,12 +273,12 @@ export function SessionDataDeleteButton({
     <AlertDialog>
       <AlertDialogTrigger asChild>
         <Button variant="destructive" className={className} disabled={disabled || isDeleting}>
-          <RotateCcw /> {isDeleting ? "Removing..." : "Remove Mock Data"}
+          <RotateCcw /> {isDeleting ? "Removing..." : "Remove My Mock Data"}
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent className="rounded-none">
         <AlertDialogHeader>
-          <AlertDialogTitle>Remove mock data?</AlertDialogTitle>
+          <AlertDialogTitle>Remove your mock data?</AlertDialogTitle>
           <AlertDialogDescription>
             This permanently removes every mock customer case, photo, assessment, and workflow
             record saved to this session. The shared program catalog will remain.
@@ -290,7 +290,7 @@ export function SessionDataDeleteButton({
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             onClick={() => void wipe()}
           >
-            Remove Mock Data
+            Remove My Mock Data
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 
 import { DemoFlag, PageIntro, StatusBadge } from "@/components/homefix";
-import { PartnerRouteError, PartnerRouteLoading } from "@/components/partner-route-state";
+import { PartnerDataWarning, PartnerRouteError, PartnerRouteLoading } from "@/components/partner-route-state";
 import { getPartnerAnalytics, getPrograms, type ProgramCatalogResponse } from "@/lib/homefix-api";
 import { toRepairCategoryLabel } from "@/lib/repair-categories";
 import { capacityStatusLabels } from "../../server/domain/partnerAnalytics";
@@ -98,6 +98,7 @@ function Programs() {
 
   return (
     <>
+      <PartnerDataWarning warning={analytics.warning} />
       <DemoFlag />
       <PageIntro
         eyebrow="Verified Sept. 19, 2026"
