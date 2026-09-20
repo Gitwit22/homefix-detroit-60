@@ -6,7 +6,6 @@ import {
   DemoFlag,
   Disclaimer,
   SectionLabel,
-  StatusBadge,
 } from "@/components/homefix";
 import { DemoSessionPanel } from "@/components/demo-session-panel";
 import { Button } from "@/components/ui/button";
@@ -36,7 +35,6 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const [recentCaseId, setRecentCaseId] = useState("");
-  const demoMode = import.meta.env["VITE_HOMEFIX_DEMO_MODE"] === "1";
 
   useEffect(() => {
     setRecentCaseId(localStorage.getItem(lastCaseStorageKey) ?? "");
@@ -64,97 +62,68 @@ function HomePage() {
 
   return (
     <div className="pb-20 lg:pb-0">
-      <section className="blueprint-grid border-b border-border">
-        <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:py-20 lg:grid-cols-[1.2fr_.8fr] lg:px-10">
-          <div className="flex flex-col justify-between">
-            <div>
-              <DemoFlag />
-              <p className="mt-7 text-xs font-bold uppercase text-rust">HomeFix 313</p>
-              <h1 className="mt-4 max-w-3xl font-display text-5xl leading-[.97] sm:text-6xl lg:text-8xl">
-                Your home has a story.
-                <br />
-                <em className="font-normal text-primary">HomeFix helps you figure out what happens next.</em>
-              </h1>
-              <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
-                Snap the problem, build your Repair Passport, and find a path toward getting it fixed.
-              </p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+      <section className="relative min-h-[min(760px,82vh)] overflow-hidden border-b border-border bg-navy text-white">
+        <img
+          src="/hero.jpg"
+          alt="A residential Detroit neighborhood"
+          className="absolute inset-0 size-full object-cover object-center"
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(8,23,35,.94)_0%,rgba(8,23,35,.72)_48%,rgba(8,23,35,.18)_100%)]" />
+        <div className="relative mx-auto flex min-h-[min(760px,82vh)] max-w-7xl flex-col justify-between px-4 py-7 sm:px-6 md:py-16 lg:px-10">
+          <div className="max-w-3xl">
+            <DemoFlag />
+            <h1 className="mt-5 font-display text-5xl leading-[.9] sm:mt-8 sm:text-7xl lg:text-8xl">
+              HomeFix 313
+            </h1>
+            <p className="mt-4 max-w-2xl font-display text-2xl leading-tight text-white sm:mt-5 sm:text-4xl">
+              Your home has a story. Figure out what happens next.
+            </p>
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-white/80 sm:mt-6 sm:text-lg">
+              Report the problem, build your Repair Passport, and find a path toward getting it fixed.
+            </p>
+            <div className="mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:flex-wrap">
+              <BlueprintButton
+                to="/intake"
+                search={{}}
+                dataGuideTarget="resident-start-assessment"
+              >
+                Start Repair Assessment
+              </BlueprintButton>
+              {recentCaseId && (
                 <BlueprintButton
-                  to="/intake"
-                  search={{}}
-                  dataGuideTarget="resident-start-assessment"
+                  to="/passport"
+                  search={{ caseId: recentCaseId }}
+                  variant="secondary"
                 >
-                  Start Repair Assessment
+                  Resume My Repair
                 </BlueprintButton>
-                {recentCaseId && (
-                  <BlueprintButton
-                    to="/passport"
-                    search={{ caseId: recentCaseId }}
-                    variant="secondary"
-                  >
-                    Resume My Repair
-                  </BlueprintButton>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="min-h-12 rounded-none"
-                  onClick={() => startGuideDemo("resident")}
-                >
-                  Take Guided Demo
-                </Button>
-              </div>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-12 rounded-none border-white/70 bg-black/20 text-white hover:bg-white hover:text-foreground"
+                onClick={() => startGuideDemo("resident")}
+              >
+                Take Guided Demo
+              </Button>
             </div>
-            <ol className="mt-12 flex flex-wrap gap-6 border-t border-foreground pt-5 text-xs font-bold uppercase">
-              {pitchSteps.map((step, index) => (
-                <li key={step} className="flex items-center gap-2">
-                  <b className="font-display text-xl font-normal text-rust">
-                    {String(index + 1).padStart(2, "0")}
-                  </b>
-                  {step}
-                  {index < pitchSteps.length - 1 && (
-                    <ArrowDown className="size-3 -rotate-90 text-muted-foreground" />
-                  )}
-                </li>
-              ))}
-            </ol>
           </div>
-          <article className="self-center bg-paper shadow-[12px_12px_0_var(--border)]">
-            <div className="border-b-8 border-primary p-5">
-              <div className="flex justify-between text-[10px] font-bold uppercase text-muted-foreground">
-                <span>HomeFix property file</span>
-                <span>HF-48221-00128</span>
-              </div>
-              <h2 className="mt-10 text-4xl uppercase leading-none">123 Main Street</h2>
-              <p className="mt-2 text-muted-foreground">Detroit, Michigan 48224</p>
-            </div>
-            <div className="grid grid-cols-2 border-b border-border">
-              <div className="border-r border-border p-5">
-                <span className="eyebrow">Repair status</span>
-                <strong className="mt-4 block text-xl">Roof / Water Intrusion</strong>
-                <div className="mt-3">
-                  <StatusBadge tone="danger">High priority</StatusBadge>
-                </div>
-              </div>
-              <div className="p-5">
-                <span className="eyebrow">Potential resources</span>
-                <strong className="mt-3 block font-display text-6xl font-normal">3</strong>
-                <span className="text-xs text-muted-foreground">program paths identified</span>
-              </div>
-            </div>
-            <div className="p-5">
-              <div className="flex items-end justify-between">
-                <span className="text-xs font-bold uppercase">Repair coverage</span>
-                <strong className="font-display text-4xl font-normal text-primary">67%</strong>
-              </div>
-              <div className="mt-3 h-2 bg-muted">
-                <span className="block h-full w-2/3 bg-primary" />
-              </div>
-            </div>
-          </article>
+          <ol className="mt-12 hidden flex-wrap gap-x-6 gap-y-3 border-t border-white/45 pt-5 text-xs font-bold uppercase sm:flex">
+            {pitchSteps.map((step, index) => (
+              <li key={step} className="flex items-center gap-2">
+                <b className="font-display text-xl font-normal text-warning">
+                  {String(index + 1).padStart(2, "0")}
+                </b>
+                {step}
+                {index < pitchSteps.length - 1 && (
+                  <ArrowDown className="size-3 -rotate-90 text-white/60" />
+                )}
+              </li>
+            ))}
+          </ol>
         </div>
       </section>
-      {demoMode && <DemoSessionPanel onReset={() => setRecentCaseId("")} />}
+      <DemoSessionPanel onReset={() => setRecentCaseId("")} />
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-10">
         <SectionLabel number="01">What HomeFix helps you do</SectionLabel>
         <div className="mt-8 grid gap-px bg-border md:grid-cols-3">

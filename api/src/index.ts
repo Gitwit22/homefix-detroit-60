@@ -6,6 +6,8 @@ import formidable from "formidable";
 
 import { intakeSchema, createIntakeCase } from "../../server/services/intake.js";
 import {
+  claimCaseSchema,
+  claimDemoSessionCase,
   demoSessionSchema,
   getDemoSession,
   listDemoSessionCases,
@@ -17,20 +19,13 @@ import { processCase, processRepair } from "../../server/services/processRepair.
 import { rollbackRepairPhoto, uploadRepairPhoto } from "../../server/services/photos.js";
 import { getProgramDetail, listProgramCatalog } from "../../server/services/program.js";
 import { calculateCoveragePlan, getCoveragePlan } from "../../server/services/coverage.js";
-import {
-  DEFAULT_PARTNER_DEMO_SEED,
-  PARTNER_DEMO_GENERATED_AT,
-  generateSyntheticPartnerDataset,
-  syntheticProgramCapacities,
-} from "../../server/demo/partnerDataset.js";
+import { syntheticProgramCapacities } from "../../server/demo/partnerDataset.js";
 import {
   calculatePartnerAnalytics,
   getPartnerCaseDetail,
 } from "../../server/services/partnerAnalytics.js";
-import {
-  findExistingOverflowWorkOrderByCaseNumber,
-  ensureOverflowDemoData,
-} from "../../server/demo/overflowDemo.js";
+import { findExistingOverflowWorkOrderByCaseNumber } from "../../server/demo/overflowDemo.js";
+import { listPersistedPartnerFacts } from "../../server/services/partnerCaseData.js";
 import {
   createOverflowJob,
   getOverflowJob,
@@ -58,59 +53,29 @@ const port = parsePort(process.env.PORT);
 const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGINS);
 const maxBodyBytes = 100_000;
 const demoMode = process.env.HOMEFIX_DEMO_MODE === "1";
-const partnerDemoSeed = Number.parseInt(
-  process.env.HOMEFIX_DEMO_SEED ?? String(DEFAULT_PARTNER_DEMO_SEED),
-  10,
-);
-const partnerFacts = generateSyntheticPartnerDataset(
-  Number.isFinite(partnerDemoSeed) ? partnerDemoSeed : DEFAULT_PARTNER_DEMO_SEED,
-);
-const partnerAnalytics = calculatePartnerAnalytics(
-  partnerFacts,
-  syntheticProgramCapacities,
-  Number.isFinite(partnerDemoSeed) ? partnerDemoSeed : DEFAULT_PARTNER_DEMO_SEED,
-  PARTNER_DEMO_GENERATED_AT,
-);
-
 async function withOverflowCaseState(caseId: string) {
+  const partnerFacts = await listPersistedPartnerFacts();
   const partnerCase = getPartnerCaseDetail(partnerFacts, caseId);
   if (!partnerCase) return null;
 
-  const config = getOverflowDemoCaseConfig(partnerCase.caseNumber);
   const existingWorkOrder = await findExistingOverflowWorkOrderByCaseNumber(partnerCase.caseNumber);
-  const eligibleNeed = config
-    ? partnerCase.needs.find(
-        (need) =>
-          need.programId === config.selectedProgramSlug &&
-          need.repairType === config.selectedRepairCategory &&
-          need.coverageStatus === "potentially_covered",
-      )
-    : null;
 
   return {
     ...partnerCase,
-    overflow: config
-      ? {
-          eligible: Boolean(eligibleNeed),
-          programId: config.selectedProgramSlug,
-          fundingStatus: config.fundingStatus,
-          fundingStatusLabel: overflowFundingStatusLabels[config.fundingStatus],
-          capacityStatus: config.capacityStatus,
-          capacityStatusLabel: overflowCapacityStatusLabels[config.capacityStatus],
-          explanation: config.explanation,
-          existingWorkOrder: existingWorkOrder
-            ? {
-                id: existingWorkOrder.id,
-                workOrderNumber: existingWorkOrder.workOrderNumber,
-                status: existingWorkOrder.status,
-                statusLabel:
-                  workOrderStatusLabels[
-                    existingWorkOrder.status as keyof typeof workOrderStatusLabels
-                  ] ?? existingWorkOrder.status,
-              }
-            : null,
-        }
-      : { eligible: false, existingWorkOrder: null },
+    overflow: {
+      eligible: false,
+      existingWorkOrder: existingWorkOrder
+        ? {
+            id: existingWorkOrder.id,
+            workOrderNumber: existingWorkOrder.workOrderNumber,
+            status: existingWorkOrder.status,
+            statusLabel:
+              workOrderStatusLabels[
+                existingWorkOrder.status as keyof typeof workOrderStatusLabels
+              ] ?? existingWorkOrder.status,
+          }
+        : null,
+    },
   };
 }
 
@@ -137,7 +102,17 @@ function parseAllowedOrigins(value: string | undefined): Set<string> {
 function applyCors(request: IncomingMessage, response: ServerResponse): boolean {
   const origin = request.headers.origin;
   if (!origin) return true;
-  if (!allowedOrigins.has(origin)) return false;
+  const isDevelopmentLoopback =
+    process.env.NODE_ENV !== "production" &&
+    (() => {
+      try {
+        const hostname = new URL(origin).hostname;
+        return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+      } catch {
+        return false;
+      }
+    })();
+  if (!allowedOrigins.has(origin) && !isDevelopmentLoopback) return false;
 
   response.setHeader("access-control-allow-origin", origin);
   response.setHeader("access-control-allow-methods", "GET, POST, DELETE, OPTIONS");
@@ -222,21 +197,19 @@ const server = createServer(async (request, response) => {
   }
 
   if (requestUrl.pathname === "/api/v1/demo-sessions") {
-    if (!demoMode) {
-      sendJson(response, 404, { error: "Not found" });
-      return;
-    }
     try {
       if (method === "POST") {
         const input = demoSessionSchema.parse(await readJson(request));
-        sendJson(response, 200, await openDemoSession(input.displayName));
+        sendJson(response, 200, await openDemoSession(input.displayName, input.pin));
         return;
       }
     } catch (error) {
       if (error instanceof RequestError) {
         sendJson(response, error.status, { error: error.message });
       } else if (error instanceof Error && error.name === "ZodError") {
-        sendJson(response, 400, { error: "A display name is required" });
+        sendJson(response, 400, { error: "A display name and four-digit PIN are required" });
+      } else if (error instanceof Error && error.message === "INVALID_SESSION_CREDENTIALS") {
+        sendJson(response, 401, { error: "Display name or PIN is incorrect" });
       } else {
         console.error(error);
         sendJson(response, 500, { error: "Unable to open demo session" });
@@ -246,10 +219,6 @@ const server = createServer(async (request, response) => {
   }
 
   if (requestUrl.pathname === "/api/v1/demo-session/cases") {
-    if (!demoMode) {
-      sendJson(response, 404, { error: "Not found" });
-      return;
-    }
     try {
       if (method === "GET") {
         const session = await requireDemoSession(request);
@@ -267,10 +236,6 @@ const server = createServer(async (request, response) => {
   }
 
   if (requestUrl.pathname === "/api/v1/demo-session/data") {
-    if (!demoMode) {
-      sendJson(response, 404, { error: "Not found" });
-      return;
-    }
     try {
       if (method === "DELETE") {
         const session = await requireDemoSession(request);
@@ -287,8 +252,43 @@ const server = createServer(async (request, response) => {
     }
   }
 
+  if (requestUrl.pathname === "/api/v1/demo-session/claim") {
+    try {
+      if (method === "POST") {
+        const session = await requireDemoSession(request);
+        const input = claimCaseSchema.parse(await readJson(request));
+        sendJson(response, 200, await claimDemoSessionCase(session.id, input.caseId));
+        return;
+      }
+    } catch (error) {
+      const status =
+        error instanceof RequestError
+          ? error.status
+          : error instanceof Error && error.message === "CASE_NOT_FOUND"
+            ? 404
+            : error instanceof Error && error.message === "CASE_ALREADY_CLAIMED"
+              ? 409
+              : error instanceof Error && error.name === "ZodError"
+                ? 400
+                : 500;
+      if (status === 500) console.error(error);
+      sendJson(response, status, { error: status === 409 ? "Passport already belongs to another session" : "Unable to save Passport" });
+      return;
+    }
+  }
+
   if (method === "GET" && requestUrl.pathname === "/api/v1/partner-analytics") {
-    sendJson(response, 200, partnerAnalytics);
+    try {
+      const facts = await listPersistedPartnerFacts();
+      sendJson(
+        response,
+        200,
+        calculatePartnerAnalytics(facts, syntheticProgramCapacities, 0, new Date().toISOString()),
+      );
+    } catch (error) {
+      console.error(error);
+      sendJson(response, 500, { error: "Unable to load partner analytics" });
+    }
     return;
   }
 
@@ -370,11 +370,10 @@ const server = createServer(async (request, response) => {
   const partnerCaseMatch = requestUrl.pathname.match(/^\/api\/v1\/partner-cases\/([^/]+)$/);
   if (method === "GET" && partnerCaseMatch) {
     try {
-      await ensureOverflowDemoData();
       const caseId = decodeURIComponent(partnerCaseMatch[1]!);
       const partnerCase = await withOverflowCaseState(caseId);
       if (!partnerCase) {
-        sendJson(response, 404, { error: "Synthetic partner case not found" });
+        sendJson(response, 404, { error: "Partner case not found" });
         return;
       }
       sendJson(response, 200, partnerCase);
@@ -406,7 +405,6 @@ const server = createServer(async (request, response) => {
   );
   if (method === "POST" && createOverflowMatch) {
     try {
-      await ensureOverflowDemoData();
       const caseReference = decodeURIComponent(createOverflowMatch[1]!);
       const body = (await readJson(request)) as { repairNeedId?: string } | null;
       const payload = await createOverflowJob(
@@ -432,7 +430,6 @@ const server = createServer(async (request, response) => {
 
   if (method === "GET" && requestUrl.pathname === "/api/v1/overflow-jobs") {
     try {
-      await ensureOverflowDemoData();
       const payload = await listOverflowJobs();
       sendJson(response, 200, payload);
     } catch (error) {
@@ -445,7 +442,6 @@ const server = createServer(async (request, response) => {
   const overflowJobMatch = requestUrl.pathname.match(/^\/api\/v1\/overflow-jobs\/([^/]+)$/);
   if (method === "GET" && overflowJobMatch) {
     try {
-      await ensureOverflowDemoData();
       const workOrderReference = decodeURIComponent(overflowJobMatch[1]!);
       const payload = await getOverflowJob(workOrderReference);
       if (!payload) {
@@ -465,7 +461,6 @@ const server = createServer(async (request, response) => {
   );
   if (method === "GET" && overflowJobBidsMatch) {
     try {
-      await ensureOverflowDemoData();
       const workOrderReference = decodeURIComponent(overflowJobBidsMatch[1]!);
       const payload = await getWorkOrderBids(workOrderReference);
       sendJson(response, 200, payload);
@@ -480,7 +475,6 @@ const server = createServer(async (request, response) => {
 
   if (method === "POST" && overflowJobBidsMatch) {
     try {
-      await ensureOverflowDemoData();
       const workOrderReference = decodeURIComponent(overflowJobBidsMatch[1]!);
       const body = (await readJson(request)) as {
         contractorName?: string;
@@ -521,7 +515,7 @@ const server = createServer(async (request, response) => {
     try {
       const payload = intakeSchema.parse(await readJson(request));
       const token = request.headers["x-homefix-demo-session"];
-      const session = demoMode && typeof token === "string" ? await getDemoSession(token) : null;
+      const session = typeof token === "string" ? await getDemoSession(token) : null;
       if (typeof token === "string" && !session) {
         sendJson(response, 401, { error: "Demo session is invalid" });
         return;

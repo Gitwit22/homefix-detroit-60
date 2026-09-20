@@ -6,7 +6,7 @@ export type DemoSession = {
 const storageKey = "homefix:demoSession";
 
 export function getStoredDemoSession(): DemoSession | null {
-  const value = sessionStorage.getItem(storageKey);
+  const value = localStorage.getItem(storageKey);
   if (!value) return null;
   try {
     const session = JSON.parse(value) as Partial<DemoSession>;
@@ -14,15 +14,15 @@ export function getStoredDemoSession(): DemoSession | null {
       ? { token: session.token, displayName: session.displayName }
       : null;
   } catch {
-    sessionStorage.removeItem(storageKey);
+    localStorage.removeItem(storageKey);
     return null;
   }
 }
 
 export function storeDemoSession(session: DemoSession) {
-  sessionStorage.setItem(storageKey, JSON.stringify(session));
+  localStorage.setItem(storageKey, JSON.stringify(session));
 }
 
 export function clearDemoSession() {
-  sessionStorage.removeItem(storageKey);
+  localStorage.removeItem(storageKey);
 }

@@ -59,6 +59,7 @@ const programByRepairType: Record<RepairType, string[]> = {
   structural: ["critical-home-repair"],
   lead_environmental: ["leadsafe"],
   windows_doors: ["weatherization"],
+  other: ["critical-home-repair"],
 };
 
 function matchWeights(repairType: RepairType): Array<{ value: MatchStatus; weight: number }> {
@@ -115,6 +116,7 @@ export function generateSyntheticPartnerDataset(
       const fact: SyntheticRepairFact = {
         homeId: `HOME-DEMO-${paddedHome}`,
         caseId,
+        caseNumber: caseId,
         repairNeedId: `NEED-DEMO-${String(repairNeedNumber).padStart(4, "0")}`,
         propertyLabel: `Property ${paddedHome}`,
         zipCode,
@@ -135,6 +137,7 @@ export function generateSyntheticPartnerDataset(
   const specialCaseFacts = facts.filter((fact) => fact.homeId === "HOME-DEMO-0001");
   for (const fact of specialCaseFacts) {
     fact.caseId = "HF-313-0842";
+    fact.caseNumber = "HF-313-0842";
     fact.propertyLabel = "123 Main Street";
     fact.zipCode = "48205";
     fact.createdAt = PARTNER_DEMO_GENERATED_AT;

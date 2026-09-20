@@ -89,7 +89,7 @@ export function useAccessibilitySettings() {
 export function DemoFlag() {
   return (
     <span className="demo-flag">
-      <CircleDot aria-hidden="true" /> Synthetic Demo Data
+      <CircleDot aria-hidden="true" /> Buildathon Preview
     </span>
   );
 }
@@ -189,7 +189,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <main className="partner-main">{children}</main>
           </div>
         ) : (
-          <main>{children}</main>
+          <main className="pb-40 lg:pb-0">{children}</main>
         )}
         {!partner ? (
           <nav className="mobile-nav" aria-label="Resident mobile navigation">

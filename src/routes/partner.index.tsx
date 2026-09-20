@@ -24,13 +24,12 @@ export const Route = createFileRoute("/partner/")({
       { title: "Partner Intelligence — HomeFix 313" },
       {
         name: "description",
-        content:
-          "Synthetic Detroit repair demand, program capacity, and unmet-needs planning data.",
+        content: "Detroit repair demand, program capacity, and unmet-needs planning data.",
       },
       { property: "og:title", content: "Partner Intelligence — HomeFix 313" },
       {
         property: "og:description",
-        content: "A civic operations view of synthetic Detroit home repair demand.",
+        content: "A civic operations view of submitted Detroit home repair demand.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -53,7 +52,7 @@ function PartnerDashboard() {
       <PageIntro
         eyebrow="HomeFix Partner Intelligence"
         title="Detroit Repair Demand"
-        description="A synthetic planning dataset showing repair demand, possible program coverage, and where help is missing."
+        description="Submitted repair assessments showing demand, possible program coverage, and where help is missing."
       />
       <section className="grid grid-cols-2 gap-y-8 border-b border-foreground py-8 sm:grid-cols-3 xl:grid-cols-6">
         <Link to="/partner/cases" className="block">

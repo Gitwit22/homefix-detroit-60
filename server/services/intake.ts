@@ -110,7 +110,7 @@ export async function createIntakeCase(
             homeId,
             caseNumber,
             demoScenario: payload.demoScenario ?? null,
-            demoSessionId: payload.demoScenario ? (options.demoSessionId ?? null) : null,
+            demoSessionId: options.demoSessionId ?? null,
             status: "assessment_started",
             currentStep: "intake",
             nextAction: "Preliminary review pending",

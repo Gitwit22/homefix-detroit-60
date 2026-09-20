@@ -11,7 +11,7 @@ import {
   RepairCategoryGrid,
 } from "@/components/homefix";
 import { submitIntakeServer } from "@/lib/intake.server";
-import { processCase, uploadRepairPhotos } from "@/lib/homefix-api";
+import { uploadRepairPhotos } from "@/lib/homefix-api";
 import { lastCaseStorageKey } from "@/lib/resident-case";
 
 export const Route = createFileRoute("/intake")({
@@ -314,23 +314,25 @@ function IntakePage() {
         localStorage.setItem(lastCaseStorageKey, response.caseId);
       }
 
-      for (const repair of response.repairs) {
-        const draft = repairs.find((item) => item.clientId === repair.clientId);
-        if (
-          draft &&
-          draft.files.length > 0 &&
-          !uploadedRepairIds.current.has(repair.repairNeedId)
-        ) {
-          await uploadRepairPhotos(repair.repairNeedId, draft.files);
-          uploadedRepairIds.current.add(repair.repairNeedId);
+      try {
+        for (const repair of response.repairs) {
+          const draft = repairs.find((item) => item.clientId === repair.clientId);
+          if (
+            draft &&
+            draft.files.length > 0 &&
+            !uploadedRepairIds.current.has(repair.repairNeedId)
+          ) {
+            await uploadRepairPhotos(repair.repairNeedId, draft.files);
+            uploadedRepairIds.current.add(repair.repairNeedId);
+          }
         }
+      } catch (uploadError) {
+        console.error("Case saved, but repair photos could not be uploaded.", uploadError);
       }
-
-      await processCase(response.caseId);
 
       navigate({
         to: "/assessment",
-        search: { caseId: response.caseId, repairNeedId: response.repairNeedId },
+        search: { caseId: response.caseId, repairNeedId: response.repairNeedId, process: "1" },
       });
     } catch (error) {
       console.error(error);

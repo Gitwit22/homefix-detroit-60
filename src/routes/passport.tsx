@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Check, FileText } from "lucide-react";
+import { DemoSessionPanel } from "@/components/demo-session-panel";
 import { DemoFlag, PriorityBadge, SectionLabel, StatusBadge } from "@/components/homefix";
 import { ResidentCaseRequired } from "@/components/resident-case-required";
 import { getCase } from "@/lib/homefix-api";
@@ -33,6 +34,7 @@ function PassportPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [payload, setPayload] = useState<Awaited<ReturnType<typeof getCase>> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [claimVersion, setClaimVersion] = useState(0);
 
   useEffect(() => {
     if (!caseId) {
@@ -219,6 +221,9 @@ function PassportPage() {
             </Link>
           </div>
         </footer>
+      </div>
+      <div className="mt-8">
+        <DemoSessionPanel caseId={caseId} onClaimed={() => setClaimVersion((value) => value + 1)} />
       </div>
     </div>
   );

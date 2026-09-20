@@ -7,6 +7,7 @@ export const repairTypes = [
   "structural",
   "lead_environmental",
   "windows_doors",
+  "other",
 ] as const;
 
 export type RepairType = (typeof repairTypes)[number];
@@ -32,6 +33,7 @@ export const repairTypeLabels: Record<RepairType, string> = {
   structural: "Structural",
   lead_environmental: "Lead / Environmental",
   windows_doors: "Windows / Doors",
+  other: "Other",
 };
 
 export const priorityLabels: Record<Priority, string> = {
@@ -71,9 +73,10 @@ export const capacityStatusLabels: Record<CapacityStatus, string> = {
   closed: "Closed",
 };
 
-export type SyntheticRepairFact = {
+export type PartnerRepairFact = {
   homeId: string;
   caseId: string;
+  caseNumber: string;
   repairNeedId: string;
   propertyLabel: string;
   zipCode: string;
@@ -84,16 +87,20 @@ export type SyntheticRepairFact = {
   caseStatus: CaseStatus;
   programId?: string;
   createdAt: string;
-  synthetic: true;
+  synthetic: boolean;
 };
 
-export type SyntheticProgramCapacity = {
+export type SyntheticRepairFact = PartnerRepairFact & { synthetic: true };
+
+export type ProgramCapacityModel = {
   programId: string;
   name: string;
   status: CapacityStatus;
   simulatedCapacity: number;
-  synthetic: true;
+  synthetic: boolean;
 };
+
+export type SyntheticProgramCapacity = ProgramCapacityModel & { synthetic: true };
 
 export type RepairTypeMetric = {
   repairType: RepairType;
@@ -177,7 +184,7 @@ export type PartnerCaseDetail = PartnerCaseSummary & {
   };
 };
 
-export type ProgramCapacityMetric = SyntheticProgramCapacity & {
+export type ProgramCapacityMetric = ProgramCapacityModel & {
   matchedNeeds: number;
   excessDemand: number;
 };
@@ -185,7 +192,7 @@ export type ProgramCapacityMetric = SyntheticProgramCapacity & {
 export type PartnerAnalytics = {
   generatedAt: string;
   seed: number;
-  synthetic: true;
+  synthetic: boolean;
   totals: {
     homes: number;
     repairNeeds: number;

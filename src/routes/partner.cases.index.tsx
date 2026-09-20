@@ -17,7 +17,7 @@ export const Route = createFileRoute("/partner/cases/")({
       { title: "Repair Cases — HomeFix 313" },
       {
         name: "description",
-        content: "Review synthetic HomeFix repair cases and current next actions.",
+        content: "Review submitted HomeFix repair cases and current next actions.",
       },
       { property: "og:title", content: "Repair Cases — HomeFix 313" },
       { property: "og:description", content: "Partner repair-case operations view." },
@@ -91,7 +91,7 @@ function Cases() {
       <PageIntro
         eyebrow="Case operations"
         title="Repair Cases"
-        description={`${filteredCases.length} of ${analytics.cases.length} synthetic homes match the active filters.`}
+        description={`${filteredCases.length} of ${analytics.cases.length} submitted homes match the active filters.`}
       />
       <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <input
@@ -159,7 +159,11 @@ function Cases() {
       <div className="mt-8">
         {filteredCases.length === 0 ? (
           <div className="border border-dashed border-border p-6 text-sm">
-            <p>No repair cases match these filters.</p>
+            <p>
+              {analytics.cases.length === 0
+                ? "No repair assessments have been submitted yet."
+                : "No repair cases match these filters."}
+            </p>
             <button type="button" className="mt-3 font-bold text-primary" onClick={clearFilters}>
               Clear Filters
             </button>

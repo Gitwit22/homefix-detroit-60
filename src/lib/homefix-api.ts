@@ -276,6 +276,17 @@ export type OverflowWorkOrder = {
 };
 
 const apiUrl = import.meta.env["VITE_HOMEFIX_API_URL"]?.replace(/\/$/, "");
+const requestTimeoutMs = 30_000;
+
+async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), requestTimeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
 
 export type DemoSessionCase = {
   caseId: string;
@@ -291,7 +302,7 @@ export async function submitIntake(payload: IntakePayload): Promise<IntakeRespon
   }
 
   const demoSession = getStoredDemoSession();
-  const response = await fetch(`${apiUrl}/api/v1/intakes`, {
+  const response = await fetchWithTimeout(`${apiUrl}/api/v1/intakes`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -307,15 +318,26 @@ export async function submitIntake(payload: IntakePayload): Promise<IntakeRespon
   return response.json() as Promise<IntakeResponse>;
 }
 
-export async function openDemoSession(displayName: string): Promise<DemoSession> {
+export async function openDemoSession(displayName: string, pin: string): Promise<DemoSession> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetch(`${apiUrl}/api/v1/demo-sessions`, {
+  const response = await fetchWithTimeout(`${apiUrl}/api/v1/demo-sessions`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ displayName }),
+    body: JSON.stringify({ displayName, pin }),
+  });
+  if (!response.ok) throw new Error(response.status === 401 ? "INVALID_SESSION_CREDENTIALS" : `HomeFix API returned ${response.status}`);
+  return response.json() as Promise<DemoSession>;
+}
+
+export async function claimDemoSessionCase(token: string, caseId: string) {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await fetchWithTimeout(`${apiUrl}/api/v1/demo-session/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-homefix-demo-session": token },
+    body: JSON.stringify({ caseId }),
   });
   if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
-  return response.json() as Promise<DemoSession>;
+  return response.json() as Promise<{ caseId: string; claimed: true }>;
 }
 
 export async function getDemoSessionCases(token: string): Promise<DemoSessionCase[]> {
@@ -346,7 +368,7 @@ export async function getCase(caseId: string): Promise<CaseAggregateResponse> {
 
 export async function processRepair(repairNeedId: string) {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetch(`${apiUrl}/api/v1/repairs/${repairNeedId}/process`, {
+  const response = await fetchWithTimeout(`${apiUrl}/api/v1/repairs/${repairNeedId}/process`, {
     method: "POST",
   });
   if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
@@ -361,7 +383,7 @@ export async function uploadRepairPhotos(repairNeedId: string, files: File[]) {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
   const body = new FormData();
   files.forEach((file) => body.append("photos", file));
-  const response = await fetch(`${apiUrl}/api/v1/repairs/${repairNeedId}/photos`, {
+  const response = await fetchWithTimeout(`${apiUrl}/api/v1/repairs/${repairNeedId}/photos`, {
     method: "POST",
     body,
   });
@@ -371,7 +393,9 @@ export async function uploadRepairPhotos(repairNeedId: string, files: File[]) {
 
 export async function processCase(caseId: string) {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
-  const response = await fetch(`${apiUrl}/api/v1/cases/${caseId}/process`, { method: "POST" });
+  const response = await fetchWithTimeout(`${apiUrl}/api/v1/cases/${caseId}/process`, {
+    method: "POST",
+  });
   if (!response.ok) throw new Error(`HomeFix API returned ${response.status}`);
   return response.json() as Promise<{ caseId: string; coverage: CoveragePlanResponse }>;
 }

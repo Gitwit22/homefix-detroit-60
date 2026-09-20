@@ -29,9 +29,9 @@ export const Route = createFileRoute("/partner/cases/$caseId")({
   head: ({ params }) => ({
     meta: [
       { title: `Case ${params.caseId} — HomeFix 313` },
-      { name: "description", content: "Synthetic partner case details and repair workflow." },
+      { name: "description", content: "Partner case details and repair workflow." },
       { property: "og:title", content: `Repair Case ${params.caseId} — HomeFix 313` },
-      { property: "og:description", content: "A synthetic HomeFix partner case dossier." },
+      { property: "og:description", content: "A HomeFix partner case dossier." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -102,7 +102,7 @@ function CaseDetail() {
       <PageIntro
         eyebrow={`Repair case ${item.caseId}`}
         title={item.propertyLabel}
-        description={`${item.zipCode} · Synthetic demonstration property`}
+        description={`${item.zipCode} · Submitted repair assessment`}
         action={<PriorityBadge priority={priorityLabels[item.priority]} />}
       />
       <div className="mt-8 grid gap-10 xl:grid-cols-[1fr_360px]">
@@ -176,7 +176,7 @@ function CaseDetail() {
               </dl>
               <p className="mt-4 text-sm text-muted-foreground">
                 {item.overflow?.explanation ??
-                  "Overflow creation is available only for configured demo cases with approved funding and full program capacity."}
+                  "No overflow pathway is configured for this repair case."}
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 {createdJob ? (
@@ -216,7 +216,7 @@ function CaseDetail() {
             <ol className="mt-5 divide-y divide-border border-y border-border">
               <li className="grid grid-cols-[130px_1fr] py-4 text-sm">
                 <b>{reportedDate}</b>
-                <span>Repair needs entered into the synthetic planning dataset</span>
+                <span>Repair assessment submitted to HomeFix</span>
               </li>
               {createdJob && (
                 <li className="grid grid-cols-[130px_1fr] py-4 text-sm">
@@ -236,7 +236,7 @@ function CaseDetail() {
             <p className="eyebrow text-warning">Current next action</p>
             <h2 className="mt-3 text-3xl">{nextAction}</h2>
             <p className="mt-3 text-sm text-primary-foreground/65">
-              Planning guidance generated from synthetic case status and coverage.
+              Planning guidance based on the current case status and resource matches.
             </p>
           </div>
           {item.coverageStatus !== "potentially_covered" && (
@@ -270,10 +270,10 @@ function CaseLoadError({
       <DemoFlag />
       <PageIntro
         eyebrow="Case unavailable"
-        title={missingCase ? "Synthetic case not found" : "Partner data could not be loaded."}
+        title={missingCase ? "Repair case not found" : "Partner data could not be loaded."}
         description={
           missingCase
-            ? "This case is not part of the current deterministic demonstration dataset."
+            ? "This case may have been removed or is no longer available."
             : "Try loading this case again, or return to repair cases."
         }
       />

@@ -10,8 +10,8 @@ import {
   type Priority,
   type ProgramCapacityMetric,
   type RepairTypeMetric,
-  type SyntheticProgramCapacity,
-  type SyntheticRepairFact,
+  type PartnerRepairFact,
+  type ProgramCapacityModel,
   type UnmetNeedMetric,
   type ZipMetric,
 } from "../domain/partnerAnalytics.js";
@@ -34,11 +34,11 @@ function percentage(numerator: number, denominator: number): number {
   return denominator === 0 ? 0 : Math.round((numerator / denominator) * 100);
 }
 
-function isHighPriority(fact: SyntheticRepairFact): boolean {
+function isHighPriority(fact: PartnerRepairFact): boolean {
   return fact.priority === "high" || fact.priority === "critical";
 }
 
-function metricForFacts(facts: SyntheticRepairFact[]) {
+function metricForFacts(facts: PartnerRepairFact[]) {
   const potentiallyCovered = facts.filter(
     (fact) => fact.matchStatus === "strong_match" || fact.matchStatus === "potential_match",
   ).length;
@@ -56,11 +56,11 @@ function metricForFacts(facts: SyntheticRepairFact[]) {
   };
 }
 
-function buildCases(facts: SyntheticRepairFact[]): {
+function buildCases(facts: PartnerRepairFact[]): {
   summaries: PartnerCaseSummary[];
   details: PartnerCaseDetail[];
 } {
-  const grouped = new Map<string, SyntheticRepairFact[]>();
+  const grouped = new Map<string, PartnerRepairFact[]>();
   for (const fact of facts) grouped.set(fact.caseId, [...(grouped.get(fact.caseId) ?? []), fact]);
 
   const details = [...grouped.values()]
@@ -86,7 +86,7 @@ function buildCases(facts: SyntheticRepairFact[]): {
       ];
       return {
         caseId: first.caseId,
-        caseNumber: first.caseId,
+        caseNumber: first.caseNumber,
         homeId: first.homeId,
         propertyLabel: first.propertyLabel,
         zipCode: first.zipCode,
@@ -131,8 +131,8 @@ function highPrioritySort(left: HighPriorityCase, right: HighPriorityCase): numb
 }
 
 export function calculatePartnerAnalytics(
-  facts: SyntheticRepairFact[],
-  capacities: SyntheticProgramCapacity[],
+  facts: PartnerRepairFact[],
+  capacities: ProgramCapacityModel[],
   seed: number,
   generatedAt: string,
 ): PartnerAnalytics {
@@ -220,7 +220,7 @@ export function calculatePartnerAnalytics(
   return {
     generatedAt,
     seed,
-    synthetic: true,
+    synthetic: facts.every((fact) => fact.synthetic),
     totals: {
       homes: new Set(facts.map((fact) => fact.homeId)).size,
       repairNeeds: facts.length,
@@ -243,7 +243,7 @@ export function calculatePartnerAnalytics(
 }
 
 export function getPartnerCaseDetail(
-  facts: SyntheticRepairFact[],
+  facts: PartnerRepairFact[],
   caseId: string,
 ): PartnerCaseDetail | undefined {
   return buildCases(facts).details.find((item) => item.caseId === caseId);

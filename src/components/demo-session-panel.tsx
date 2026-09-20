@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
+  claimDemoSessionCase,
   getDemoSessionCases,
   openDemoSession,
   wipeDemoSessionData,
@@ -30,9 +31,18 @@ import { lastCaseStorageKey } from "@/lib/resident-case";
 
 const demoDraftKey = "homefix:denise-carter-pitch-v1:draft";
 
-export function DemoSessionPanel({ onReset }: { onReset: () => void }) {
+export function DemoSessionPanel({
+  onReset,
+  caseId,
+  onClaimed,
+}: {
+  onReset?: () => void;
+  caseId?: string;
+  onClaimed?: () => void;
+}) {
   const [session, setSession] = useState<DemoSession | null>(() => getStoredDemoSession());
   const [displayName, setDisplayName] = useState("");
+  const [pin, setPin] = useState("");
   const [cases, setCases] = useState<DemoSessionCase[]>([]);
   const [error, setError] = useState("");
   const [isWorking, setIsWorking] = useState(false);
@@ -52,20 +62,29 @@ export function DemoSessionPanel({ onReset }: { onReset: () => void }) {
 
   const signIn = async (event: FormEvent) => {
     event.preventDefault();
-    if (!displayName.trim()) {
-      setError("Enter a display name to continue.");
+    if (!displayName.trim() || !/^\d{4}$/.test(pin)) {
+      setError("Enter a display name and four-digit PIN.");
       return;
     }
     setIsWorking(true);
     setError("");
     try {
-      const nextSession = await openDemoSession(displayName);
+      const nextSession = await openDemoSession(displayName, pin);
       storeDemoSession(nextSession);
       setSession(nextSession);
+      if (caseId) {
+        await claimDemoSessionCase(nextSession.token, caseId);
+        onClaimed?.();
+      }
       setDisplayName("");
+      setPin("");
     } catch (signInError) {
       console.error(signInError);
-      setError("The demo session could not be opened.");
+      setError(
+        signInError instanceof Error && signInError.message === "INVALID_SESSION_CREDENTIALS"
+          ? "Display name or PIN is incorrect."
+          : "Your Passport session could not be opened.",
+      );
     } finally {
       setIsWorking(false);
     }
@@ -86,13 +105,27 @@ export function DemoSessionPanel({ onReset }: { onReset: () => void }) {
       await wipeDemoSessionData(session.token);
       localStorage.removeItem(lastCaseStorageKey);
       localStorage.removeItem(demoDraftKey);
-      clearDemoSession();
-      setSession(null);
       setCases([]);
-      onReset();
+      onReset?.();
     } catch (wipeError) {
       console.error(wipeError);
-      setError("Demo data could not be wiped. Nothing was removed from the case database.");
+      setError("Your saved data could not be deleted. Nothing was removed.");
+    } finally {
+      setIsWorking(false);
+    }
+  };
+
+  const claim = async () => {
+    if (!session || !caseId) return;
+    setIsWorking(true);
+    setError("");
+    try {
+      await claimDemoSessionCase(session.token, caseId);
+      await loadCases(session);
+      onClaimed?.();
+    } catch (claimError) {
+      console.error(claimError);
+      setError("This Repair Passport could not be saved to your session.");
     } finally {
       setIsWorking(false);
     }
@@ -102,21 +135,19 @@ export function DemoSessionPanel({ onReset }: { onReset: () => void }) {
     <section className="border-b border-foreground bg-secondary/40">
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_auto] lg:items-center lg:px-10">
         <div>
-          <p className="eyebrow">Live demo session</p>
+          <p className="eyebrow">Repair Passport access</p>
           {session ? (
             <>
               <h2 className="mt-2 text-3xl">Welcome, {session.displayName}</h2>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                Cases created during this browser session can be resumed here. This demo name is not
-                a secure account.
+                Your saved Repair Passports can be resumed on this device or another browser.
               </p>
             </>
           ) : (
             <>
-              <h2 className="mt-2 text-3xl">Save this walkthrough for the session</h2>
+              <h2 className="mt-2 text-3xl">Save and return to your Repair Passport</h2>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                Signing in is optional. A display name groups demo cases so you can resume or wipe
-                them before the next presentation.
+                Create or open a buildathon session with a display name and four-digit PIN.
               </p>
             </>
           )}
@@ -141,12 +172,31 @@ export function DemoSessionPanel({ onReset }: { onReset: () => void }) {
               maxLength={80}
               disabled={isWorking}
             />
+            <label className="sr-only" htmlFor="passport-pin">
+              Four-digit PIN
+            </label>
+            <input
+              id="passport-pin"
+              className="min-h-11 w-36 border border-input bg-background px-3"
+              value={pin}
+              onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
+              placeholder="4-digit PIN"
+              inputMode="numeric"
+              autoComplete="current-password"
+              pattern="[0-9]{4}"
+              disabled={isWorking}
+            />
             <Button type="submit" className="min-h-11 rounded-none" disabled={isWorking}>
-              <LogIn /> {isWorking ? "Opening..." : "Start Session"}
+              <LogIn /> {isWorking ? "Opening..." : caseId ? "Save My Passport" : "Create or Sign In"}
             </Button>
           </form>
         ) : (
           <div className="flex flex-wrap gap-2 lg:justify-end">
+            {caseId && !cases.some((item) => item.caseId === caseId) && (
+              <Button className="rounded-none" onClick={() => void claim()} disabled={isWorking}>
+                {isWorking ? "Saving..." : "Save My Passport"}
+              </Button>
+            )}
             <Button
               variant="outline"
               className="rounded-none"
@@ -158,15 +208,15 @@ export function DemoSessionPanel({ onReset }: { onReset: () => void }) {
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" className="rounded-none" disabled={isWorking}>
-                  <RotateCcw /> Wipe My Demo Data
+                  <RotateCcw /> Delete My Saved Data
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent className="rounded-none">
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Wipe your resident demo data?</AlertDialogTitle>
+                  <AlertDialogTitle>Delete your saved Repair Passports?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This permanently removes your Denise demo cases and uploaded repair photos.
-                    Partner analytics, programs, and overflow demo data will remain available.
+                    This permanently removes every customer case, photo, assessment, and workflow
+                    record saved to this session. The shared program catalog will remain.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -175,7 +225,7 @@ export function DemoSessionPanel({ onReset }: { onReset: () => void }) {
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     onClick={() => void wipe()}
                   >
-                    Wipe Demo Data
+                    Delete Saved Data
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

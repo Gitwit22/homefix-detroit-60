@@ -199,7 +199,7 @@ function Programs() {
                       <div className="text-sm">
                         {capacity ? (
                           <>
-                            <p className="eyebrow">Synthetic capacity model</p>
+                            <p className="eyebrow">Modeled capacity assumption</p>
                             <p className="mt-2">
                               {capacityStatusLabels[capacity.status]}: {capacity.matchedNeeds} needs
                               / {capacity.simulatedCapacity} capacity
@@ -209,7 +209,7 @@ function Programs() {
                             </p>
                           </>
                         ) : (
-                          <p className="text-muted-foreground">No synthetic capacity model</p>
+                          <p className="text-muted-foreground">No capacity assumption available</p>
                         )}
                       </div>
                       <Link

@@ -77,10 +77,15 @@ test("fallback triage remains conservative and honors resident safety answers", 
   assert.ok(result.followUpQuestions.some((question) => question.includes("breaker")));
 });
 
-test("demo sessions require a concise non-empty display name", () => {
-  assert.equal(demoSessionSchema.safeParse({ displayName: "  Denise  " }).success, true);
-  assert.equal(demoSessionSchema.safeParse({ displayName: "   " }).success, false);
-  assert.equal(demoSessionSchema.safeParse({ displayName: "D".repeat(81) }).success, false);
+test("demo sessions require a concise display name and four-digit PIN", () => {
+  assert.equal(demoSessionSchema.safeParse({ displayName: "  Denise  ", pin: "3130" }).success, true);
+  assert.equal(demoSessionSchema.safeParse({ displayName: "   ", pin: "3130" }).success, false);
+  assert.equal(
+    demoSessionSchema.safeParse({ displayName: "D".repeat(81), pin: "3130" }).success,
+    false,
+  );
+  assert.equal(demoSessionSchema.safeParse({ displayName: "Denise", pin: "313" }).success, false);
+  assert.equal(demoSessionSchema.safeParse({ displayName: "Denise", pin: "31A0" }).success, false);
 });
 
 test("managed program catalog has stable unique records and complete matching data", () => {

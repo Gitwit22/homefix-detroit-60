@@ -25,6 +25,7 @@ export const demoSessions = pgTable("demo_sessions", {
   id: uuid("id").defaultRandom().primaryKey(),
   displayName: text("display_name").notNull(),
   normalizedName: text("normalized_name").unique().notNull(),
+  pinHash: text("pin_hash"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

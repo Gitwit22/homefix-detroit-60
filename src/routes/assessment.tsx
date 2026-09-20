@@ -41,6 +41,7 @@ function AssessmentPage() {
   const { caseId, repairNeedId, process } = Route.useSearch();
   const navigate = useNavigate({ from: "/assessment" });
   const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<Awaited<ReturnType<typeof getCase>> | null>(null);
 
@@ -57,14 +58,24 @@ function AssessmentPage() {
       setIsLoading(true);
       setError(null);
       try {
-        if (repairNeedId && process === "1") {
-          await runTriageServer(repairNeedId);
-        }
         const result = await getCase(caseId);
-        if (!cancelled) setPayload(result);
+        if (!cancelled) {
+          setPayload(result);
+          setIsLoading(false);
+        }
         if (repairNeedId && process === "1") {
-          if (!cancelled) {
-            navigate({ to: "/assessment", replace: true, search: { caseId, repairNeedId } });
+          setIsProcessing(true);
+          try {
+            await runTriageServer(repairNeedId);
+            const refreshed = await getCase(caseId);
+            if (!cancelled) setPayload(refreshed);
+          } catch (processingError) {
+            console.error(processingError);
+          } finally {
+            if (!cancelled) {
+              setIsProcessing(false);
+              navigate({ to: "/assessment", replace: true, search: { caseId, repairNeedId } });
+            }
           }
         }
       } catch (err) {
@@ -119,6 +130,11 @@ function AssessmentPage() {
         <p className="mt-4 max-w-2xl text-muted-foreground">
           {assessment?.summary ?? repairNeed.description}
         </p>
+        {isProcessing && (
+          <p className="mt-4 text-sm font-semibold text-primary" role="status">
+            Your case is saved. HomeFix is finishing the preliminary analysis...
+          </p>
+        )}
       </header>
       {payload.repairNeeds.length > 1 && (
         <nav

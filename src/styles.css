@@ -503,10 +503,10 @@
     @apply text-warning;
   }
   .guide-toggle {
-    @apply fixed bottom-24 right-4 z-50 min-h-12 border border-foreground bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-lg lg:bottom-6;
+    @apply fixed bottom-28 right-4 z-50 hidden min-h-12 border border-foreground bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-lg lg:bottom-6 lg:block;
   }
   .guide-panel {
-    @apply fixed bottom-40 right-4 z-50 w-[min(94vw,380px)] border border-foreground bg-paper p-4 shadow-2xl lg:bottom-24;
+    @apply fixed bottom-44 right-4 z-50 w-[min(94vw,380px)] border border-foreground bg-paper p-4 shadow-2xl lg:bottom-24;
   }
   .guide-header {
     @apply flex items-center justify-between gap-4 text-base;

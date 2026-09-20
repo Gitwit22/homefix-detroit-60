@@ -20,12 +20,12 @@ export const Route = createFileRoute("/partner/analytics")({
       { title: "Repair Analytics — HomeFix 313" },
       {
         name: "description",
-        content: "Synthetic trends across Detroit home repair needs and program pathways.",
+        content: "Trends across submitted Detroit home repair needs and program pathways.",
       },
       { property: "og:title", content: "Repair Analytics — HomeFix 313" },
       {
         property: "og:description",
-        content: "Planning trends from the HomeFix 313 synthetic dataset.",
+        content: "Planning trends from HomeFix 313 repair assessments.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -130,7 +130,7 @@ function Analytics() {
       <PageIntro
         eyebrow="Planning trends"
         title="Repair Analytics"
-        description="Directional patterns from synthetic demo records. Not intended for operational decision-making."
+        description="Directional patterns from submitted repair assessments. Program capacity remains a planning estimate."
       />
       <div className="mt-6 grid gap-3 md:grid-cols-3">
         <select

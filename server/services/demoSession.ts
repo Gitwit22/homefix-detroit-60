@@ -1,4 +1,6 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
+import { desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "../db/index.js";
@@ -10,24 +12,54 @@ import {
   repairPhotos,
   residents,
 } from "../db/schema.js";
-import { DENISE_DEMO_SCENARIO } from "../demo/deniseScenario.js";
 import { deleteRepairPhotoObject } from "./photos.js";
+
+const scrypt = promisify(scryptCallback);
 
 export const demoSessionSchema = z.object({
   displayName: z.string().trim().min(1).max(80),
+  pin: z.string().regex(/^\d{4}$/),
 });
 
-export async function openDemoSession(displayName: string) {
+export const claimCaseSchema = z.object({ caseId: z.string().uuid() });
+
+async function hashPin(pin: string) {
+  const salt = randomBytes(16).toString("hex");
+  const hash = (await scrypt(pin, salt, 32)) as Buffer;
+  return `${salt}:${hash.toString("hex")}`;
+}
+
+async function verifyPin(pin: string, storedHash: string) {
+  const [salt, expectedHex] = storedHash.split(":");
+  if (!salt || !expectedHex) return false;
+  const expected = Buffer.from(expectedHex, "hex");
+  const actual = (await scrypt(pin, salt, expected.length)) as Buffer;
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
+export async function openDemoSession(displayName: string, pin: string) {
   const normalizedName = displayName.trim().toLocaleLowerCase("en-US");
+  const existingRows = await db
+    .select()
+    .from(demoSessions)
+    .where(eq(demoSessions.normalizedName, normalizedName))
+    .limit(1);
+  const existing = existingRows[0];
+  if (existing) {
+    if (!existing.pinHash || !(await verifyPin(pin, existing.pinHash))) {
+      throw new Error("INVALID_SESSION_CREDENTIALS");
+    }
+    await db
+      .update(demoSessions)
+      .set({ displayName: displayName.trim(), updatedAt: new Date() })
+      .where(eq(demoSessions.id, existing.id));
+    return { token: existing.id, displayName: displayName.trim() };
+  }
+
   const rows = await db
     .insert(demoSessions)
-    .values({ displayName: displayName.trim(), normalizedName })
-    .onConflictDoUpdate({
-      target: demoSessions.normalizedName,
-      set: { displayName: displayName.trim(), updatedAt: new Date() },
-    })
+    .values({ displayName: displayName.trim(), normalizedName, pinHash: await hashPin(pin) })
     .returning({ id: demoSessions.id, displayName: demoSessions.displayName });
-
   const session = rows[0];
   if (!session) throw new Error("Demo session could not be opened");
   return { token: session.id, displayName: session.displayName };
@@ -54,13 +86,28 @@ export async function listDemoSessionCases(sessionId: string) {
     })
     .from(repairCases)
     .innerJoin(homes, eq(homes.id, repairCases.homeId))
-    .where(
-      and(
-        eq(repairCases.demoSessionId, sessionId),
-        eq(repairCases.demoScenario, DENISE_DEMO_SCENARIO),
-      ),
-    )
+    .where(eq(repairCases.demoSessionId, sessionId))
     .orderBy(desc(repairCases.createdAt));
+}
+
+export async function claimDemoSessionCase(sessionId: string, caseId: string) {
+  const cases = await db
+    .select({ id: repairCases.id, demoSessionId: repairCases.demoSessionId })
+    .from(repairCases)
+    .where(eq(repairCases.id, caseId))
+    .limit(1);
+  const foundCase = cases[0];
+  if (!foundCase) throw new Error("CASE_NOT_FOUND");
+  if (foundCase.demoSessionId && foundCase.demoSessionId !== sessionId) {
+    throw new Error("CASE_ALREADY_CLAIMED");
+  }
+  if (!foundCase.demoSessionId) {
+    await db
+      .update(repairCases)
+      .set({ demoSessionId: sessionId, updatedAt: new Date() })
+      .where(eq(repairCases.id, caseId));
+  }
+  return { caseId, claimed: true as const };
 }
 
 export async function wipeDemoSessionData(sessionId: string) {
@@ -72,12 +119,7 @@ export async function wipeDemoSessionData(sessionId: string) {
     })
     .from(repairCases)
     .innerJoin(homes, eq(homes.id, repairCases.homeId))
-    .where(
-      and(
-        eq(repairCases.demoSessionId, sessionId),
-        eq(repairCases.demoScenario, DENISE_DEMO_SCENARIO),
-      ),
-    );
+    .where(eq(repairCases.demoSessionId, sessionId));
 
   if (ownedCases.length === 0) return { deletedCases: 0, deletedPhotos: 0 };
 

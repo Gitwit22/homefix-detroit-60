@@ -10,7 +10,7 @@ export const Route = createFileRoute("/partner/unmet-needs")({
       { title: "Unmet Repair Needs — HomeFix 313" },
       {
         name: "description",
-        content: "Explore synthetic Detroit repair needs without identified assistance resources.",
+        content: "Explore submitted Detroit repair needs without identified assistance resources.",
       },
       { property: "og:title", content: "Unmet Repair Needs — HomeFix 313" },
       { property: "og:description", content: "Planning intelligence for repair assistance gaps." },
@@ -43,7 +43,7 @@ function Unmet() {
       <PageIntro
         eyebrow="Planning intelligence"
         title="Where Help Is Missing"
-        description="Repair demand without a currently identified assistance resource. All records are synthetic."
+        description="Submitted repair demand without a currently identified assistance resource."
       />
       <div className="grid grid-cols-2 gap-y-6 border-b border-foreground py-8 sm:grid-cols-4">
         <Metric value={analytics.totals.unmatchedNeeds} label="Unmatched needs" accent />
@@ -110,8 +110,8 @@ function Unmet() {
             unmatched queue.
           </h2>
           <p className="mt-3 max-w-3xl text-sm text-primary-foreground/65">
-            This synthetic view helps partners explore where new funding, referral pathways, or
-            modeled program capacity may have the greatest effect.
+            This view helps partners explore where new funding, referral pathways, or modeled
+            program capacity may have the greatest effect.
           </p>
         </div>
       </section>
