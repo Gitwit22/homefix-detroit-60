@@ -1,6 +1,7 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { Volume2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { startGuideDemo } from "@/lib/homefix-guide";
 
 const guideStartEvent = "homefix-guide:start";
 const intakeGuideEvent = "homefix-guide:intake-step";
@@ -425,6 +426,16 @@ export function HomeFixGuide() {
 
     if (step.step === 1) {
       void navigate({ to: "/intake", search: { demo: "denise-carter-pitch-v1" } });
+      return;
+    }
+
+    const caseId = new URLSearchParams(window.location.search).get("caseId") ?? "";
+    if (step.step === 4 && caseId) {
+      void navigate({ to: "/passport", search: { caseId } });
+      return;
+    }
+    if (step.step === 5 && caseId) {
+      void navigate({ to: "/coverage", search: { caseId } });
     }
   };
 
@@ -434,6 +445,7 @@ export function HomeFixGuide() {
       ? activeResidentStep
       : null;
   const demoToggleLabel = partner ? "Tour Partner Intelligence" : "Need Help?";
+  const showPartnerTourOffer = partner && !partnerDemoActive;
 
   return (
     <>
@@ -442,12 +454,7 @@ export function HomeFixGuide() {
         className="guide-toggle"
         aria-expanded={open}
         aria-controls="homefix-guide-panel"
-        onClick={() => {
-          if (partner && !partnerDemoActive) {
-            setPartnerDemoActive(true);
-          }
-          setOpen((value) => !value);
-        }}
+        onClick={() => setOpen((value) => !value)}
       >
         {demoToggleLabel}
       </button>
@@ -469,7 +476,23 @@ export function HomeFixGuide() {
               <X aria-hidden="true" />
             </button>
           </div>
-          {demoStep ? (
+          {showPartnerTourOffer ? (
+            <>
+              <p className="guide-step-label">Partner View</p>
+              <h2 className="guide-demo-title">Tour Partner Intelligence</h2>
+              <p className="guide-subhead">
+                Take a short walkthrough of repair demand, cases, unmet needs, programs, and the
+                Overflow Network.
+              </p>
+              <button
+                type="button"
+                className="guide-demo-button"
+                onClick={() => startGuideDemo("partner")}
+              >
+                Start Tour
+              </button>
+            </>
+          ) : demoStep ? (
             <>
               <p className="guide-step-label">
                 Step {demoStep.step} of {demoStep.total}
@@ -511,6 +534,7 @@ export function HomeFixGuide() {
                         onClick={() => {
                           exitDemo();
                           void navigate({ to: "/partner" });
+                          window.setTimeout(() => startGuideDemo("partner"), 0);
                         }}
                       >
                         {demoStep.alternateActionLabel}
