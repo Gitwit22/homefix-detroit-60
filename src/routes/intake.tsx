@@ -231,8 +231,7 @@ function IntakePage() {
             startedWhen: repair.startedWhen,
             gettingWorse: repair.worse === "Yes",
             safeToOccupy: repair.safe !== "No",
-            urgency:
-              repair.safe === "No" ? "high" : repair.worse === "Yes" ? "high" : "moderate",
+            urgency: repair.safe === "No" ? "high" : repair.worse === "Yes" ? "high" : "moderate",
           })),
         }));
 
@@ -248,7 +247,11 @@ function IntakePage() {
 
       for (const repair of response.repairs) {
         const draft = repairs.find((item) => item.clientId === repair.clientId);
-        if (draft && draft.files.length > 0 && !uploadedRepairIds.current.has(repair.repairNeedId)) {
+        if (
+          draft &&
+          draft.files.length > 0 &&
+          !uploadedRepairIds.current.has(repair.repairNeedId)
+        ) {
           await uploadRepairPhotos(repair.repairNeedId, draft.files);
           uploadedRepairIds.current.add(repair.repairNeedId);
         }
@@ -301,6 +304,7 @@ function IntakePage() {
                 </FormField>
                 <FormField label="Detroit street address">
                   <input
+                    data-guide-target="intake-address"
                     value={streetAddress}
                     onChange={(event) => setStreetAddress(event.target.value)}
                   />
@@ -456,7 +460,9 @@ function IntakePage() {
                     type="button"
                     variant="outline"
                     className="min-h-12 rounded-none"
-                    onClick={() => setRepairs((current) => [...current, createRepairDraft(current.length)])}
+                    onClick={() =>
+                      setRepairs((current) => [...current, createRepairDraft(current.length)])
+                    }
                   >
                     <Plus /> Add another repair
                   </Button>
