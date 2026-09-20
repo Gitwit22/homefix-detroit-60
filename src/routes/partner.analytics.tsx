@@ -7,7 +7,14 @@ import { parsePartnerFilters } from "@/lib/partner-filters";
 import { repairTypeLabels } from "../../server/domain/partnerAnalytics";
 
 export const Route = createFileRoute("/partner/analytics")({
-  validateSearch: (search: Record<string, unknown>) => parsePartnerFilters(search),
+  validateSearch: (search: Record<string, unknown>) => {
+    const filters = parsePartnerFilters(search);
+    return {
+      zip: filters.zip,
+      repairType: filters.repairType,
+      priority: filters.priority,
+    };
+  },
   head: () => ({
     meta: [
       { title: "Repair Analytics — HomeFix 313" },
@@ -34,33 +41,43 @@ function Analytics() {
   const analytics = Route.useLoaderData();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const zipOptions = [...new Set(analytics.cases.map((item) => item.zipCode))].sort();
+  const repairTypeByLabel = Object.fromEntries(
+    Object.entries(repairTypeLabels).map(([repairType, label]) => [label.toLowerCase(), repairType]),
+  );
+  const casesWithTypes = analytics.cases.map((item) => ({
+    ...item,
+    repairTypes: [...new Set(item.repairLabels
+      .map((label) => repairTypeByLabel[label.toLowerCase()])
+      .filter((repairType): repairType is string => Boolean(repairType)))],
+  }));
+  const zipOptions = [...new Set(casesWithTypes.map((item) => item.zipCode))].sort();
   const repairTypeOptions = analytics.byRepairType.map((metric) => ({
     value: metric.repairType,
     label: metric.label,
   }));
-  const filteredCases = analytics.cases.filter((item) => {
+  const filteredCases = casesWithTypes.filter((item) => {
     if (search.zip && item.zipCode !== search.zip) return false;
     if (search.priority && item.priority !== search.priority) return false;
-    if (search.repairType) {
-      const label = repairTypeLabels[search.repairType as keyof typeof repairTypeLabels];
-      if (!label || !item.repairLabels.includes(label)) return false;
-    }
+    if (search.repairType && !item.repairTypes.includes(search.repairType)) return false;
     return true;
   });
   const byRepairType = analytics.byRepairType.map((metric) => {
-    const matchingCases = filteredCases.filter((item) => item.repairLabels.includes(metric.label));
-    const repairNeeds = matchingCases.length;
-    const highPriority = matchingCases.filter(
-      (item) => item.priority === "high" || item.priority === "critical",
-    ).length;
-    const potentiallyCovered = matchingCases.filter(
-      (item) => item.coverageStatus === "potentially_covered",
-    ).length;
-    const verificationNeeded = matchingCases.filter(
-      (item) => item.coverageStatus === "verification_needed",
-    ).length;
-    const unmatched = matchingCases.filter((item) => item.coverageStatus === "funding_gap").length;
+    const matchingCases = filteredCases.filter((item) => item.repairTypes.includes(metric.repairType));
+    const weightedNeeds = (item: (typeof matchingCases)[number]) =>
+      item.repairNeeds / Math.max(item.repairTypes.length, 1);
+    const repairNeeds = matchingCases.reduce((sum, item) => sum + weightedNeeds(item), 0);
+    const highPriority = matchingCases
+      .filter((item) => item.priority === "high" || item.priority === "critical")
+      .reduce((sum, item) => sum + weightedNeeds(item), 0);
+    const potentiallyCovered = matchingCases
+      .filter((item) => item.coverageStatus === "potentially_covered")
+      .reduce((sum, item) => sum + weightedNeeds(item), 0);
+    const verificationNeeded = matchingCases
+      .filter((item) => item.coverageStatus === "verification_needed")
+      .reduce((sum, item) => sum + weightedNeeds(item), 0);
+    const unmatched = matchingCases
+      .filter((item) => item.coverageStatus === "funding_gap")
+      .reduce((sum, item) => sum + weightedNeeds(item), 0);
     const gapRate = repairNeeds === 0 ? 0 : Math.round((unmatched / repairNeeds) * 100);
     return {
       ...metric,
@@ -73,19 +90,11 @@ function Analytics() {
     };
   });
   const totals = {
-    repairNeeds: filteredCases.reduce((sum, item) => sum + item.repairNeeds, 0),
-    highPriorityRepairs: filteredCases
-      .filter((item) => item.priority === "high" || item.priority === "critical")
-      .reduce((sum, item) => sum + item.repairNeeds, 0),
-    verificationNeeded: filteredCases
-      .filter((item) => item.coverageStatus === "verification_needed")
-      .reduce((sum, item) => sum + item.repairNeeds, 0),
-    unmatchedNeeds: filteredCases
-      .filter((item) => item.coverageStatus === "funding_gap")
-      .reduce((sum, item) => sum + item.repairNeeds, 0),
-    potentiallyCoveredRepairs: filteredCases
-      .filter((item) => item.coverageStatus === "potentially_covered")
-      .reduce((sum, item) => sum + item.repairNeeds, 0),
+    repairNeeds: byRepairType.reduce((sum, metric) => sum + metric.repairNeeds, 0),
+    highPriorityRepairs: byRepairType.reduce((sum, metric) => sum + metric.highPriority, 0),
+    verificationNeeded: byRepairType.reduce((sum, metric) => sum + metric.verificationNeeded, 0),
+    unmatchedNeeds: byRepairType.reduce((sum, metric) => sum + metric.unmatched, 0),
+    potentiallyCoveredRepairs: byRepairType.reduce((sum, metric) => sum + metric.potentiallyCovered, 0),
   };
   const potentiallyCoveredPercentage =
     totals.repairNeeds === 0 ? 0 : Math.round((totals.potentiallyCoveredRepairs / totals.repairNeeds) * 100);
@@ -95,10 +104,13 @@ function Analytics() {
   const highPriorityPercentage = Math.round(
     totals.repairNeeds === 0 ? 0 : (totals.highPriorityRepairs / totals.repairNeeds) * 100,
   );
-  const highestDemand = byRepairType.reduce((highest, metric) =>
-    metric.repairNeeds > highest.repairNeeds ? metric : highest,
+  const highestDemand = byRepairType.reduce<(typeof byRepairType)[number] | null>(
+    (highest, metric) =>
+      !highest || metric.repairNeeds > highest.repairNeeds ? metric : highest,
+    null,
   );
-  const largestGap = [...byRepairType].sort((a, b) => b.unmatched - a.unmatched)[0];
+  const largestGap =
+    [...byRepairType].sort((a, b) => b.unmatched - a.unmatched)[0] ?? null;
   const constrainedPrograms = analytics.programCapacity.filter(
     (program) => program.status !== "open",
   ).length;
@@ -172,7 +184,7 @@ function Analytics() {
       <div className="grid grid-cols-2 gap-y-6 border-b border-foreground py-8 sm:grid-cols-4">
         <Metric value={`${potentiallyCoveredPercentage}%`} label="Needs with potential resource" />
         <Metric value={`${highPriorityPercentage}%`} label="High priority" />
-        <Metric value={totals.verificationNeeded} label="Needs verification" />
+        <Metric value={Math.round(totals.verificationNeeded)} label="Needs verification" />
         <Metric value={`${unmatchedPercentage}%`} label="Unmatched" accent />
       </div>
       <section className="py-10">
@@ -183,7 +195,9 @@ function Analytics() {
               key={metric.repairType}
               className="flex h-full min-w-0 flex-1 flex-col justify-end"
             >
-              <span className="mb-2 text-center font-display text-2xl">{metric.repairNeeds}</span>
+              <span className="mb-2 text-center font-display text-2xl">
+                {Math.round(metric.repairNeeds)}
+              </span>
               <div
                 className="bg-primary"
                 style={{ height: `${(metric.repairNeeds / maximumDemand) * 80}%` }}
@@ -197,13 +211,13 @@ function Analytics() {
       </section>
       <section className="grid gap-px bg-border sm:grid-cols-3">
         <Insight title="Highest demand">
-          {highestDemand.label} represents{" "}
-          {Math.round((highestDemand.repairNeeds / Math.max(totals.repairNeeds, 1)) * 100)}% of
-          filtered needs.
+          {highestDemand
+            ? `${highestDemand.label} represents ${Math.round((highestDemand.repairNeeds / Math.max(totals.repairNeeds, 1)) * 100)}% of filtered needs.`
+            : "No demand in this filtered view."}
         </Insight>
         <Insight title="Largest gap">
           {largestGap
-            ? `${largestGap.label} has ${largestGap.unmatched} unmatched needs and a ${largestGap.gapRate}% gap rate.`
+            ? `${largestGap.label} has ${Math.round(largestGap.unmatched)} unmatched needs and a ${largestGap.gapRate}% gap rate.`
             : "No funding gaps are present."}
         </Insight>
         <Insight title="Pipeline risk">

@@ -148,7 +148,7 @@ function Programs() {
       <div className="mt-10 space-y-14">
         {filteredTotal === 0 ? (
           <div className="border border-dashed border-border p-6 text-sm">
-            <p>No programs match this repair type and status.</p>
+            <p>No programs match the current filters.</p>
             <button type="button" className="mt-3 font-bold text-primary" onClick={clearFilters}>
               Clear Filters
             </button>

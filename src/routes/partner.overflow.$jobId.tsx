@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { ArrowLeft, Camera, ClipboardList, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -383,7 +383,9 @@ function formatMoney(value: number) {
   }).format(value / 100);
 }
 
-function OverflowJobError() {
+function OverflowJobError({ error, reset }: { error: Error; reset: () => void }) {
+  const router = useRouter();
+  void error;
   return (
     <div className="py-10">
       <DemoFlag />
@@ -392,7 +394,13 @@ function OverflowJobError() {
         title="Partner data could not be loaded."
         description="Please try loading this overflow job again."
       />
-      <Button className="mt-4 min-h-12 rounded-none bg-primary" onClick={() => window.location.reload()}>
+      <Button
+        className="mt-4 min-h-12 rounded-none bg-primary"
+        onClick={() => {
+          router.invalidate();
+          reset();
+        }}
+      >
         Try Again
       </Button>
     </div>

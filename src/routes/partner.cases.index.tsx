@@ -35,7 +35,16 @@ function Cases() {
   const analytics = Route.useLoaderData();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const zipOptions = [...new Set(analytics.cases.map((item) => item.zipCode))].sort();
+  const repairTypeByLabel = Object.fromEntries(
+    Object.entries(repairTypeLabels).map(([repairType, label]) => [label.toLowerCase(), repairType]),
+  );
+  const casesWithTypes = analytics.cases.map((item) => ({
+    ...item,
+    repairTypes: [...new Set(item.repairLabels
+      .map((label) => repairTypeByLabel[label.toLowerCase()])
+      .filter((repairType): repairType is string => Boolean(repairType)))],
+  }));
+  const zipOptions = [...new Set(casesWithTypes.map((item) => item.zipCode))].sort();
   const repairTypeOptions = analytics.byRepairType.map((metric) => ({
     value: metric.repairType,
     label: metric.label,
@@ -45,7 +54,7 @@ function Cases() {
     value,
     label,
   }));
-  const filteredCases = analytics.cases.filter((item) => {
+  const filteredCases = casesWithTypes.filter((item) => {
     if (search.q) {
       const query = search.q.toLowerCase();
       const matchesQuery =
@@ -58,10 +67,7 @@ function Cases() {
     if (search.zip && item.zipCode !== search.zip) return false;
     if (search.priority && item.priority !== search.priority) return false;
     if (search.coverage && item.coverageStatus !== search.coverage) return false;
-    if (search.repairType) {
-      const label = repairTypeLabels[search.repairType as keyof typeof repairTypeLabels];
-      if (!label || !item.repairLabels.includes(label)) return false;
-    }
+    if (search.repairType && !item.repairTypes.includes(search.repairType)) return false;
     return true;
   });
   const updateSearch = (next: Record<string, string | undefined>) => {

@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, FileWarning, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,16 @@ export const Route = createFileRoute("/partner/cases/$caseId")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  loader: ({ params }) => getPartnerCase(params.caseId),
+  loader: async ({ params }) => {
+    try {
+      return await getPartnerCase(params.caseId);
+    } catch (error) {
+      const baseError = error instanceof Error ? error : new Error("Case load failed");
+      const statusMatch = /returned (\d{3})/.exec(baseError.message);
+      const status = statusMatch ? Number(statusMatch[1]) : undefined;
+      throw Object.assign(baseError, { status });
+    }
+  },
   pendingComponent: PartnerRouteLoading,
   errorComponent: CaseLoadError,
   component: CaseDetail,
@@ -247,16 +256,34 @@ function CaseDetail() {
   );
 }
 
-function CaseLoadError() {
+function CaseLoadError({
+  error,
+  reset,
+}: {
+  error: Error & { status?: number };
+  reset: () => void;
+}) {
+  const router = useRouter();
+  const missingCase = error.status === 404;
   return (
     <div className="py-16">
       <DemoFlag />
       <PageIntro
         eyebrow="Case unavailable"
-        title="Partner data could not be loaded."
-        description="Try loading this case again, or return to repair cases."
+        title={missingCase ? "Synthetic case not found" : "Partner data could not be loaded."}
+        description={
+          missingCase
+            ? "This case is not part of the current deterministic demonstration dataset."
+            : "Try loading this case again, or return to repair cases."
+        }
       />
-      <Button className="mt-6 min-h-12 rounded-none bg-primary" onClick={() => window.location.reload()}>
+      <Button
+        className="mt-6 min-h-12 rounded-none bg-primary"
+        onClick={() => {
+          router.invalidate();
+          reset();
+        }}
+      >
         Try Again
       </Button>
       <Button asChild variant="outline" className="mt-3 rounded-none">
