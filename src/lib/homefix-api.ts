@@ -21,6 +21,7 @@ import { clearDemoSession, getStoredDemoSession, type DemoSession } from "./demo
 import {
   clearContractorSession,
   getStoredContractorSession,
+  storeContractorSession,
   type ContractorSession,
 } from "./contractor-session";
 
@@ -28,6 +29,26 @@ export type { PartnerAnalytics, PartnerCaseDetail };
 export { HomeFixApiError };
 
 export type PartnerDataSource = "live" | "demo" | "combined";
+
+export type ContractorProfile = {
+  id: string;
+  displayName: string;
+  contactName: string | null;
+  phone: string | null;
+  email: string | null;
+  performsInspections: boolean;
+  performsRepairs: boolean;
+  supervisesTraining: boolean;
+  repairSpecialties: string[];
+  serviceZipCodes: string[];
+  licenseNumber: string | null;
+  licenseExpiresOn: string | null;
+  insuranceProvider: string | null;
+  insuranceExpiresOn: string | null;
+  profileComplete: boolean;
+};
+
+export type ContractorProfileInput = Omit<ContractorProfile, "id" | "profileComplete">;
 
 export type CaseDocument = {
   id: string;
@@ -563,17 +584,49 @@ export async function signInContractor(
   return response.json() as Promise<ContractorSession>;
 }
 
-export async function validateContractorAccess(): Promise<ContractorSession> {
+export async function validateContractorAccess(): Promise<ContractorProfile> {
   if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
   try {
     const response = await partnerFetch(`${apiUrl}/api/v1/contractor-access`);
     if (!response.ok) throw await homeFixApiError(response);
-    return response.json() as Promise<ContractorSession>;
+    return response.json() as Promise<ContractorProfile>;
   } catch (error) {
     const session = getStoredContractorSession();
-    if (session && isApiUnavailable(error)) return session;
+    if (session && isApiUnavailable(error)) {
+      return {
+        id: session.token,
+        displayName: session.displayName,
+        contactName: null,
+        phone: null,
+        email: null,
+        performsInspections: false,
+        performsRepairs: false,
+        supervisesTraining: false,
+        repairSpecialties: [],
+        serviceZipCodes: [],
+        licenseNumber: null,
+        licenseExpiresOn: null,
+        insuranceProvider: null,
+        insuranceExpiresOn: null,
+        profileComplete: false,
+      };
+    }
     throw error;
   }
+}
+
+export async function updateContractorProfile(input: ContractorProfileInput) {
+  if (!apiUrl) throw new Error("VITE_HOMEFIX_API_URL is not configured");
+  const response = await partnerFetch(`${apiUrl}/api/v1/contractor-access/profile`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw await homeFixApiError(response);
+  const profile = (await response.json()) as ContractorProfile;
+  const session = getStoredContractorSession();
+  if (session) storeContractorSession({ ...session, displayName: profile.displayName });
+  return profile;
 }
 
 export async function getPublicOpportunities(

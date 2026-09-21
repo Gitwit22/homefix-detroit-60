@@ -46,6 +46,18 @@ export const contractorAccessAccounts = pgTable("contractor_access_accounts", {
   displayName: text("display_name").notNull(),
   normalizedName: text("normalized_name").unique().notNull(),
   pinHash: text("pin_hash").notNull(),
+  contactName: text("contact_name"),
+  phone: text("phone"),
+  email: text("email"),
+  performsInspections: boolean("performs_inspections").default(false).notNull(),
+  performsRepairs: boolean("performs_repairs").default(false).notNull(),
+  supervisesTraining: boolean("supervises_training").default(false).notNull(),
+  repairSpecialties: jsonb("repair_specialties").$type<string[]>().default([]).notNull(),
+  serviceZipCodes: jsonb("service_zip_codes").$type<string[]>().default([]).notNull(),
+  licenseNumber: text("license_number"),
+  licenseExpiresOn: text("license_expires_on"),
+  insuranceProvider: text("insurance_provider"),
+  insuranceExpiresOn: text("insurance_expires_on"),
   contractorComplianceConfirmed: boolean("contractor_compliance_confirmed")
     .default(false)
     .notNull(),

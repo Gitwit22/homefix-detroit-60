@@ -27,6 +27,7 @@ import {
   rescheduleInspectionAppointment,
   reviewCaseDocument,
   saveInspectionFindings,
+  type ContractorProfile,
   type PartnerCaseDetail,
 } from "@/lib/homefix-api";
 import { toRepairCategoryLabel } from "@/lib/repair-categories";
@@ -79,6 +80,7 @@ export const Route = createFileRoute("/partner/cases/$caseId")({
 
 function CaseDetail() {
   const item = Route.useLoaderData();
+  const { contractorProfile } = Route.useRouteContext();
   const router = useRouter();
   const [createdJob, setCreatedJob] = useState(item.overflow?.existingWorkOrder ?? null);
   const [isCreatingJob, setIsCreatingJob] = useState(false);
@@ -226,6 +228,7 @@ function CaseDetail() {
             <InspectionWorkspace
               caseId={item.caseId}
               inspectionPackage={item.inspectionPackage ?? null}
+              contractorProfile={contractorProfile}
               onUpdated={() => router.invalidate()}
             />
           </section>
@@ -451,17 +454,23 @@ function DocumentReviewWorkspace({
 function InspectionWorkspace({
   caseId,
   inspectionPackage,
+  contractorProfile,
   onUpdated,
 }: {
   caseId: string;
   inspectionPackage: InspectionPackage | null;
+  contractorProfile: ContractorProfile;
   onUpdated: () => Promise<void>;
 }) {
   const [organizationName, setOrganizationName] = useState(
-    inspectionPackage?.providerOrganizationName ?? "",
+    inspectionPackage?.providerOrganizationName ?? contractorProfile.displayName,
   );
-  const [workerName, setWorkerName] = useState(inspectionPackage?.assignedWorkerName ?? "");
-  const [workerPhone, setWorkerPhone] = useState(inspectionPackage?.assignedWorkerPhone ?? "");
+  const [workerName, setWorkerName] = useState(
+    inspectionPackage?.assignedWorkerName ?? contractorProfile.contactName ?? "",
+  );
+  const [workerPhone, setWorkerPhone] = useState(
+    inspectionPackage?.assignedWorkerPhone ?? contractorProfile.phone ?? "",
+  );
   const [selectedStart, setSelectedStart] = useState(
     inspectionPackage?.confirmedStart ?? inspectionPackage?.availabilityWindows[0]?.start ?? "",
   );

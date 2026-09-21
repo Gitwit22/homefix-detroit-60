@@ -169,6 +169,13 @@
       "when": 1789944130341,
       "tag": "0023_sparkling_domino",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1789948480625,
+      "tag": "0024_mighty_enchantress",
+      "breakpoints": true
     }
   ]
 }

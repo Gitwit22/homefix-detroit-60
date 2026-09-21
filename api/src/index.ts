@@ -1,8 +1,11 @@
-import "dotenv/config";
+import { config } from "dotenv";
 
 import { rm } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import formidable from "formidable";
+
+config({ path: ".env.local" });
+config();
 
 import { intakeSchema, createIntakeCase } from "../../server/services/intake.js";
 import {
@@ -16,11 +19,13 @@ import {
 } from "../../server/services/demoSession.js";
 import {
   ContractorAccessError,
+  contractorProfileSchema,
   contractorRegistrationSchema,
   contractorSignInSchema,
   getContractorAccess,
   registerContractor,
   signInContractor,
+  updateContractorProfile,
 } from "../../server/services/contractorAccess.js";
 import { getCaseAggregate } from "../../server/services/case.js";
 import {
@@ -405,6 +410,7 @@ async function requireContractorAccess(request: IncomingMessage) {
 export function isPartnerProtectedRequest(pathname: string, method: string) {
   if (
     pathname.startsWith("/api/v1/partner-demo-control") ||
+    pathname === "/api/v1/contractor-access/profile" ||
     pathname === "/api/v1/partner-analytics" ||
     pathname === "/api/v1/partner-inspections" ||
     pathname.startsWith("/api/v1/partner-cases/") ||
@@ -417,7 +423,9 @@ export function isPartnerProtectedRequest(pathname: string, method: string) {
 
   return (
     method === "POST" &&
-    /^\/api\/v1\/cases\/[0-9a-f-]+\/inspection\/(confirm|reschedule|findings)$/i.test(pathname)
+    /^\/api\/v1\/cases\/[0-9a-f-]+\/inspection\/(assign|confirm|reschedule|findings)$/i.test(
+      pathname,
+    )
   );
 }
 
@@ -563,6 +571,30 @@ const server = createServer(async (request, response) => {
       });
       return;
     }
+  }
+
+  if (method === "PATCH" && requestUrl.pathname === "/api/v1/contractor-access/profile") {
+    try {
+      const input = contractorProfileSchema.parse(await readJson(request));
+      sendJson(response, 200, await updateContractorProfile(contractorAccess!.id, input));
+    } catch (error) {
+      const status =
+        error instanceof ContractorAccessError && error.code === "ACCOUNT_EXISTS"
+          ? 409
+          : error instanceof Error && error.name === "ZodError"
+            ? 400
+            : 500;
+      if (status === 500) console.error(error);
+      sendJson(response, status, {
+        error:
+          status === 409
+            ? "An account already exists for that business or contractor name."
+            : status === 400
+              ? "Review the contractor profile fields and select at least one capability."
+              : "The contractor profile could not be updated. Please try again.",
+      });
+    }
+    return;
   }
 
   const residentResource = residentResourceForRequest(requestUrl.pathname, method);

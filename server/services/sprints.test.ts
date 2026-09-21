@@ -12,8 +12,10 @@ const { triageRepairCategories, triageUrgencies } = await import("../domain/repa
 const { demoSessionSchema } = await import("./demoSession.js");
 const {
   contractorRegistrationSchema,
+  contractorProfileSchema,
   contractorSignInSchema,
   hashContractorPin,
+  presentContractorProfile,
   verifyContractorPin,
 } = await import("./contractorAccess.js");
 const { evaluateProgramRules } = await import("./eligibility.js");
@@ -437,6 +439,83 @@ test("contractor PIN hashes verify without storing the original code", async () 
   assert.equal(await verifyContractorPin("3130", hash), true);
   assert.equal(await verifyContractorPin("9999", hash), false);
   assert.equal(await verifyContractorPin("3130", "invalid"), false);
+});
+
+test("contractor profiles normalize capabilities, specialties, and service ZIP codes", () => {
+  const profile = contractorProfileSchema.parse({
+    displayName: "Reed Residential Services",
+    contactName: "Lisa Walker",
+    phone: "313-555-0194",
+    email: "lisa@example.com",
+    performsInspections: true,
+    performsRepairs: true,
+    supervisesTraining: false,
+    repairSpecialties: ["electrical", "electrical", "plumbing"],
+    serviceZipCodes: ["48201", "48201", "48202"],
+    licenseNumber: "",
+    licenseExpiresOn: "",
+    insuranceProvider: "Detroit Mutual",
+    insuranceExpiresOn: "2027-09-20",
+  });
+
+  assert.deepEqual(profile.repairSpecialties, ["electrical", "plumbing"]);
+  assert.deepEqual(profile.serviceZipCodes, ["48201", "48202"]);
+  assert.equal(profile.licenseNumber, null);
+});
+
+test("contractor profiles require valid contact details and a capability", () => {
+  const base = {
+    displayName: "Reed Residential Services",
+    contactName: "Lisa Walker",
+    phone: "313-555-0194",
+    email: "lisa@example.com",
+    performsInspections: false,
+    performsRepairs: false,
+    supervisesTraining: false,
+    repairSpecialties: [],
+    serviceZipCodes: [],
+    licenseNumber: "",
+    licenseExpiresOn: "",
+    insuranceProvider: "",
+    insuranceExpiresOn: "",
+  };
+
+  assert.equal(contractorProfileSchema.safeParse(base).success, false);
+  assert.equal(
+    contractorProfileSchema.safeParse({ ...base, performsInspections: true, email: "bad" }).success,
+    false,
+  );
+  assert.equal(
+    contractorProfileSchema.safeParse({
+      ...base,
+      performsInspections: true,
+      serviceZipCodes: ["4820"],
+    }).success,
+    false,
+  );
+});
+
+test("contractor profile completion is computed without exposing credentials", () => {
+  const profile = presentContractorProfile({
+    id: "account-1",
+    displayName: "Reed Residential Services",
+    contactName: "Lisa Walker",
+    phone: "313-555-0194",
+    email: "lisa@example.com",
+    performsInspections: true,
+    performsRepairs: false,
+    supervisesTraining: false,
+    repairSpecialties: [],
+    serviceZipCodes: [],
+    licenseNumber: null,
+    licenseExpiresOn: null,
+    insuranceProvider: null,
+    insuranceExpiresOn: null,
+  });
+
+  assert.equal(profile.profileComplete, true);
+  assert.equal("pinHash" in profile, false);
+  assert.equal(presentContractorProfile({ ...profile, contactName: null }).profileComplete, false);
 });
 
 test("managed program catalog has stable unique records and complete matching data", () => {
