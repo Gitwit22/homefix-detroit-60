@@ -201,7 +201,7 @@
     @apply size-16 shrink-0 object-contain;
   }
   .header-actions {
-    @apply flex items-center gap-2;
+    @apply col-end-[-1] flex items-center justify-self-end gap-2;
   }
   .easy-read-toggle {
     @apply inline-flex min-h-11 items-center gap-1.5 border border-foreground/30 bg-paper px-3 py-2 text-sm font-bold text-foreground;
